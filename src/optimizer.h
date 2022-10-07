@@ -1,7 +1,7 @@
 /**
-* Copyright (c) 2022 Darius Rückert
-* Licensed under the MIT License.
-* See LICENSE file for more information.
+ * Copyright (c) 2022 Darius Rückert
+ * Licensed under the MIT License.
+ * See LICENSE file for more information.
  */
 
 #pragma once
@@ -13,9 +13,9 @@
 namespace tinytorch
 {
 
-struct RMSPropOptimizer
+struct SGDOptimizer
 {
-    RMSPropOptimizer(std::vector<Tensor> t, float lr) : params(t), lr(lr)
+    SGDOptimizer(std::vector<Tensor> t, float lr) : params(t), lr(lr)
     {
         velocities.resize(t.size());
         for (int i = 0; i < t.size(); ++i)
@@ -41,10 +41,19 @@ struct RMSPropOptimizer
                 auto g  = param.grad()[i];
                 auto& v = velocity[i];
 
-                v = momentum * v + (1 - momentum) * g * g;
-                w = w - lr * g / (sqrtf(v) + epsilon);
+                // sgd with nesterov momentum
+                float b;
+                if (step > 0)
+                {
+                    b = momentum * b + (1 - 0.1) * g;
+
+                    g = g + momentum * b;
+                }
+
+                w = w - lr * g;
             }
         }
+        step++;
     }
 
     void ZeroGrad()
@@ -55,6 +64,7 @@ struct RMSPropOptimizer
         }
     }
 
+    int step      = 0;
     float epsilon = 1e-6;
     float lr;
     float momentum = 0.9;
