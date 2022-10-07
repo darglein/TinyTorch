@@ -22,8 +22,10 @@ void backward(Tensor loss)
     auto root_node = loss.getEdge()->function;
     node_stack.push_back(root_node);
 
-    // The gradient of the root is the loss
-    grad_map[root_node] = {loss};
+    // The gradient of the final loss is 1
+    Tensor one(1);
+    one[0] = 1;
+    grad_map[root_node] = {one};
 
     while (!node_stack.empty())
     {

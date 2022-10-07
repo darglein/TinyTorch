@@ -30,7 +30,7 @@ int main()
         return x;
     };
 
-    tinytorch::RMSPropOptimizer optim(params, 0.1);
+    tinytorch::RMSPropOptimizer optim(params, 0.01);
     for (int i = 0; i < 100; ++i)
     {
         optim.ZeroGrad();

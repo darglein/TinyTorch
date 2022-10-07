@@ -10,8 +10,6 @@
 
 #include <map>
 
-#define GRAPH_STEP -1
-
 namespace tinytorch
 {
 
