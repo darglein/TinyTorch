@@ -94,3 +94,18 @@ Step 13 Loss: [Tensor s=1]: 1.26026e-05
 ...
 ```
 
+## Building TinyTorch
+
+```shell
+cd TinyTorch
+mkdir build && cd build
+cmake ..
+make
+```
+
+## Running the Sample
+
+```shell
+cd TinyTorch
+./build/bin/tt_sample
+```

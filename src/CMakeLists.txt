@@ -1,5 +1,5 @@
 
-set(APP_NAME tiny-torch)
+set(APP_NAME tt_sample)
 
 
 add_executable(${APP_NAME} "")
