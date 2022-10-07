@@ -74,44 +74,5 @@ struct Tensor
     std::shared_ptr<TensorImpl> impl_;
 };
 
-// ================================================================================
-// Tensor Create operators
-
-inline Tensor zero(int size)
-{
-    Tensor t(size);
-    for (int i = 0; i < t.size(); ++i)
-    {
-        t[i] = 0;
-    }
-    return t;
-}
-
-
-inline Tensor rand(int size)
-{
-    Tensor t(size);
-
-
-    static std::mt19937 mersenne_engine{572547235};
-    std::uniform_real_distribution<float> dist{0.f, 1.f};
-
-    for (int i = 0; i < t.size(); ++i)
-    {
-        t[i] = dist(mersenne_engine);
-    }
-
-    return t;
-}
-
-inline std::ostream& operator<<(std::ostream& strm, Tensor t)
-{
-    strm << "[Tensor s=" << t.size() << "]: ";
-    for (int i = 0; i < t.size(); ++i)
-    {
-        strm << std::setw(10) << t[i] << " ";
-    }
-    return strm;
-}
 
 }  // namespace tinytorch

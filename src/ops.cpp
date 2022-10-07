@@ -8,7 +8,6 @@
 
 #include "graph.h"
 
-#include "tensor_ops_impl.h"
 
 namespace tinytorch
 {
