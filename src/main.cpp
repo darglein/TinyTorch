@@ -30,8 +30,11 @@ int main()
         return x;
     };
 
+    // Create a simple optimizer
     tinytorch::SGDOptimizer optim(params, 0.1);
-    for (int i = 0; i < 100; ++i)
+
+    // Optimize the model for 50 iterations
+    for (int i = 0; i < 50; ++i)
     {
         optim.ZeroGrad();
 
