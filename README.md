@@ -4,27 +4,27 @@ A Minimalistic Auto-Diff Optimization Framework for Teaching and Understanding P
 
 ### This Project is for
 
-:heavy_check_mark: Teaching Auto-Diff and Backpropagation
+:heavy_check_mark: Teaching auto-diff and backpropagation
 
-:heavy_check_mark: Introducing or Learning libTorch/Pytorch
+:heavy_check_mark: Introducing or learning libTorch/Pytorch
 
-:heavy_check_mark: Showing that Auto-Diff Optimization is not Magic
+:heavy_check_mark: Showing that auto-diff optimization is not magic
 
 
 ### This Project is NOT for
 
-:heavy_multiplication_x: Fitting Models to your own Data
+:heavy_multiplication_x: Fitting models to your own data
 
-:heavy_multiplication_x: Replacing Pytorch or any other Optimization Framework
+:heavy_multiplication_x: Replacing Pytorch or any other optimization framework
 
 
 # Features of TinyTorch
 
-* Forward and Backward Implementations of basic Operations (+, -, *, sum, square)
-* Automatic Graph Generation during forward
+* Forward and backward implementations of basic operations (+, -, *, sum, square)
+* Automatic graph generation during forward
 * Backpropagation through the generated graph
 * Almost the same syntax as libTorch
-
+* No dependencies except the std-library
 
 ## Example Code
 
