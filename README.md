@@ -70,6 +70,24 @@ int main()
     }
     return 0;
 }
+```
 
+Example Output:
+```
+Step 0 Loss: [Tensor s=1]:    5.73343 
+Step 1 Loss: [Tensor s=1]:    2.18133 
+Step 2 Loss: [Tensor s=1]:    1.17362 
+Step 3 Loss: [Tensor s=1]:   0.321065 
+Step 4 Loss: [Tensor s=1]:  0.0889282 
+Step 5 Loss: [Tensor s=1]:  0.0313245 
+Step 6 Loss: [Tensor s=1]:  0.0113702 
+Step 7 Loss: [Tensor s=1]:  0.0036413 
+Step 8 Loss: [Tensor s=1]: 0.00149557 
+Step 9 Loss: [Tensor s=1]: 0.000541403 
+Step 10 Loss: [Tensor s=1]: 0.000217643 
+Step 11 Loss: [Tensor s=1]: 8.67411e-05 
+Step 12 Loss: [Tensor s=1]: 3.2838e-05 
+Step 13 Loss: [Tensor s=1]: 1.26026e-05 
+...
 ```
 
