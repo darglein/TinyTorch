@@ -6,9 +6,6 @@ add_executable(${APP_NAME} "")
 target_include_directories(${APP_NAME} PUBLIC ".")
 
 
-
-
-#message(FATAL_ERROR ${CMAKE_CUDA_FLAGS})
 #############  source #############
 
 FILE(GLOB_RECURSE ALL_SRC  *.cpp)
