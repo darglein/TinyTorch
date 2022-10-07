@@ -1,0 +1,25 @@
+
+set(APP_NAME tiny-torch)
+
+
+add_executable(${APP_NAME} "")
+target_include_directories(${APP_NAME} PUBLIC ".")
+
+
+
+
+#message(FATAL_ERROR ${CMAKE_CUDA_FLAGS})
+#############  source #############
+
+FILE(GLOB_RECURSE ALL_SRC  *.cpp)
+FILE(GLOB_RECURSE ALL_HEADER  *.h)
+
+target_sources(${APP_NAME} PRIVATE ${ALL_SRC} PUBLIC ${ALL_HEADER})
+
+
+#############  output dir ############# 
+
+set_target_properties( ${APP_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set_property(TARGET ${APP_NAME} PROPERTY CXX_STANDARD 17)
+
+
