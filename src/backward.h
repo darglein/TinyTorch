@@ -48,7 +48,7 @@ void backward(Tensor loss)
                 auto next_node = next->function;
 
                 // Accumulate gradient
-                grad_map[next_node].resize(next_node->num_inputs);
+                grad_map[next_node].resize(next_node->num_input_gradients_of_backward);
                 grad_map[next_node][next->input_nr].AddInplace(next_gradients[next->input_nr]);
 
                 // Add next node to the stack

@@ -1,7 +1,7 @@
 /**
-* Copyright (c) 2022 Darius Rückert
-* Licensed under the MIT License.
-* See LICENSE file for more information.
+ * Copyright (c) 2022 Darius Rückert
+ * Licensed under the MIT License.
+ * See LICENSE file for more information.
  */
 
 #pragma once
@@ -55,7 +55,7 @@ struct Node
     // Variables that are required for the backward pass
     Context context;
 
-    int num_inputs;
+    int num_input_gradients_of_backward;
 };
 
 
@@ -67,6 +67,8 @@ struct FunctionNode : public Node
 
     std::vector<Tensor> backward(std::vector<Tensor> fwd_output_grad) override
     {
+        assert(fwd_output_grad.size() == num_input_gradients_of_backward);
+        
         // backward
         auto grad_list = T::backward(context, fwd_output_grad);
         return grad_list;
@@ -80,11 +82,10 @@ struct FunctionNode : public Node
         {
             node->next.push_back(t[i].getEdge());
         }
-        node->num_inputs = t.size();
-
 
         // Forward
         auto result = T::forward(node->context, t);
+        node->num_input_gradients_of_backward = result.size();
 
         // Set the edges of the output to point to this node
         for (int i = 0; i < result.size(); ++i)
@@ -99,7 +100,7 @@ struct FunctionNode : public Node
 
 struct AccumulateGrad : public Node
 {
-    AccumulateGrad(Tensor t) : t(t) { num_inputs = 1; }
+    AccumulateGrad(Tensor t) : t(t) { num_input_gradients_of_backward = 1; }
 
     std::vector<Tensor> backward(std::vector<Tensor> input_grad) override
     {
