@@ -13,6 +13,8 @@
 namespace tinytorch
 {
 
+
+// implemented after https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
 struct SGDOptimizer
 {
     SGDOptimizer(std::vector<Tensor> t, float lr) : params(t), lr(lr)
@@ -38,16 +40,29 @@ struct SGDOptimizer
             {
                 auto& w = param[i];
                 assert(param.grad().size() == param.size());
+
                 auto g  = param.grad()[i];
-                auto& v = velocity[i];
+                auto& b = velocity[i];
 
-                // sgd with nesterov momentum
-                float b;
-                if (step > 0)
+                if (momentum != 0)
                 {
-                    b = momentum * b + (1 - 0.1) * g;
+                    if (step > 0)
+                    {
+                        b = momentum * b + (1 - dampening) * g;
+                    }
+                    else
+                    {
+                        b = g;
+                    }
 
-                    g = g + momentum * b;
+                    if (nesterov)
+                    {
+                        g = g + momentum * b;
+                    }
+                    else
+                    {
+                        g = b;
+                    }
                 }
 
                 w = w - lr * g;
@@ -64,10 +79,11 @@ struct SGDOptimizer
         }
     }
 
-    int step      = 0;
-    float epsilon = 1e-6;
+    bool nesterov   = true;
+    float dampening = 0.1;
+    int step        = 0;
     float lr;
-    float momentum = 0.9;
+    float momentum = 0.5;
     std::vector<Tensor> params;
     std::vector<Tensor> velocities;
 };
