@@ -5,8 +5,26 @@
  */
 #include "tensor_data.h"
 
-tinytorch::TensorData::TensorData(std::vector<int64_t> sizes, ScalarType type) : _sizes(sizes), _type(type)
+
+tinytorch::StorageImpl::StorageImpl(int64_t size, tinytorch::DeviceType device) : size_(size), device_(device)
 {
-    auto size_per_element = 4;
-    // data = malloc(size_per_element * numel());
+    if (device_ == kCPU)
+    {
+        data_ptr_ = malloc(size);
+    }
+    else
+    {
+        assert(false);
+    }
+}
+tinytorch::StorageImpl::~StorageImpl()
+{
+    if (device_ == kCPU)
+    {
+        free(data_ptr_);
+    }
+    else
+    {
+        assert(false);
+    }
 }

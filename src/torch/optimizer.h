@@ -6,13 +6,51 @@
 
 #pragma once
 
-#include "tiny_torch_config.h"
 #include "tensor.h"
 
+#include "tensor_info.h"
+#include "tiny_torch_config.h"
 
 namespace tinytorch
 {
 
+
+template <typename T>
+void sgd_step(TensorInfo<T> param, TensorInfo<T> param_grad, TensorInfo<T> velocity, float momentum, float dampening,
+              int step, bool nesterov, float lr)
+{
+    for (int i = 0; i < param.numel(); ++i)
+    {
+        auto& w = param[i];
+        // assert(param.grad().size() == param.size());
+
+        auto g  = param_grad[i];
+        auto& b = velocity[i];
+
+        if (momentum != 0)
+        {
+            if (step > 0)
+            {
+                b = momentum * b + (1 - dampening) * g;
+            }
+            else
+            {
+                b = g;
+            }
+
+            if (nesterov)
+            {
+                g = g + momentum * b;
+            }
+            else
+            {
+                g = b;
+            }
+        }
+
+        w = w - lr * g;
+    }
+}
 
 // implemented after https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
 struct SGDOptimizer
@@ -22,7 +60,7 @@ struct SGDOptimizer
         velocities.resize(t.size());
         for (int i = 0; i < t.size(); ++i)
         {
-            velocities[i] = zero(t[i].size());
+            velocities[i] = zeros_like(t[i]);
         }
     }
 
@@ -32,41 +70,11 @@ struct SGDOptimizer
         {
             auto& param    = params[p];
             auto& velocity = velocities[p];
-            if (param.grad().size() == 0)
+            if (param.numel() == 0)
             {
                 continue;
             }
-            for (int i = 0; i < param.size(); ++i)
-            {
-                auto& w = param[i];
-                assert(param.grad().size() == param.size());
-
-                auto g  = param.mutable_grad()[i];
-                auto& b = velocity[i];
-
-                if (momentum != 0)
-                {
-                    if (step > 0)
-                    {
-                        b = momentum * b + (1 - dampening) * g;
-                    }
-                    else
-                    {
-                        b = g;
-                    }
-
-                    if (nesterov)
-                    {
-                        g = g + momentum * b;
-                    }
-                    else
-                    {
-                        g = b;
-                    }
-                }
-
-                w = w - lr * g;
-            }
+            sgd_step<float>(param, param.mutable_grad(), velocity, momentum, dampening, step, nesterov, lr);
         }
         step++;
     }
@@ -75,7 +83,7 @@ struct SGDOptimizer
     {
         for (auto& p : params)
         {
-            p.ClearGrad();
+            p.mutable_grad().zero_();
         }
     }
 

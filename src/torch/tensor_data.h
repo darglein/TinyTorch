@@ -21,33 +21,34 @@
 namespace tinytorch
 {
 
+enum DeviceType
+{
+    kCPU,
+    kCUDA
+};
 
 enum ScalarType
 {
     kFloat,
 };
 
-struct TensorStorage
+struct StorageImpl
 {
+    StorageImpl(int64_t size, DeviceType device);
 
-};
+    StorageImpl& operator=(StorageImpl&& other) = default;
+    StorageImpl& operator=(const StorageImpl&)  = delete;
+    StorageImpl()                               = delete;
+    StorageImpl(StorageImpl&& other)            = default;
+    StorageImpl(const StorageImpl&)             = delete;
+    ~StorageImpl();
 
-struct TensorData
-{
-    TensorData(std::vector<int64_t> sizes, ScalarType type);
+    uint8_t* byte_ptr() { return (uint8_t*)data_ptr_; }
 
-    int64_t numel()
-    {
-        int64_t res = 1;
-        for (auto v : _sizes) res *= v;
-        return res;
-    }
-
-    int64_t storage_offset_ = 0;
-    std::shared_ptr<TensorStorage> data;
-    std::vector<int64_t> _sizes;
-    std::vector<int64_t> _strides;
-    ScalarType _type;
+   protected:
+    DeviceType device_;
+    void* data_ptr_ = nullptr;
+    int64_t size_;
 };
 
 

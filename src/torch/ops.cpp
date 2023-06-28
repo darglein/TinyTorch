@@ -80,15 +80,15 @@ struct SumNode : public FunctionNode<SumNode>
 {
     static std::vector<Tensor> forward(Context& ctx, std::vector<Tensor> t)
     {
-        ctx.data_int["size"] = t[0].size();
-        auto result          = sum_impl(t[0]);
+        ctx.data_sizes["sizes"] = t[0].sizes();
+        auto result             = sum_impl(t[0]);
         return {result};
     }
 
     static std::vector<Tensor> backward(Context& ctx, std::vector<Tensor> grad)
     {
         assert(grad.size() == 1);
-        auto grad_a = sum_backward_impl(ctx.data_int["size"], grad[0]);
+        auto grad_a = sum_backward_impl(ctx.data_sizes["sizes"], grad[0]);
         return grad_a;
     }
 };

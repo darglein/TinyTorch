@@ -1,22 +1,22 @@
 /**
-* Copyright (c) 2022 Darius Rückert
-* Licensed under the MIT License.
-* See LICENSE file for more information.
-*/
+ * Copyright (c) 2022 Darius Rückert
+ * Licensed under the MIT License.
+ * See LICENSE file for more information.
+ */
 
 #include "torch/torch.h"
 
 int main()
 {
     // The data tensors
-    tinytorch::Tensor observation = tinytorch::rand(10);
-    tinytorch::Tensor target      = tinytorch::rand(10);
+    tinytorch::Tensor observation = tinytorch::rand({3, 5});
+    tinytorch::Tensor target      = tinytorch::rand({3, 5});
 
     // The parameters of the model
     std::vector<tinytorch::Tensor> params;
     for (int i = 0; i < 4; ++i)
     {
-        params.push_back(tinytorch::rand(10));
+        params.push_back(tinytorch::rand({3, 5}));
         MakeParameter(params.back());
     }
 

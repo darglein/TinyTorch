@@ -6,6 +6,7 @@
 
 #pragma once
 #include "tensor.h"
+#include "ops.h"
 
 #include <map>
 
@@ -35,6 +36,8 @@ struct Context
 {
     std::map<std::string, Tensor> data;
     std::map<std::string, int> data_int;
+    //TODO: besser
+    std::map<std::string, std::vector<int64_t>> data_sizes;
 };
 
 struct Node
@@ -116,7 +119,8 @@ struct AccumulateGrad : public Node
     std::vector<Tensor> backward(std::vector<Tensor> input_grad) override
     {
         assert(input_grad.size() == 1);
-        t.AddGradInplace(input_grad[0]);
+        // t.AddGradInplace(input_grad[0]);
+        t.mutable_grad() += input_grad[0];
         return {};
     }
 
