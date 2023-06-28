@@ -27,6 +27,11 @@ enum ScalarType
     kFloat,
 };
 
+struct TensorStorage
+{
+
+};
+
 struct TensorData
 {
     TensorData(std::vector<int64_t> sizes, ScalarType type);
@@ -38,7 +43,8 @@ struct TensorData
         return res;
     }
 
-    void* data = nullptr;
+    int64_t storage_offset_ = 0;
+    std::shared_ptr<TensorStorage> data;
     std::vector<int64_t> _sizes;
     std::vector<int64_t> _strides;
     ScalarType _type;

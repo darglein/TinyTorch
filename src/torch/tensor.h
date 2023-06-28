@@ -22,57 +22,82 @@ namespace tinytorch
 {
 
 struct Edge;
+struct Tensor;
+struct TensorImpl;
+
+
+struct TINYTORCH_API Tensor
+{
+    Tensor(int size = 0);
+    Tensor(std::vector<float> data);
+    int size() const;
+    float& operator[](int idx);
+    void resize(int new_size);
+
+
+    void ClearGrad();
+    const Tensor& grad();
+    Tensor& mutable_grad();
+
+    void AddGradInplace(Tensor g);
+    void AddInplace(Tensor g);
+    std::shared_ptr<Edge> getEdge();
+    void SetEdge(std::shared_ptr<Edge> edge);
+
+
+    void set_requires_grad(bool requires_grad);
+    bool requires_grad();
+
+   private:
+    std::shared_ptr<TensorImpl> impl_;
+};
+
+
+struct AutogradMeta
+{
+    Tensor _grad;
+    std::shared_ptr<Edge> edge;
+    bool _requires_grad = false;
+
+    Tensor& mutable_grad() { return _grad; }
+    const Tensor& grad() const { return _grad; }
+};
 
 struct TensorImpl
 {
     TensorImpl(int size) : data(size) {}
     TensorImpl(std::vector<float> data) : data(data) {}
 
+
+    void set_requires_grad(bool requires_grad)
+    {
+        if (requires_grad)
+        {
+            autograd_meta = std::make_unique<AutogradMeta>();
+        }
+        else
+        {
+            autograd_meta = nullptr;
+        }
+    }
+
+    bool requires_grad()
+    {
+        if (autograd_meta)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+
     std::vector<float> data;
-
+    std::unique_ptr<AutogradMeta> autograd_meta;
     // required for .backward()
-    std::vector<float> grad;
-    std::shared_ptr<Edge> edge;
-};
-
-struct Tensor
-{
-    Tensor(int size = 0) : impl_(std::make_shared<TensorImpl>(size)) {}
-    Tensor(std::vector<float> data) : impl_(std::make_shared<TensorImpl>(data)) {}
-    int size() { return impl_->data.size(); }
-    float& operator[](int idx) { return impl_->data[idx]; }
-    void resize(int new_size)
-    {
-        assert(impl_);
-        impl_->data.resize(new_size, 0);
-        impl_->grad.resize(new_size, 0);
-    }
-
-
-    void ClearGrad() { impl_->grad.clear(); }
-    Tensor grad() { return Tensor(impl_->grad); }
-
-    void AddGradInplace(Tensor g)
-    {
-        resize(g.size());
-        for (int i = 0; i < size(); ++i)
-        {
-            impl_->grad[i] += g[i];
-        }
-    }
-    void AddInplace(Tensor g)
-    {
-        resize(g.size());
-        for (int i = 0; i < size(); ++i)
-        {
-            impl_->data[i] += g[i];
-        }
-    }
-    std::shared_ptr<Edge> getEdge() { return impl_->edge; };
-    void SetEdge(std::shared_ptr<Edge> edge) { impl_->edge = edge; }
-
-   private:
-    std::shared_ptr<TensorImpl> impl_;
+    // std::vector<float> grad;
 };
 
 

@@ -41,7 +41,7 @@ struct SGDOptimizer
                 auto& w = param[i];
                 assert(param.grad().size() == param.size());
 
-                auto g  = param.grad()[i];
+                auto g  = param.mutable_grad()[i];
                 auto& b = velocity[i];
 
                 if (momentum != 0)

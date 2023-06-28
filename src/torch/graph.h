@@ -5,10 +5,11 @@
  */
 
 #pragma once
-#include "tiny_torch_config.h"
 #include "tensor.h"
 
 #include <map>
+
+#include "tiny_torch_config.h"
 
 namespace tinytorch
 {
@@ -68,7 +69,7 @@ struct FunctionNode : public Node
     std::vector<Tensor> backward(std::vector<Tensor> fwd_output_grad) override
     {
         assert(fwd_output_grad.size() == num_input_gradients_of_backward);
-        
+
         // backward
         auto grad_list = T::backward(context, fwd_output_grad);
         return grad_list;
@@ -77,20 +78,30 @@ struct FunctionNode : public Node
     static std::vector<Tensor> forward_and_build_graph(std::vector<Tensor> t)
     {
         // Create node and set next edge
-        auto node = std::make_shared<FunctionNode<T>>();
+        bool need_grad = false;
+        auto node      = std::make_shared<FunctionNode<T>>();
         for (int i = 0; i < t.size(); ++i)
         {
             node->next.push_back(t[i].getEdge());
+            // if(node->next.)
+            if (t[i].requires_grad())
+            {
+                need_grad = true;
+            }
         }
 
         // Forward
-        auto result = T::forward(node->context, t);
+        auto result                           = T::forward(node->context, t);
         node->num_input_gradients_of_backward = result.size();
 
         // Set the edges of the output to point to this node
         for (int i = 0; i < result.size(); ++i)
         {
-            result[i].SetEdge(std::make_shared<Edge>(node, i));
+            result[i].set_requires_grad(need_grad);
+            if(need_grad)
+            {
+                result[i].SetEdge(std::make_shared<Edge>(node, i));
+            }
         }
         return result;
     }
@@ -114,6 +125,7 @@ struct AccumulateGrad : public Node
 
 inline void MakeParameter(Tensor t)
 {
+    t.set_requires_grad(true);
     t.SetEdge(std::make_shared<Edge>(std::make_shared<AccumulateGrad>(t), 0));
 }
 
