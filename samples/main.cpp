@@ -4,7 +4,7 @@
 * See LICENSE file for more information.
 */
 
-#include "tiny_torch.h"
+#include "torch/torch.h"
 
 int main()
 {

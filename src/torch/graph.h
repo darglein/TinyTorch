@@ -5,7 +5,7 @@
  */
 
 #pragma once
-
+#include "tiny_torch_config.h"
 #include "tensor.h"
 
 #include <map>

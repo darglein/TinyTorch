@@ -5,23 +5,23 @@
  */
 
 #pragma once
-
+#include "tiny_torch_config.h"
 #include "tensor.h"
 namespace tinytorch
 {
 
 // Basic tensor generation
-Tensor zero(int size);
-Tensor rand(int size);
-std::ostream& operator<<(std::ostream& strm, Tensor t);
+TINYTORCH_API Tensor zero(int size);
+TINYTORCH_API Tensor rand(int size);
+TINYTORCH_API std::ostream& operator<<(std::ostream& strm, Tensor t);
 
 // Basic Tensor Math operators
 // These operators should be called by the user and support Auto-Diff
-Tensor square(Tensor a);
-Tensor operator-(Tensor a, Tensor b);
-Tensor operator+(Tensor a, Tensor b);
-Tensor operator*(Tensor a, Tensor b);
-Tensor sum(Tensor a);
+TINYTORCH_API Tensor square(Tensor a);
+TINYTORCH_API Tensor operator-(Tensor a, Tensor b);
+TINYTORCH_API Tensor operator+(Tensor a, Tensor b);
+TINYTORCH_API Tensor operator*(Tensor a, Tensor b);
+TINYTORCH_API Tensor sum(Tensor a);
 
 
 // Internal implementation of forward/backward
