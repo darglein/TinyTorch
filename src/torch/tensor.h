@@ -87,7 +87,7 @@ struct AutogradMeta
 
 struct TensorImpl
 {
-    TensorImpl(std::vector<int64_t> sizes, TensorOptions options);
+    TensorImpl(const std::vector<int64_t>& sizes, TensorOptions options);
     // TensorImpl(std::vector<float> data) : data(data) {}
 
 

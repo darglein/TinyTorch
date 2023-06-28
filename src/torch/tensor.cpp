@@ -119,7 +119,7 @@ TensorOptions Tensor::options() const
 }
 
 
-TensorImpl::TensorImpl(std::vector<int64_t> sizes, TensorOptions options) : sizes_(sizes), options_(options)
+TensorImpl::TensorImpl(const std::vector<int64_t>& sizes, TensorOptions options) : sizes_(sizes), options_(options)
 {
     int64_t bytes_per_element = 4;
 
