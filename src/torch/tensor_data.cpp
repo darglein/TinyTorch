@@ -6,7 +6,7 @@
 #include "tensor_data.h"
 
 
-tinytorch::StorageImpl::StorageImpl(int64_t size, tinytorch::DeviceType device) : size_(size), device_(device)
+tinytorch::StorageImpl::StorageImpl(int64_t size, tinytorch::Device device) : size_(size), device_(device)
 {
     if (device_ == kCPU)
     {

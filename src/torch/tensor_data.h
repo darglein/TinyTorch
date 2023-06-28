@@ -21,7 +21,7 @@
 namespace tinytorch
 {
 
-enum DeviceType
+enum Device
 {
     kCPU,
     kCUDA
@@ -30,11 +30,12 @@ enum DeviceType
 enum ScalarType
 {
     kFloat,
+    kDouble,
 };
 
 struct StorageImpl
 {
-    StorageImpl(int64_t size, DeviceType device);
+    StorageImpl(int64_t size, Device device);
 
     StorageImpl& operator=(StorageImpl&& other) = default;
     StorageImpl& operator=(const StorageImpl&)  = delete;
@@ -46,7 +47,7 @@ struct StorageImpl
     uint8_t* byte_ptr() { return (uint8_t*)data_ptr_; }
 
    protected:
-    DeviceType device_;
+    Device device_;
     void* data_ptr_ = nullptr;
     int64_t size_;
 };

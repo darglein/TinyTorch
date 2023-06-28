@@ -18,6 +18,7 @@
 
 #include "tensor_data.h"
 #include "tiny_torch_config.h"
+#include "tensor_options.h"
 
 namespace tinytorch
 {
@@ -41,6 +42,8 @@ struct TINYTORCH_API Tensor
 
     const std::vector<int64_t>& sizes() const;
 
+    ScalarType scalar_type();
+
         // void ClearGrad();
     const Tensor& grad();
     Tensor& mutable_grad();
@@ -62,6 +65,8 @@ struct TINYTORCH_API Tensor
 
     bool defined() { return impl_!=nullptr; }
 
+    TensorOptions options();
+
     void set_requires_grad(bool requires_grad);
     bool requires_grad();
 
@@ -82,7 +87,7 @@ struct AutogradMeta
 
 struct TensorImpl
 {
-    TensorImpl(std::vector<int64_t> sizes, ScalarType scalar_type);
+    TensorImpl(std::vector<int64_t> sizes, TensorOptions options);
     // TensorImpl(std::vector<float> data) : data(data) {}
 
 
@@ -126,7 +131,7 @@ struct TensorImpl
     std::shared_ptr<StorageImpl> storage_;
     std::vector<int64_t> sizes_;
     std::vector<int64_t> strides_;
-    ScalarType scalar_type_;
+    TensorOptions options_;
     // required for .backward()
     // std::vector<float> grad;
 };
@@ -135,7 +140,7 @@ template <typename T>
 T* Tensor::data_ptr()
 {
     assert(impl_);
-    assert(impl_->scalar_type_ == kFloat);
+    assert(scalar_type() == kFloat);
     return (T*)ptr();
 }
 

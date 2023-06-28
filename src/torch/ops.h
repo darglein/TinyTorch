@@ -7,15 +7,16 @@
 #pragma once
 #include "tiny_torch_config.h"
 #include "tensor.h"
+#include "tensor_options.h"
 namespace tinytorch
 {
 
 // Basic tensor generation
-TINYTORCH_API Tensor full(std::vector<int64_t> sizes, float value);
-TINYTORCH_API Tensor ones(std::vector<int64_t> sizes);
-TINYTORCH_API Tensor empty(std::vector<int64_t> sizes);
-TINYTORCH_API Tensor zeros(std::vector<int64_t> sizes);
-TINYTORCH_API Tensor rand(std::vector<int64_t> sizes);
+TINYTORCH_API Tensor full(std::vector<int64_t> sizes, float value, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor ones(std::vector<int64_t> sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor empty(std::vector<int64_t> sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor zeros(std::vector<int64_t> sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor rand(std::vector<int64_t> sizes, TensorOptions options = TensorOptions());
 
 TINYTORCH_API Tensor full_like(Tensor t, float value);
 TINYTORCH_API Tensor ones_like(Tensor t);

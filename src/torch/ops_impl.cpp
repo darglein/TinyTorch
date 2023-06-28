@@ -11,6 +11,18 @@
 namespace tinytorch
 {
 
+#define CASE_MACRO(func, type, scalar_type, ...) \
+    case scalar_type:                            \
+        func<type>(__VA_ARGS__);                 \
+        break;
+
+#define SWITCH_MACRO_FLOAT(real_scalar_type, func, ...) \
+    switch (real_scalar_type)                           \
+    {                                                   \
+        CASE_MACRO(func, float, kFloat, __VA_ARGS__)    \
+        CASE_MACRO(func, double, kDouble, __VA_ARGS__)  \
+    }
+
 template <typename T>
 void fill_impl(TensorInfo<T> a, float value)
 {
@@ -21,7 +33,7 @@ void fill_impl(TensorInfo<T> a, float value)
 }
 void fill_impl(Tensor a, float value)
 {
-    fill_impl<float>(a, value);
+    SWITCH_MACRO_FLOAT(a.scalar_type(), fill_impl, a, value);
 }
 
 template <typename T>
@@ -210,16 +222,16 @@ std::vector<Tensor> sum_backward_impl(std::vector<int64_t> input_sizes, Tensor g
 // Tensor Create operators
 
 
-Tensor empty(std::vector<int64_t> sizes)
+Tensor empty(std::vector<int64_t> sizes, TensorOptions options )
 {
-    Tensor t(std::make_shared<TensorImpl>(sizes, kFloat));
+    Tensor t(std::make_shared<TensorImpl>(sizes, options));
     return t;
 }
 
 
-Tensor full(std::vector<int64_t> sizes, float value)
+Tensor full(std::vector<int64_t> sizes, float value, TensorOptions options )
 {
-    Tensor t = empty(sizes);
+    Tensor t = empty(sizes, options);
     for (int64_t i = 0; i < t.numel(); ++i)
     {
         t.data_ptr<float>()[i] = value;
@@ -228,24 +240,24 @@ Tensor full(std::vector<int64_t> sizes, float value)
 }
 
 
-Tensor ones(std::vector<int64_t> sizes)
+Tensor ones(std::vector<int64_t> sizes, TensorOptions options )
 {
-    return full(sizes, 1);
+    return full(sizes, 1, options);
 }
 
 
-Tensor zeros(std::vector<int64_t> sizes)
+Tensor zeros(std::vector<int64_t> sizes, TensorOptions options )
 {
-    return full(sizes, 0);
+    return full(sizes, 0, options);
 }
 
 
-Tensor rand(std::vector<int64_t> sizes)
+Tensor rand(std::vector<int64_t> sizes, TensorOptions options )
 {
     static std::mt19937 mersenne_engine{572547235};
     std::uniform_real_distribution<float> dist{0.f, 1.f};
 
-    Tensor t = empty(sizes);
+    Tensor t = empty(sizes, options);
     for (int64_t i = 0; i < t.numel(); ++i)
     {
         t.data_ptr<float>()[i] = dist(mersenne_engine);
@@ -269,7 +281,7 @@ Tensor full_like(Tensor t, float value)
 
 Tensor empty_like(Tensor t)
 {
-    Tensor t2(std::make_shared<TensorImpl>(t.sizes(), kFloat));
+    Tensor t2(std::make_shared<TensorImpl>(t.sizes(), t.options()));
     return t2;
 }
 Tensor zeros_like(Tensor t)

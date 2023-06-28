@@ -8,15 +8,17 @@
 
 int main()
 {
+    auto options = tinytorch::TensorOptions().device(tinytorch::kCUDA).dtype(tinytorch::kFloat);
+
     // The data tensors
-    tinytorch::Tensor observation = tinytorch::rand({3, 5});
-    tinytorch::Tensor target      = tinytorch::rand({3, 5});
+    tinytorch::Tensor observation = tinytorch::rand({3, 5}, options);
+    tinytorch::Tensor target      = tinytorch::rand({3, 5}, options);
 
     // The parameters of the model
     std::vector<tinytorch::Tensor> params;
     for (int i = 0; i < 4; ++i)
     {
-        params.push_back(tinytorch::rand({3, 5}));
+        params.push_back(tinytorch::rand({3, 5}, options));
         MakeParameter(params.back());
     }
 

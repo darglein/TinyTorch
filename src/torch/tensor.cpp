@@ -109,9 +109,17 @@ void Tensor::zero_()
 {
     fill_impl(*this, 0);
 }
+ScalarType Tensor::scalar_type()
+{
+    return impl_->options_.dtype_;
+}
+TensorOptions Tensor::options()
+{
+    return impl_->options_;
+}
 
 
-TensorImpl::TensorImpl(std::vector<int64_t> sizes, ScalarType scalar_type) : sizes_(sizes), scalar_type_(scalar_type)
+TensorImpl::TensorImpl(std::vector<int64_t> sizes, TensorOptions options) : sizes_(sizes), options_(options)
 {
     int64_t bytes_per_element = 4;
 
