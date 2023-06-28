@@ -50,7 +50,7 @@ struct TensorInfo
     int64_t numel()
     {
         int64_t result = 1;
-        for (int i = 0; i < dims; ++i)
+        for (int64_t i = 0; i < dims; ++i)
         {
             result *= sizes[i];
         }
@@ -68,7 +68,7 @@ struct TensorInfo
         {
             int64_t offset = 0;
 
-            for (int i = dims - 1; i > 0; --i)
+            for (int64_t i = dims - 1; i > 0; --i)
             {
                 int64_t curDimIndex  = linearId % sizes[i];
                 int64_t curDimOffset = curDimIndex * strides[i];
@@ -83,7 +83,7 @@ struct TensorInfo
             int64_t offset = 0;
 
             // Uses static dims
-            for (int i = max_dims - 1; i > 0; --i)
+            for (int64_t i = max_dims - 1; i > 0; --i)
             {
                 int64_t curDimIndex  = linearId % sizes[i];
                 int64_t curDimOffset = curDimIndex * strides[i];
@@ -102,7 +102,7 @@ struct TensorInfo
     T* data;
     int64_t sizes[max_dims];
     int64_t strides[max_dims];
-    int dims;
+    int64_t dims;
 };
 
 
@@ -114,7 +114,7 @@ TensorInfo<T, MAX_DIMS>::TensorInfo()
 }
 
 template <typename T, int MAX_DIMS>
-TensorInfo<T, MAX_DIMS>::TensorInfo(T* p, int dim, int64_t sz[MAX_TENSORINFO_DIMS], int64_t st[MAX_TENSORINFO_DIMS])
+TensorInfo<T, MAX_DIMS>::TensorInfo(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims])
 {
     data = p;
     dims = dim;
