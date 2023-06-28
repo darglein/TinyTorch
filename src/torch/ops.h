@@ -12,12 +12,17 @@ namespace tinytorch
 
 // Basic tensor generation
 TINYTORCH_API Tensor full(std::vector<int64_t> sizes, float value);
+TINYTORCH_API Tensor ones(std::vector<int64_t> sizes);
 TINYTORCH_API Tensor empty(std::vector<int64_t> sizes);
 TINYTORCH_API Tensor zeros(std::vector<int64_t> sizes);
 TINYTORCH_API Tensor rand(std::vector<int64_t> sizes);
+
+TINYTORCH_API Tensor full_like(Tensor t, float value);
+TINYTORCH_API Tensor ones_like(Tensor t);
 TINYTORCH_API Tensor empty_like(Tensor t);
 TINYTORCH_API Tensor zeros_like(Tensor t);
 TINYTORCH_API Tensor rand_like(Tensor t);
+
 TINYTORCH_API std::ostream& operator<<(std::ostream& strm, Tensor t);
 
 // Basic Tensor Math operators

@@ -10,3 +10,4 @@
 #include "tiny_torch.h"
 
 namespace torch=tinytorch;
+namespace at=tinytorch;

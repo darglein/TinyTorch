@@ -228,6 +228,12 @@ Tensor full(std::vector<int64_t> sizes, float value)
 }
 
 
+Tensor ones(std::vector<int64_t> sizes)
+{
+    return full(sizes, 1);
+}
+
+
 Tensor zeros(std::vector<int64_t> sizes)
 {
     return full(sizes, 0);
@@ -247,6 +253,19 @@ Tensor rand(std::vector<int64_t> sizes)
     return t;
 }
 
+Tensor ones_like(Tensor t)
+{
+    return full_like(t, 1);
+}
+Tensor full_like(Tensor t, float value)
+{
+    Tensor t2 = empty_like(t);
+    for (int64_t i = 0; i < t.numel(); ++i)
+    {
+        t2.data_ptr<float>()[i] = value;
+    }
+    return t2;
+}
 
 Tensor empty_like(Tensor t)
 {
@@ -295,4 +314,5 @@ Tensor& operator+=(Tensor& a, Tensor b)
     add_impl<float>(a, b, a);
     return a;
 }
+
 }  // namespace tinytorch
