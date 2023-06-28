@@ -1,22 +1,22 @@
 /**
-* Copyright (c) 2022 Darius Rückert
-* Licensed under the MIT License.
-* See LICENSE file for more information.
+ * Copyright (c) 2022 Darius Rückert
+ * Licensed under the MIT License.
+ * See LICENSE file for more information.
  */
 
 #pragma once
-#include "tiny_torch_config.h"
 #include "tensor.h"
+
 #include "tensor_options.h"
+#include "tiny_torch_config.h"
 namespace tinytorch
 {
-
 // Basic tensor generation
-TINYTORCH_API Tensor full(std::vector<int64_t> sizes, float value, TensorOptions options = TensorOptions());
-TINYTORCH_API Tensor ones(std::vector<int64_t> sizes, TensorOptions options = TensorOptions());
-TINYTORCH_API Tensor empty(std::vector<int64_t> sizes, TensorOptions options = TensorOptions());
-TINYTORCH_API Tensor zeros(std::vector<int64_t> sizes, TensorOptions options = TensorOptions());
-TINYTORCH_API Tensor rand(std::vector<int64_t> sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor full(const std::vector<int64_t>& sizes, float value, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor ones(const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor empty(const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor zeros(const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor rand(const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions());
 
 TINYTORCH_API Tensor full_like(Tensor t, float value);
 TINYTORCH_API Tensor ones_like(Tensor t);
@@ -47,8 +47,8 @@ Tensor mult_impl(Tensor a, Tensor b);
 Tensor sum_impl(Tensor a);
 std::vector<Tensor> square_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> mult_backward_impl(Tensor a, Tensor b, Tensor grad_output);
-std::vector<Tensor>  add_backward_impl(Tensor grad_output);
-std::vector<Tensor>  sub_backward_impl(Tensor grad_output);
-std::vector<Tensor>  sum_backward_impl(std::vector<int64_t> input_sizes, Tensor grad_output);
+std::vector<Tensor> add_backward_impl(Tensor grad_output);
+std::vector<Tensor> sub_backward_impl(Tensor grad_output);
+std::vector<Tensor> sum_backward_impl(const std::vector<int64_t>& input_sizes, Tensor grad_output);
 
 }  // namespace tinytorch

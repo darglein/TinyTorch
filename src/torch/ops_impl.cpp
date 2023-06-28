@@ -209,7 +209,7 @@ void sum_backward_impl(TensorInfo<T> grad_output, TensorInfo<T> grad_a)
 }
 
 
-std::vector<Tensor> sum_backward_impl(std::vector<int64_t> input_sizes, Tensor grad_output)
+std::vector<Tensor> sum_backward_impl(const std::vector<int64_t>& input_sizes, Tensor grad_output)
 {
     assert(grad_output.numel() == 1);
     Tensor grad_a = empty(input_sizes);
@@ -222,14 +222,14 @@ std::vector<Tensor> sum_backward_impl(std::vector<int64_t> input_sizes, Tensor g
 // Tensor Create operators
 
 
-Tensor empty(std::vector<int64_t> sizes, TensorOptions options )
+Tensor empty(const std::vector<int64_t>& sizes, TensorOptions options)
 {
     Tensor t(std::make_shared<TensorImpl>(sizes, options));
     return t;
 }
 
 
-Tensor full(std::vector<int64_t> sizes, float value, TensorOptions options )
+Tensor full(const std::vector<int64_t>& sizes, float value, TensorOptions options)
 {
     Tensor t = empty(sizes, options);
     for (int64_t i = 0; i < t.numel(); ++i)
@@ -240,19 +240,19 @@ Tensor full(std::vector<int64_t> sizes, float value, TensorOptions options )
 }
 
 
-Tensor ones(std::vector<int64_t> sizes, TensorOptions options )
+Tensor ones(const std::vector<int64_t>& sizes, TensorOptions options)
 {
     return full(sizes, 1, options);
 }
 
 
-Tensor zeros(std::vector<int64_t> sizes, TensorOptions options )
+Tensor zeros(const std::vector<int64_t>& sizes, TensorOptions options)
 {
     return full(sizes, 0, options);
 }
 
 
-Tensor rand(std::vector<int64_t> sizes, TensorOptions options )
+Tensor rand(const std::vector<int64_t>& sizes, TensorOptions options)
 {
     static std::mt19937 mersenne_engine{572547235};
     std::uniform_real_distribution<float> dist{0.f, 1.f};

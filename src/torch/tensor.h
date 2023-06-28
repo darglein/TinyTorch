@@ -42,10 +42,10 @@ struct TINYTORCH_API Tensor
 
     const std::vector<int64_t>& sizes() const;
 
-    ScalarType scalar_type();
+    ScalarType scalar_type() const;
 
         // void ClearGrad();
-    const Tensor& grad();
+    const Tensor& grad() const;
     Tensor& mutable_grad();
 
     std::shared_ptr<Edge> getEdge();
@@ -56,19 +56,19 @@ struct TINYTORCH_API Tensor
 
     uint8_t* ptr();
 
-    int64_t dim();
+    int64_t dim() const;
 
-    int64_t size(int64_t index);
-    int64_t stride(int64_t index);
+    int64_t size(int64_t index) const;
+    int64_t stride(int64_t index) const;
 
     void zero_();
 
-    bool defined() { return impl_!=nullptr; }
+    bool defined() const { return impl_ != nullptr; }
 
-    TensorOptions options();
+    TensorOptions options() const;
 
     void set_requires_grad(bool requires_grad);
-    bool requires_grad();
+    bool requires_grad() const;
 
    private:
     std::shared_ptr<TensorImpl> impl_;
@@ -93,7 +93,7 @@ struct TensorImpl
 
     void set_requires_grad(bool requires_grad);
 
-    bool requires_grad()
+    bool requires_grad() const
     {
         if (autograd_meta)
         {
@@ -105,12 +105,12 @@ struct TensorImpl
         }
     }
 
-    int64_t dim() { return sizes_.size(); }
+    int64_t dim() const { return sizes_.size(); }
 
 
     std::unique_ptr<AutogradMeta> autograd_meta;
 
-    int64_t numel()
+    int64_t numel() const
     {
         int64_t res = 1;
         for (auto v : sizes_) res *= v;
@@ -123,7 +123,8 @@ struct TensorImpl
         return (T*)ptr();
     }
 
-    uint8_t* ptr(){
+    uint8_t* ptr()
+    {
         return (storage_->byte_ptr() + storage_offset_);
     }
 

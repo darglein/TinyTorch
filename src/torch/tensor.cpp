@@ -33,7 +33,7 @@ int64_t Tensor::numel() const
 //{
 //    mutable_grad().impl_->data.clear();
 //}
-const Tensor& Tensor::grad()
+const Tensor& Tensor::grad() const
 {
     return impl_->autograd_meta->grad();
 }
@@ -80,7 +80,7 @@ void Tensor::set_requires_grad(bool requires_grad)
 {
     impl_->set_requires_grad(requires_grad);
 }
-bool Tensor::requires_grad()
+bool Tensor::requires_grad() const
 {
     return impl_->requires_grad();
 }
@@ -92,15 +92,15 @@ const std::vector<int64_t>& Tensor::sizes() const
 {
     return impl_->sizes_;
 }
-int64_t Tensor::dim()
+int64_t Tensor::dim() const
 {
     return impl_->dim();
 }
-int64_t Tensor::size(int64_t index)
+int64_t Tensor::size(int64_t index) const
 {
     return impl_->sizes_[index];
 }
-int64_t Tensor::stride(int64_t index)
+int64_t Tensor::stride(int64_t index) const
 {
     return impl_->strides_[index];
 }
@@ -109,11 +109,11 @@ void Tensor::zero_()
 {
     fill_impl(*this, 0);
 }
-ScalarType Tensor::scalar_type()
+ScalarType Tensor::scalar_type() const
 {
     return impl_->options_.dtype_;
 }
-TensorOptions Tensor::options()
+TensorOptions Tensor::options() const
 {
     return impl_->options_;
 }
