@@ -10,5 +10,8 @@
 #include "ops.h"
 #include "optimizer.h"
 #include "tensor.h"
+#include "module.h"
 
 #include "tiny_torch_config.h"
+
+#define TINY_TORCH

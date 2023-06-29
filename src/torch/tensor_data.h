@@ -29,9 +29,17 @@ enum Device
 
 enum ScalarType
 {
+    kByte,
+    kUInt8 = kByte,
+    kShort,
+    kInt,
+    kLong,
     kFloat,
     kDouble,
+    kHalf,
 };
+
+using Dtype = ScalarType;
 
 struct StorageImpl
 {

@@ -88,19 +88,19 @@ uint8_t* Tensor::ptr()
 {
     return impl_->ptr();
 }
-const std::vector<int64_t>& Tensor::sizes() const
+const SizeType& Tensor::sizes() const
 {
     return impl_->sizes_;
 }
-int64_t Tensor::dim()
+int64_t Tensor::dim() const
 {
     return impl_->dim();
 }
-int64_t Tensor::size(int64_t index)
+int64_t Tensor::size(int64_t index) const
 {
     return impl_->sizes_[index];
 }
-int64_t Tensor::stride(int64_t index)
+int64_t Tensor::stride(int64_t index) const
 {
     return impl_->strides_[index];
 }
@@ -119,7 +119,7 @@ TensorOptions Tensor::options()
 }
 
 
-TensorImpl::TensorImpl(std::vector<int64_t> sizes, TensorOptions options) : sizes_(sizes), options_(options)
+TensorImpl::TensorImpl(SizeType sizes, TensorOptions options) : sizes_(sizes), options_(options)
 {
     int64_t bytes_per_element = 4;
 
@@ -136,7 +136,7 @@ void TensorImpl::set_requires_grad(bool requires_grad)
 {
     if (requires_grad)
     {
-        autograd_meta = std::make_unique<AutogradMeta>();
+        autograd_meta        = std::make_unique<AutogradMeta>();
         autograd_meta->_grad = zeros(sizes_);
     }
     else
