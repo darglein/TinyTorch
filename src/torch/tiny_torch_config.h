@@ -29,3 +29,7 @@
 #else
 #    define TINYTORCH_API TINYTORCH_HELPER_DLL_IMPORT
 #endif
+
+#ifndef TINY_TORCH_NAMESPACE
+#define TINY_TORCH_NAMESPACE tinytorch
+#endif

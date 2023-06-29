@@ -4,7 +4,7 @@
  * See LICENSE file for more information.
  */
 
-#include "torch/torch.h"
+#include "torch/tiny_torch.h"
 
 int main()
 {
@@ -33,7 +33,7 @@ int main()
     };
 
     // Create a simple optimizer
-    tinytorch::SGDOptimizer optim(params, 0.1);
+    tinytorch::optim::SGDOptimizer optim(params, 0.1);
 
     // Optimize the model for 50 iterations
     for (int i = 0; i < 50; ++i)
