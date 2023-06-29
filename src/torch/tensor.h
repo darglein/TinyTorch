@@ -128,6 +128,11 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    Tensor select(int64_t dim, int64_t index) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
 
     Tensor scatter_add(int64_t dim, Tensor ids, Tensor value) const
     {

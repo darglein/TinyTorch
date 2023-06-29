@@ -358,6 +358,60 @@ Tensor cos_impl(Tensor a)
     return result;
 }
 
+
+// TODO: These are not correct yet. They need an outer loop over all other dimensions.
+template <typename T>
+static void index_select32_impl(TensorInfo<T> slice, TensorInfo<int32_t> index, TensorInfo<T> result)
+{
+#if 0
+    for (int64_t i = 0; i < result.numel(); ++i)
+    {
+        result[i] = slice[index[i]];
+    }
+#endif
+
+    throw std::runtime_error("not implemented");
+}
+
+template <typename T>
+static void index_select64_impl(TensorInfo<T> slice, TensorInfo<int64_t> index, TensorInfo<T> result)
+{
+#if 0
+    for (int64_t i = 0; i < index.numel(); ++i)
+    {
+        result[i] = slice[index[i]];
+    }
+#endif
+
+    throw std::runtime_error("not implemented");
+}
+
+Tensor index_select_impl(Tensor input, int64_t dim, Tensor index)
+{
+    assert(dim < input.dim());
+    assert(index.dtype() == kInt || index.dtype() == kLong);
+
+    auto numel = index.numel();
+
+    auto result_size = input.sizes().vec();
+    result_size[dim] = numel;
+
+    Tensor result = empty(result_size, input.options());
+
+    Tensor slice = input.select(dim, 0);
+    
+    if (index.dtype() == kInt)
+    {
+        SWITCH_MACRO_ALL(input.scalar_type(), index_select32_impl, slice, index, result);
+    }
+    else
+    {
+        SWITCH_MACRO_ALL(input.scalar_type(), index_select64_impl, slice, index, result);
+    }
+
+    return result;
+}
+
 // ================================================================================================================
 
 template <typename T>

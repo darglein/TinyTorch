@@ -162,6 +162,7 @@ Tensor log1p_impl(Tensor a);
 Tensor exp_impl(Tensor a);
 Tensor sin_impl(Tensor a);
 Tensor cos_impl(Tensor a);
+Tensor index_select_impl(Tensor input, int64_t dim, Tensor index);
 std::vector<Tensor> square_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> add_backward_impl(Tensor grad_output);
 std::vector<Tensor> sub_backward_impl(Tensor grad_output);
