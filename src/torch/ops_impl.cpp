@@ -733,11 +733,36 @@ std::ostream& operator<<(std::ostream& strm, Tensor t)
     print_impl<float>(strm, t);
     return strm;
 }
+
 Tensor& operator+=(Tensor& a, Tensor b)
 {
     assert(!a.requires_grad());
-    add_impl<float>(a, b, a);
+    SWITCH_MACRO_ALL(a.scalar_type(), add_impl, a, b, a);
     return a;
 }
+
+Tensor& operator-=(Tensor& a, Tensor b)
+{
+    assert(!a.requires_grad());
+    SWITCH_MACRO_ALL(a.scalar_type(), sub_impl, a, b, a);
+    return a;
+}
+
+Tensor& operator*=(Tensor& a, Tensor b)
+{
+    assert(!a.requires_grad());
+    SWITCH_MACRO_ALL(a.scalar_type(), mult_impl, a, b, a);
+    return a;
+}
+
+Tensor& operator/=(Tensor& a, Tensor b)
+{
+    assert(!a.requires_grad());
+    SWITCH_MACRO_ALL(a.scalar_type(), div_impl, a, b, a);
+    return a;
+}
+
+
+
 
 }  // namespace TINY_TORCH_NAMESPACE

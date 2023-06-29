@@ -119,6 +119,9 @@ inline Tensor cos(Tensor b)
 TINYTORCH_API Tensor sum(Tensor a);
 
 TINYTORCH_API Tensor& operator+=(Tensor& a, Tensor b);
+TINYTORCH_API Tensor& operator-=(Tensor& a, Tensor b);
+TINYTORCH_API Tensor& operator*=(Tensor& a, Tensor b);
+TINYTORCH_API Tensor& operator/=(Tensor& a, Tensor b);
 
 
 inline Tensor cat(const std::vector<Tensor>& a, int64_t dim)
@@ -126,7 +129,7 @@ inline Tensor cat(const std::vector<Tensor>& a, int64_t dim)
     throw std::runtime_error("not implemented");
     return {};
 }
-inline Tensor index_select(Tensor a, int64_t dim, Tensor b)
+inline Tensor index_select(Tensor input, int64_t dim, Tensor index)
 {
     throw std::runtime_error("not implemented");
     return {};
