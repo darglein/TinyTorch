@@ -389,7 +389,7 @@ static void exp_backward_impl(TensorInfo<T> a, TensorInfo<T> grad_output, Tensor
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
     {
-        grad_a[i] = exp(a[i]) * grad_output[i];
+        grad_a[i] = std::exp(a[i]) * grad_output[i];
     }
 }
 
@@ -405,7 +405,7 @@ static void sin_backward_impl(TensorInfo<T> a, TensorInfo<T> grad_output, Tensor
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
     {
-        grad_a[i] = cos(a[i]) * grad_output[i];
+        grad_a[i] = std::cos(a[i]) * grad_output[i];
     }
 }
 
@@ -421,7 +421,7 @@ static void cos_backward_impl(TensorInfo<T> a, TensorInfo<T> grad_output, Tensor
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
     {
-        grad_a[i] = -sin(a[i]) * grad_output[i];
+        grad_a[i] = -std::sin(a[i]) * grad_output[i];
     }
 }
 
