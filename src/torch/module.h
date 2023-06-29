@@ -136,15 +136,13 @@ struct AnyModule
 
 
 template <typename ModuleType>
-void load(
-    nn::ModuleHolder<ModuleType> module_holder, std::string name)
+void load(nn::ModuleHolder<ModuleType> module_holder, std::string name)
 {
     throw std::runtime_error("not implemented");
 }
 
 template <typename ModuleType>
-void save(
-    nn::ModuleHolder<ModuleType> module_holder, std::string name)
+void save(nn::ModuleHolder<ModuleType> module_holder, std::string name)
 {
     throw std::runtime_error("not implemented");
 }

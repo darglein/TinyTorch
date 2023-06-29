@@ -69,10 +69,11 @@ struct TINYTORCH_API Tensor
     // float& operator[](int idx);
     void resize(int new_size);
 
-        const SizeType strides() const{
-            throw std::runtime_error("not implemented");
-            return {};
-        }
+    const SizeType strides() const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
 
     const SizeType& sizes() const;
 
@@ -267,10 +268,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    void backward() const
-    {
-        throw std::runtime_error("not implemented");
-    }
+    void backward() const { throw std::runtime_error("not implemented"); }
     Tensor std() const
     {
         throw std::runtime_error("not implemented");

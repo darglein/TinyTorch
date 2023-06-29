@@ -55,22 +55,16 @@ struct Context
     // TODO: besser
     std::map<std::string, std::vector<int64_t>> data_sizes;
 
-    std::map<std::string,IValue> saved_data;
+    std::map<std::string, IValue> saved_data;
 
-    void set_materialize_grads(bool b){
+    void set_materialize_grads(bool b) { throw std::runtime_error("not implemented"); }
 
-        throw std::runtime_error("not implemented");
-    }
-
-    std::vector<Tensor> get_saved_variables(){
-
+    std::vector<Tensor> get_saved_variables()
+    {
         throw std::runtime_error("not implemented");
         return {};
     }
- void save_for_backward(   std::vector<Tensor> l){
-
-        throw std::runtime_error("not implemented");
-    }
+    void save_for_backward(std::vector<Tensor> l) { throw std::runtime_error("not implemented"); }
 };
 
 
@@ -98,7 +92,7 @@ struct Node
 };
 
 using AutogradContext = Context;
-using variable_list = std::vector<Tensor>;
+using variable_list   = std::vector<Tensor>;
 
 
 template <typename T>

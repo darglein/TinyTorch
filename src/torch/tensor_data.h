@@ -21,8 +21,8 @@
 namespace TINY_TORCH_NAMESPACE
 {
 
-struct Half{
-
+struct Half
+{
 };
 enum Device
 {
@@ -35,12 +35,12 @@ enum ScalarType
     kByte,
     kUInt8 = kByte,
     kInt16,
-    kShort=kInt16,
+    kShort = kInt16,
     kInt32,
-    kInt=kInt32,
+    kInt = kInt32,
     kLong,
     kFloat32,
-    kFloat=kFloat32,
+    kFloat = kFloat32,
     kFloat64,
     kDouble = kFloat64,
     kHalf,
