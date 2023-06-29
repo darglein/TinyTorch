@@ -6,12 +6,11 @@
 
 #pragma once
 
-
-#define TINY_TORCH_NAMESPACE torch
-#include "cuda_runtime.h"
 #include "tiny_torch.h"
 
-#if defined(__CUDA_RUNTIME_H__) || defined(__CUDACC__)
+#if __has_include("cuda_runtime.h")
+#    include "cuda_runtime.h"
+#    if defined(__CUDA_RUNTIME_H__) || defined(__CUDACC__)
 namespace TINY_TORCH_NAMESPACE
 {
 namespace cuda
@@ -23,8 +22,8 @@ inline cudaStream_t getCurrentCUDAStream()
 }
 }  // namespace cuda
 }  // namespace TINY_TORCH_NAMESPACE
+#    endif
 #endif
 
-
-// namespace torch=TINY_TORCH_NAMESPACE;
-namespace at = TINY_TORCH_NAMESPACE;
+namespace torch = TINY_TORCH_NAMESPACE;
+namespace at    = TINY_TORCH_NAMESPACE;
