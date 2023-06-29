@@ -43,29 +43,7 @@ TINYTORCH_API std::ostream& operator<<(std::ostream& strm, Tensor t);
 // Basic Tensor Math operators
 // These operators should be called by the user and support Auto-Diff
 TINYTORCH_API Tensor square(Tensor a);
-TINYTORCH_API Tensor operator-(Tensor a, Tensor b);
 TINYTORCH_API Tensor operator+(Tensor a, Tensor b);
-TINYTORCH_API Tensor operator*(Tensor a, Tensor b);
-inline Tensor operator/(Tensor a, Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor operator/(Tensor a, double b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor operator*(double a, Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor operator*(Tensor a, double b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
 inline Tensor operator+(double a, Tensor b)
 {
     throw std::runtime_error("not implemented");
@@ -76,12 +54,34 @@ inline Tensor operator+(Tensor a, double b)
     throw std::runtime_error("not implemented");
     return {};
 }
+TINYTORCH_API Tensor operator-(Tensor a, Tensor b);
 inline Tensor operator-(Tensor a, double b)
 {
     throw std::runtime_error("not implemented");
     return {};
 }
 inline Tensor operator-(double a, Tensor b)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
+TINYTORCH_API Tensor operator*(Tensor a, Tensor b);
+inline Tensor operator*(double a, Tensor b)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor operator*(Tensor a, double b)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor operator/(Tensor a, Tensor b)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor operator/(Tensor a, double b)
 {
     throw std::runtime_error("not implemented");
     return {};
@@ -142,9 +142,17 @@ inline void load(Tensor&, std::string)
 void fill_impl(Tensor a, float value);
 Tensor square_impl(Tensor a);
 Tensor add_impl(Tensor a, Tensor b);
+Tensor add_impl(Tensor a, double b);
+Tensor add_impl(double a, Tensor b);
 Tensor sub_impl(Tensor a, Tensor b);
+Tensor sub_impl(Tensor a, double b);
+Tensor sub_impl(double a, Tensor b);
 Tensor mult_impl(Tensor a, Tensor b);
+Tensor mult_impl(Tensor a, double b);
+Tensor mult_impl(double a, Tensor b);
 Tensor div_impl(Tensor a, Tensor b);
+Tensor div_impl(Tensor a, double b);
+Tensor neg_impl(Tensor a);
 Tensor sum_impl(Tensor a);
 Tensor log_impl(Tensor a);
 Tensor log1p_impl(Tensor a);
@@ -155,7 +163,11 @@ std::vector<Tensor> square_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> add_backward_impl(Tensor grad_output);
 std::vector<Tensor> sub_backward_impl(Tensor grad_output);
 std::vector<Tensor> mult_backward_impl(Tensor a, Tensor b, Tensor grad_output);
+std::vector<Tensor> mult_backward_impl(Tensor a, double b, Tensor grad_output); // Returns only one gradient, the one for the tensor.
+std::vector<Tensor> mult_backward_impl(double b, Tensor a, Tensor grad_output); // Returns only one gradient, the one for the tensor.
 std::vector<Tensor> div_backward_impl(Tensor a, Tensor b, Tensor grad_output);
+std::vector<Tensor> div_backward_impl(Tensor a, double b, Tensor grad_output); // Returns only one gradient, the one for the tensor.
+std::vector<Tensor> neg_backward_impl(Tensor grad_output);
 std::vector<Tensor> sum_backward_impl(const std::vector<int64_t>& input_sizes, Tensor grad_output);
 std::vector<Tensor> log_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> log1p_backward_impl(Tensor a, Tensor grad_output);

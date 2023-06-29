@@ -87,6 +87,38 @@ Tensor add_impl(Tensor a, Tensor b)
 }
 
 template <typename T>
+static void add_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(a[i] + b);
+    }
+}
+
+Tensor add_impl(Tensor a, double b)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), add_impl, a, b, result);
+    return result;
+}
+
+template <typename T>
+static void add_impl(double a, TensorInfo<T> b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < b.numel(); ++i)
+    {
+        result[i] = T(a + b[i]);
+    }
+}
+
+Tensor add_impl(double a, Tensor b)
+{
+    Tensor result = empty_like(b);
+    SWITCH_MACRO_ALL(b.scalar_type(), add_impl, a, b, result);
+    return result;
+}
+
+template <typename T>
 static void sub_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
@@ -99,6 +131,38 @@ Tensor sub_impl(Tensor a, Tensor b)
 {
     Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), sub_impl, a, b, result);
+    return result;
+}
+
+template <typename T>
+static void sub_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(a[i] - b);
+    }
+}
+
+Tensor sub_impl(Tensor a, double b)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), sub_impl, a, b, result);
+    return result;
+}
+
+template <typename T>
+static void sub_impl(double a, TensorInfo<T> b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < b.numel(); ++i)
+    {
+        result[i] = T(a - b[i]);
+    }
+}
+
+Tensor sub_impl(double a, Tensor b)
+{
+    Tensor result = empty_like(b);
+    SWITCH_MACRO_ALL(b.scalar_type(), sub_impl, a, b, result);
     return result;
 }
 
@@ -119,6 +183,38 @@ Tensor mult_impl(Tensor a, Tensor b)
 }
 
 template <typename T>
+static void mult_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(a[i] * b);
+    }
+}
+
+Tensor mult_impl(Tensor a, double b)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), mult_impl, a, b, result);
+    return result;
+}
+
+template <typename T>
+static void mult_impl(double a, TensorInfo<T> b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < b.numel(); ++i)
+    {
+        result[i] = T(a * b[i]);
+    }
+}
+
+Tensor mult_impl(double a, Tensor b)
+{
+    Tensor result = empty_like(b);
+    SWITCH_MACRO_ALL(b.scalar_type(), mult_impl, a, b, result);
+    return result;
+}
+
+template <typename T>
 static void div_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
@@ -131,6 +227,38 @@ Tensor div_impl(Tensor a, Tensor b)
 {
     Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), div_impl, a, b, result);
+    return result;
+}
+
+template <typename T>
+static void div_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(a[i] / b);
+    }
+}
+
+Tensor div_impl(Tensor a, double b)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), div_impl, a, b, result);
+    return result;
+}
+
+template <typename T>
+static void neg_impl(TensorInfo<T> a, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[0] = -a[i];
+    }
+}
+
+Tensor neg_impl(Tensor a)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_FLOAT(a.scalar_type(), neg_impl, a, result);
     return result;
 }
 
@@ -312,6 +440,30 @@ std::vector<Tensor> mult_backward_impl(Tensor a, Tensor b, Tensor grad_output)
 }
 
 template <typename T>
+static void mult_backward_impl(TensorInfo<T> a, double b, TensorInfo<T> grad_output, TensorInfo<T> grad_a)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        auto g    = grad_output[i];
+        grad_a[i] = T(b * g);
+    }
+}
+
+std::vector<Tensor> mult_backward_impl(Tensor a, double b, Tensor grad_output)
+{
+    Tensor grad_a = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), mult_backward_impl, a, b, grad_output, grad_a);
+    return {grad_a};
+}
+
+std::vector<Tensor> mult_backward_impl(double b, Tensor a, Tensor grad_output)
+{
+    Tensor grad_a = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), mult_backward_impl, a, b, grad_output, grad_a);
+    return {grad_a};
+}
+
+template <typename T>
 static void div_backward_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> grad_output, TensorInfo<T> grad_a,
                               TensorInfo<T> grad_b)
 {
@@ -319,7 +471,7 @@ static void div_backward_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> gr
     {
         auto g    = grad_output[i];
         T b_      = b[i];
-        grad_a[i] = T(1) / b_ * g;
+        grad_a[i] = g / b_;
         grad_b[i] = -a[i] / (b_ * b_) * g;
     }
 }
@@ -330,6 +482,39 @@ std::vector<Tensor> div_backward_impl(Tensor a, Tensor b, Tensor grad_output)
     Tensor grad_b = empty_like(b);
     SWITCH_MACRO_ALL(a.scalar_type(), div_backward_impl, a, b, grad_output, grad_a, grad_b);
     return {grad_a, grad_b};
+}
+
+template <typename T>
+static void div_backward_impl(TensorInfo<T> a, double b, TensorInfo<T> grad_output, TensorInfo<T> grad_a)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        auto g    = grad_output[i];
+        grad_a[i] = T(g / b);
+    }
+}
+
+std::vector<Tensor> div_backward_impl(Tensor a, double b, Tensor grad_output)
+{
+    Tensor grad_a = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), div_backward_impl, a, b, grad_output, grad_a);
+    return {grad_a};
+}
+
+template <typename T>
+static void neg_backward_impl(TensorInfo<T> grad_output, TensorInfo<T> grad_a)
+{
+    for (int64_t i = 0; i < grad_a.numel(); ++i)
+    {
+        grad_a[i] = -grad_output[i];
+    }
+}
+
+std::vector<Tensor> neg_backward_impl(Tensor grad_output)
+{
+    Tensor grad_a = empty_like(grad_output);
+    SWITCH_MACRO_ALL(grad_output.scalar_type(), neg_backward_impl, grad_output, grad_a);
+    return {grad_a};
 }
 
 
