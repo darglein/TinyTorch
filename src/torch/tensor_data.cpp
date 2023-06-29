@@ -5,8 +5,9 @@
  */
 #include "tensor_data.h"
 
-
-tinytorch::StorageImpl::StorageImpl(int64_t size, tinytorch::Device device) : size_(size), device_(device)
+namespace TINY_TORCH_NAMESPACE
+{
+StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(device)
 {
     if (device_ == kCPU)
     {
@@ -17,7 +18,7 @@ tinytorch::StorageImpl::StorageImpl(int64_t size, tinytorch::Device device) : si
         assert(false);
     }
 }
-tinytorch::StorageImpl::~StorageImpl()
+StorageImpl::~StorageImpl()
 {
     if (device_ == kCPU)
     {
@@ -27,4 +28,6 @@ tinytorch::StorageImpl::~StorageImpl()
     {
         assert(false);
     }
+}
+
 }

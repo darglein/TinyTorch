@@ -9,7 +9,7 @@
 
 #include "tensor_options.h"
 #include "tiny_torch_config.h"
-namespace tinytorch
+namespace TINY_TORCH_NAMESPACE
 {
 // Basic tensor generation
 TINYTORCH_API Tensor full(const std::vector<int64_t>& sizes, float value, TensorOptions options = TensorOptions());
@@ -17,6 +17,12 @@ TINYTORCH_API Tensor ones(const std::vector<int64_t>& sizes, TensorOptions optio
 TINYTORCH_API Tensor empty(const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions());
 TINYTORCH_API Tensor zeros(const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions());
 TINYTORCH_API Tensor rand(const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions());
+inline Tensor randint(int low, int heigh, const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions())
+{
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
 
 TINYTORCH_API Tensor full_like(Tensor t, float value);
 TINYTORCH_API Tensor ones_like(Tensor t);
@@ -85,6 +91,36 @@ inline Tensor operator-(double a, Tensor b){
     throw std::runtime_error("not implemented");
     return {};
 }
+inline Tensor operator-(Tensor b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor log(Tensor b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor log1p(Tensor b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor exp(Tensor b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor sin(Tensor b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor cos(Tensor b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
 TINYTORCH_API Tensor sum(Tensor a);
 
 TINYTORCH_API Tensor& operator+=(Tensor& a, Tensor b);
@@ -101,6 +137,11 @@ inline Tensor index_select(Tensor a, int64_t dim, Tensor b)
     return {};
 }
 
+inline void load(Tensor&, std:: string){
+    throw std::runtime_error("not implemented");
+
+}
+
 // Internal implementation of forward/backward
 // Should NOT be called by the user
 void fill_impl(Tensor a, float value);
@@ -115,4 +156,4 @@ std::vector<Tensor> add_backward_impl(Tensor grad_output);
 std::vector<Tensor> sub_backward_impl(Tensor grad_output);
 std::vector<Tensor> sum_backward_impl(const std::vector<int64_t>& input_sizes, Tensor grad_output);
 
-}  // namespace tinytorch
+}  // namespace TINY_TORCH_NAMESPACE

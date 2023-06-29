@@ -9,9 +9,11 @@
 #include "graph.h"
 
 
-namespace tinytorch
+namespace TINY_TORCH_NAMESPACE
 {
 
+namespace autograd
+{
 struct SquareNode : public FunctionNode<SquareNode>
 {
     static std::vector<Tensor> forward(Context& ctx, std::vector<Tensor> t)
@@ -92,8 +94,9 @@ struct SumNode : public FunctionNode<SumNode>
         return grad_a;
     }
 };
+}
 
-
+using namespace autograd;
 
 Tensor square(Tensor a)
 {
@@ -120,4 +123,4 @@ Tensor sum(Tensor a)
 }
 
 
-}  // namespace tinytorch
+}  // namespace TINY_TORCH_NAMESPACE

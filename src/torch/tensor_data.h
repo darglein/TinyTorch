@@ -18,9 +18,12 @@
 
 #include "tiny_torch_config.h"
 
-namespace tinytorch
+namespace TINY_TORCH_NAMESPACE
 {
 
+struct Half{
+
+};
 enum Device
 {
     kCPU,
@@ -66,4 +69,4 @@ struct StorageImpl
 
 
 
-}  // namespace tinytorch
+}  // namespace TINY_TORCH_NAMESPACE

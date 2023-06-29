@@ -19,7 +19,7 @@
 #include "tensor_data.h"
 #include "tiny_torch_config.h"
 
-namespace tinytorch
+namespace TINY_TORCH_NAMESPACE
 {
 
 
@@ -45,7 +45,11 @@ struct TINYTORCH_API TensorOptions
     TensorOptions(Device device) : device_(device) {}
     TensorOptions(ScalarType dtype) : dtype_(dtype) {}
 
-
+    TensorOptions& requires_grad(bool b)
+    {
+        requires_grad_ = b;
+        return *this;
+    }
     TensorOptions& device(Device d)
     {
         device_ = d;
@@ -59,4 +63,4 @@ struct TINYTORCH_API TensorOptions
 };
 
 
-}  // namespace tinytorch
+}  // namespace TINY_TORCH_NAMESPACE

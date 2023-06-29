@@ -6,7 +6,7 @@
 #include "tensor.h"
 
 #include "ops.h"
-namespace tinytorch
+namespace TINY_TORCH_NAMESPACE
 {
 
 
@@ -145,4 +145,4 @@ void TensorImpl::set_requires_grad(bool requires_grad)
         autograd_meta = nullptr;
     }
 }
-}  // namespace tinytorch
+}  // namespace TINY_TORCH_NAMESPACE

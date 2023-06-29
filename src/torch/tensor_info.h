@@ -21,7 +21,7 @@
 #include "tiny_torch_config.h"
 #include <type_traits>
 
-namespace tinytorch
+namespace TINY_TORCH_NAMESPACE
 {
 
 
@@ -144,4 +144,4 @@ struct IndexToOffset<T, -1>
 };
 
 
-}  // namespace tinytorch
+}  // namespace TINY_TORCH_NAMESPACE

@@ -11,32 +11,34 @@
 #include "tensor_info.h"
 #include "tiny_torch_config.h"
 
-namespace tinytorch
+namespace TINY_TORCH_NAMESPACE
 {
 namespace optim
 {
 
 struct AdamOptions
 {
-    AdamOptions(double lr = 1e-3) : lr(lr) {}
-    double lr = 1e-3;
+    AdamOptions(double lr = 1e-3) : lr_(lr) {}
+    double& lr() { return lr_; }
+    double lr_ = 1e-3;
     typedef std::tuple<double, double> betas_t;
-    betas_t betas       = std::make_tuple(0.9, 0.999);
-    double eps          = 1e-8;
-    double weight_decay = 0;
-    bool amsgrad        = false;
+    betas_t betas_       = std::make_tuple(0.9, 0.999);
+    double eps_          = 1e-8;
+    double weight_decay_ = 0;
+    bool amsgrad_        = false;
 };
 
 
 struct RMSpropOptions
 {
-    RMSpropOptions(double lr = 1e-2) : lr(lr) {}
-    double lr           = 1e-2;
-    double alpha        = 0.99;
-    double eps          = 1e-8;
-    double weight_decay = 0;
-    double momentum     = 0;
-    bool centered       = false;
+    RMSpropOptions(double lr = 1e-2) : lr_(lr) {}
+    double& lr() { return lr_; }
+    double lr_           = 1e-2;
+    double alpha_        = 0.99;
+    double eps_          = 1e-8;
+    double weight_decay_ = 0;
+    double momentum_     = 0;
+    bool centered_       = false;
 };
 
 
@@ -121,4 +123,4 @@ struct SGDOptimizer
     std::vector<Tensor> velocities;
 };
 }  // namespace optim
-}  // namespace tinytorch
+}  // namespace TINY_TORCH_NAMESPACE

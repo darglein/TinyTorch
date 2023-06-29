@@ -3,17 +3,17 @@
 #include "ops.h"
 #include "tensor.h"
 
-namespace tinytorch
+namespace TINY_TORCH_NAMESPACE
 {
 
 
 void backward(Tensor loss)
 {
     // for graph traversal
-    std::vector<std::shared_ptr<Node>> node_stack;
+    std::vector<std::shared_ptr<autograd::Node>> node_stack;
 
     // Here we accumulate the gradients
-    std::map<std::shared_ptr<Node>, std::vector<Tensor>> grad_map;
+    std::map<std::shared_ptr<autograd::Node>, std::vector<Tensor>> grad_map;
 
 
     assert(loss.numel() == 1);
@@ -65,4 +65,4 @@ void backward(Tensor loss)
     }
 }
 
-}  // namespace tinytorch
+}  // namespace TINY_TORCH_NAMESPACE

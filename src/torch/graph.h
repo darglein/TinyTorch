@@ -5,40 +5,74 @@
  */
 
 #pragma once
-#include "tensor.h"
 #include "ops.h"
+#include "tensor.h"
 
 #include <map>
 
 #include "tiny_torch_config.h"
 
-namespace tinytorch
+namespace TINY_TORCH_NAMESPACE
 {
-
+namespace autograd
+{
 struct Node;
+}
 
 // exact copy paste from pytorch
 struct Edge
 {
-    Edge(std::shared_ptr<Node> function_, uint32_t input_nr_) noexcept
+    Edge(std::shared_ptr<autograd::Node> function_, uint32_t input_nr_) noexcept
         : function(std::move(function_)), input_nr(input_nr_)
     {
     }
 
     /// The function this `Edge` points to.
-    std::shared_ptr<Node> function;
+    std::shared_ptr<autograd::Node> function;
 
     /// The identifier of a particular input to the function.
     uint32_t input_nr;
+};
+
+
+namespace autograd
+{
+
+struct IValue
+{
+    template <typename T>
+    std::shared_ptr<T> toCustomClass()
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
 };
 
 struct Context
 {
     std::map<std::string, Tensor> data;
     std::map<std::string, int> data_int;
-    //TODO: besser
+    // TODO: besser
     std::map<std::string, std::vector<int64_t>> data_sizes;
+
+    std::map<std::string,IValue> saved_data;
+
+    void set_materialize_grads(bool b){
+
+        throw std::runtime_error("not implemented");
+    }
+
+    std::vector<Tensor> get_saved_variables(){
+
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+ void save_for_backward(   std::vector<Tensor> l){
+
+        throw std::runtime_error("not implemented");
+    }
 };
+
 
 struct Node
 {
@@ -63,6 +97,8 @@ struct Node
     int64_t num_input_gradients_of_backward = 0;
 };
 
+using AutogradContext = Context;
+using variable_list = std::vector<Tensor>;
 
 
 template <typename T>
@@ -102,7 +138,7 @@ struct FunctionNode : public Node
         for (int i = 0; i < result.size(); ++i)
         {
             result[i].set_requires_grad(need_grad);
-            if(need_grad)
+            if (need_grad)
             {
                 result[i].SetEdge(std::make_shared<Edge>(node, i));
             }
@@ -111,6 +147,8 @@ struct FunctionNode : public Node
     }
 };
 
+template <typename T>
+using Function = FunctionNode<T>;
 
 
 struct AccumulateGrad : public Node
@@ -127,11 +165,21 @@ struct AccumulateGrad : public Node
 
     Tensor t;
 };
+}  // namespace autograd
 
 inline void MakeParameter(Tensor t)
 {
     t.set_requires_grad(true);
-    t.SetEdge(std::make_shared<Edge>(std::make_shared<AccumulateGrad>(t), 0));
+    t.SetEdge(std::make_shared<Edge>(std::make_shared<autograd::AccumulateGrad>(t), 0));
 }
 
-}  // namespace tinytorch
+struct NoGradGuard
+{
+    NoGradGuard() { throw std::runtime_error("not implemented"); }
+};
+struct AutoGradMode
+{
+    AutoGradMode(bool b) { throw std::runtime_error("not implemented"); }
+};
+
+}  // namespace TINY_TORCH_NAMESPACE

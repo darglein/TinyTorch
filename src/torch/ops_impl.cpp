@@ -8,7 +8,7 @@
 #include "tensor.h"
 
 #include "tensor_info.h"
-namespace tinytorch
+namespace TINY_TORCH_NAMESPACE
 {
 
 #define CASE_MACRO(func, type, scalar_type, ...) \
@@ -21,6 +21,8 @@ namespace tinytorch
     {                                                   \
         CASE_MACRO(func, float, kFloat, __VA_ARGS__)    \
         CASE_MACRO(func, double, kDouble, __VA_ARGS__)  \
+        default:                                        \
+            break;                                      \
     }
 
 template <typename T>
@@ -327,4 +329,4 @@ Tensor& operator+=(Tensor& a, Tensor b)
     return a;
 }
 
-}  // namespace tinytorch
+}  // namespace TINY_TORCH_NAMESPACE
