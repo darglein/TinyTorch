@@ -44,6 +44,7 @@ struct Node
 {
     // Create a node and give it a unique increasing sequence number
     Node() : sequence_nr(current_seq_nr++) {}
+    virtual ~Node() {}
 
     // Computes and returns the gradients of the input tensor of the forward operator.
     // The input is the gradient of the forward output

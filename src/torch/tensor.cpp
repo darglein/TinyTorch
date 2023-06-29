@@ -84,7 +84,7 @@ bool Tensor::requires_grad()
 {
     return impl_->requires_grad();
 }
-uint8_t* Tensor::ptr()
+uint8_t* Tensor::ptr() const
 {
     return impl_->ptr();
 }

@@ -31,11 +31,15 @@ enum ScalarType
 {
     kByte,
     kUInt8 = kByte,
-    kShort,
-    kInt,
+    kInt16,
+    kShort=kInt16,
+    kInt32,
+    kInt=kInt32,
     kLong,
-    kFloat,
-    kDouble,
+    kFloat32,
+    kFloat=kFloat32,
+    kFloat64,
+    kDouble = kFloat64,
     kHalf,
 };
 

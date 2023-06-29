@@ -27,6 +27,10 @@ struct Edge;
 struct Tensor;
 struct TensorImpl;
 
+struct CustomClassHolder{
+
+};
+
 struct SizeType
 {
     SizeType() {}
@@ -74,9 +78,9 @@ struct TINYTORCH_API Tensor
     void SetEdge(std::shared_ptr<Edge> edge);
 
     template <typename T>
-    T* data_ptr();
+    T* data_ptr() const;
 
-    uint8_t* ptr();
+    uint8_t* ptr()  const;
 
     int64_t dim()const;
 
@@ -96,161 +100,161 @@ struct TINYTORCH_API Tensor
         return 0;
     }
 
-    Device device()
+    Device device()const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor view(std::vector<int64_t> sizes)
+    Tensor view(std::vector<int64_t> sizes)const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor slice(int64_t dim, int64_t start, int64_t end)
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-
-    Tensor clone()
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor to(ScalarType new_type)
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor to(Device new_type)
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor permute(std::vector<int64_t> size)
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor reshape(std::vector<int64_t> size)
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor repeat(std::vector<int64_t> size)
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor cpu()
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor square()
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor sqrt()
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor cuda()
+    Tensor slice(int64_t dim, int64_t start, int64_t end)const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
 
-    Tensor clamp(double mi, double ma)
+    Tensor clone()const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor clamp_min(double m)
+    Tensor to(ScalarType new_type)const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor unsqueeze(int64_t dim)
+    Tensor to(Device new_type)const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor squeeze(int64_t dim)
+    Tensor permute(std::vector<int64_t> size)const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor min()
+    Tensor reshape(std::vector<int64_t> size)const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    std::pair<Tensor, Tensor> min(int64_t index)
+    Tensor repeat(std::vector<int64_t> size)const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor max()
+    Tensor cpu() const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor sum()
+    Tensor square()const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor sum(int64_t dim, bool squeeze_dim)
+    Tensor sqrt()const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor mean()
+    Tensor cuda()const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor std()
+
+    Tensor clamp(double mi, double ma)const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor item()
+    Tensor clamp_min(double m)const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor unsqueeze(int64_t dim)const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor squeeze(int64_t dim)const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor min()const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    std::pair<Tensor, Tensor> min(int64_t index)const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor max()const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor sum()const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor sum(int64_t dim, bool squeeze_dim)const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor mean()const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor std()const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor item()const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
     template <typename T>
-    T item()
+    T item()const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    double toDouble()
+    double toDouble()const
     {
         throw std::runtime_error("not implemented");
         return 0;
     }
-    bool is_contiguous()
+    bool is_contiguous()const
     {
         throw std::runtime_error("not implemented");
         return true;
     }
-    bool is_cuda()
+    bool is_cuda()const
     {
         throw std::runtime_error("not implemented");
         return true;
     }
-    bool is_cpu()
+    bool is_cpu()const
     {
         throw std::runtime_error("not implemented");
         return true;
     }
 
-    Tensor contiguous()
+    Tensor contiguous()const
     {
         throw std::runtime_error("not implemented");
         return {};
@@ -322,7 +326,7 @@ struct TensorImpl
 };
 
 template <typename T>
-T* Tensor::data_ptr()
+T* Tensor::data_ptr()  const
 {
     assert(impl_);
     assert(scalar_type() == kFloat);

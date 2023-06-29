@@ -25,7 +25,13 @@ TINYTORCH_API Tensor zeros_like(Tensor t);
 TINYTORCH_API Tensor rand_like(Tensor t);
 
 
-inline Tensor from_blob(void* data, std::vector<int64_t> sizes,std::vector<int64_t> stride, ScalarType type)
+inline Tensor from_blob(void* data, std::vector<int64_t> sizes,std::vector<int64_t> stride, ScalarType type=kFloat)
+{
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor from_blob(void* data, std::vector<int64_t> sizes,ScalarType type=kFloat)
 {
 
     throw std::runtime_error("not implemented");
@@ -44,12 +50,37 @@ inline Tensor operator/(Tensor a, Tensor b){
     throw std::runtime_error("not implemented");
     return {};
 }
+inline Tensor operator/(Tensor a, double b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
 inline Tensor operator*(double a, Tensor b){
 
     throw std::runtime_error("not implemented");
     return {};
 }
+inline Tensor operator*(Tensor a, double b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
 inline Tensor operator+(double a, Tensor b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor operator+(Tensor a,double b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor operator-(Tensor a, double b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor operator-(double a, Tensor b){
 
     throw std::runtime_error("not implemented");
     return {};
@@ -60,6 +91,11 @@ TINYTORCH_API Tensor& operator+=(Tensor& a, Tensor b);
 
 
 inline Tensor cat(std::vector<Tensor> a, int64_t dim)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor index_select(Tensor a, int64_t dim, Tensor b)
 {
     throw std::runtime_error("not implemented");
     return {};

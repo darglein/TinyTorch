@@ -13,6 +13,31 @@
 
 namespace tinytorch
 {
+namespace optim
+{
+
+struct AdamOptions
+{
+    AdamOptions(double lr = 1e-3) : lr(lr) {}
+    double lr = 1e-3;
+    typedef std::tuple<double, double> betas_t;
+    betas_t betas       = std::make_tuple(0.9, 0.999);
+    double eps          = 1e-8;
+    double weight_decay = 0;
+    bool amsgrad        = false;
+};
+
+
+struct RMSpropOptions
+{
+    RMSpropOptions(double lr = 1e-2) : lr(lr) {}
+    double lr           = 1e-2;
+    double alpha        = 0.99;
+    double eps          = 1e-8;
+    double weight_decay = 0;
+    double momentum     = 0;
+    bool centered       = false;
+};
 
 
 template <typename T>
@@ -55,7 +80,7 @@ void sgd_step(TensorInfo<T> param, TensorInfo<T> param_grad, TensorInfo<T> veloc
 // implemented after https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
 struct SGDOptimizer
 {
-    SGDOptimizer(std::vector<Tensor> t, float lr) :  lr(lr), params(t)
+    SGDOptimizer(std::vector<Tensor> t, float lr) : lr(lr), params(t)
     {
         velocities.resize(t.size());
         for (int i = 0; i < t.size(); ++i)
@@ -95,5 +120,5 @@ struct SGDOptimizer
     std::vector<Tensor> params;
     std::vector<Tensor> velocities;
 };
-
+}  // namespace optim
 }  // namespace tinytorch
