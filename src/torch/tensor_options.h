@@ -41,9 +41,21 @@ struct TINYTORCH_API TensorOptions
     bool has_pinned_memory_ : 1;
     bool has_memory_format_ : 1;
 
+    TensorOptions() {}
+    TensorOptions(Device device) : device_(device) {}
+    TensorOptions(ScalarType dtype) : dtype_(dtype) {}
 
-    TensorOptions& device(Device d) { device_ = d; return *this;}
-    TensorOptions& dtype(ScalarType d) { dtype_ = d;  return *this;}
+
+    TensorOptions& device(Device d)
+    {
+        device_ = d;
+        return *this;
+    }
+    TensorOptions& dtype(ScalarType d)
+    {
+        dtype_ = d;
+        return *this;
+    }
 };
 
 

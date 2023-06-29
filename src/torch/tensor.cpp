@@ -88,7 +88,7 @@ uint8_t* Tensor::ptr()
 {
     return impl_->ptr();
 }
-const std::vector<int64_t>& Tensor::sizes() const
+const SizeType& Tensor::sizes() const
 {
     return impl_->sizes_;
 }
@@ -119,7 +119,8 @@ TensorOptions Tensor::options() const
 }
 
 
-TensorImpl::TensorImpl(const std::vector<int64_t>& sizes, TensorOptions options) : sizes_(sizes), options_(options)
+
+TensorImpl::TensorImpl(SizeType sizes, TensorOptions options) : sizes_(sizes), options_(options)
 {
     int64_t bytes_per_element = 4;
 
@@ -136,7 +137,7 @@ void TensorImpl::set_requires_grad(bool requires_grad)
 {
     if (requires_grad)
     {
-        autograd_meta = std::make_unique<AutogradMeta>();
+        autograd_meta        = std::make_unique<AutogradMeta>();
         autograd_meta->_grad = zeros(sizes_);
     }
     else

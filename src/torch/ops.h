@@ -24,6 +24,13 @@ TINYTORCH_API Tensor empty_like(Tensor t);
 TINYTORCH_API Tensor zeros_like(Tensor t);
 TINYTORCH_API Tensor rand_like(Tensor t);
 
+
+inline Tensor from_blob(void* data, std::vector<int64_t> sizes,std::vector<int64_t> stride, ScalarType type)
+{
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
 TINYTORCH_API std::ostream& operator<<(std::ostream& strm, Tensor t);
 
 // Basic Tensor Math operators
@@ -32,10 +39,31 @@ TINYTORCH_API Tensor square(Tensor a);
 TINYTORCH_API Tensor operator-(Tensor a, Tensor b);
 TINYTORCH_API Tensor operator+(Tensor a, Tensor b);
 TINYTORCH_API Tensor operator*(Tensor a, Tensor b);
+inline Tensor operator/(Tensor a, Tensor b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor operator*(double a, Tensor b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor operator+(double a, Tensor b){
+
+    throw std::runtime_error("not implemented");
+    return {};
+}
 TINYTORCH_API Tensor sum(Tensor a);
 
 TINYTORCH_API Tensor& operator+=(Tensor& a, Tensor b);
 
+
+inline Tensor cat(std::vector<Tensor> a, int64_t dim)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
 
 // Internal implementation of forward/backward
 // Should NOT be called by the user
