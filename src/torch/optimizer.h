@@ -113,10 +113,10 @@ struct SGDOptimizer
     }
 
     bool nesterov   = true;
-    float dampening = 0.1;
+    float dampening = 0.1f;
     int step        = 0;
     float lr;
-    float momentum = 0.5;
+    float momentum = 0.5f;
     std::vector<Tensor> params;
     std::vector<Tensor> velocities;
 };

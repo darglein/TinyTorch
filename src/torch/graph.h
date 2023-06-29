@@ -60,7 +60,7 @@ struct Node
     // Variables that are required for the backward pass
     Context context;
 
-    int num_input_gradients_of_backward;
+    int64_t num_input_gradients_of_backward = 0;
 };
 
 
