@@ -256,11 +256,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor squeeze(int64_t dim) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor squeeze(int64_t dim) const;
     Tensor prod(int64_t dim) const
     {
         throw std::runtime_error("not implemented");
@@ -406,6 +402,7 @@ struct AutogradMeta
 struct TensorImpl
 {
     TensorImpl(const SizeType& sizes, TensorOptions options);
+    TensorImpl(std::shared_ptr<StorageImpl> storage, const SizeType& sizes, TensorOptions options);
     // TensorImpl(std::vector<float> data) : data(data) {}
 
 
@@ -452,6 +449,9 @@ struct TensorImpl
     TensorOptions options_;
     // required for .backward()
     // std::vector<float> grad;
+
+private:
+    void recompute_strides();
 };
 
 template <typename T>

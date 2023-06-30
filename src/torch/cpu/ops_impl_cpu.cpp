@@ -442,15 +442,59 @@ Tensor softplus_impl_cpu(Tensor a, double beta)
 }
 
 template <typename T>
-static void prod_impl_cpu(TensorInfo<T> a, int64_t dim, TensorInfo<T> result)
+static void prod_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
-    throw std::runtime_error("not implemented");
+    int64_t dims = input.dims;
+
+    int64_t to_prod = input.sizes[dim];
+    int64_t count   = input.numel() / input.sizes[dim];
+    assert(count == result.numel());
+
+    for (int64_t c = 0; c < count; ++c)
+    {
+        int64_t linearId = c;
+
+        int64_t input_offset = 0;
+        for (int64_t i = dims - 1; i > 0; --i)
+        {
+            if (i != dim)
+            {
+                int64_t curDimIndex = linearId % input.sizes[i];
+                input_offset += curDimIndex * input.strides[i];
+                linearId /= input.sizes[i];
+            }
+        }
+
+        if (dim != 0)
+        {
+            input_offset += linearId * input.strides[0];
+        }
+
+        T prod = T(1);
+
+        for (int64_t p = 0; p < to_prod; ++p)
+        {
+            prod *= input[input_offset];
+            input_offset += input.strides[dim];
+        }
+
+        result[c] = prod;
+    }
 }
 
-Tensor prod_impl_cpu(Tensor a, int64_t dim)
+Tensor prod_impl_cpu(Tensor input, int64_t dim)
 {
-    Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), prod_impl_cpu, a, dim, result);
+    assert(dim < input.dim());
+
+    auto result_size = input.sizes().vec();
+    result_size[dim] = 1;
+
+    Tensor result = empty(result_size, input.options());
+
+    SWITCH_MACRO_ALL(input.scalar_type(), prod_impl_cpu, input, dim, result);
+
+    result = result.squeeze(dim);
+
     return result;
 }
 
