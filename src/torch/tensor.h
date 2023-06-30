@@ -83,14 +83,9 @@ inline std::ostream& operator<<(std::ostream& strm, const SizeType& size)
 
 struct TINYTORCH_API Tensor
 {
-    // Tensor(int size = 0);
-    // Tensor(std::vector<float> data);
-
     Tensor() {}
     Tensor(std::shared_ptr<TensorImpl> impl) : impl_(impl) {}
     int64_t numel() const;
-    // float& operator[](int idx);
-    void resize(int new_size);
 
     const SizeType& strides() const;
     const SizeType& sizes() const;
@@ -98,7 +93,9 @@ struct TINYTORCH_API Tensor
     ScalarType scalar_type() const;
     ScalarType dtype() const { return scalar_type(); }
 
-    // void ClearGrad();
+    Device device() const;
+    TensorOptions options() const;
+
     const Tensor& grad() const;
 
     Tensor& mutable_grad();
@@ -120,18 +117,11 @@ struct TINYTORCH_API Tensor
 
     bool defined() const { return impl_ != nullptr; }
 
-    TensorOptions options() const;
-
     void set_requires_grad(bool requires_grad);
 
     bool requires_grad() const;
     int64_t element_size() const;
 
-    Device device() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
     Tensor view(const SizeType& sizes) const
     {
         throw std::runtime_error("not implemented");
@@ -152,7 +142,6 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-
     Tensor scatter_add(int64_t dim, Tensor ids, Tensor value) const
     {
         throw std::runtime_error("not implemented");
@@ -340,8 +329,8 @@ struct TINYTORCH_API Tensor
     template <typename T>
     T item() const
     {
-        throw std::runtime_error("not implemented");
-        return {};
+        assert(numel() == 1);
+        return *data_ptr<T>();
     }
     double toDouble() const
     {
@@ -363,16 +352,8 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return true;
     }
-    bool is_cuda() const
-    {
-        throw std::runtime_error("not implemented");
-        return true;
-    }
-    bool is_cpu() const
-    {
-        throw std::runtime_error("not implemented");
-        return true;
-    }
+    inline bool is_cuda() const { return device() == kCUDA; }
+    bool is_cpu() const { return device() == kCPU; }
 
     Tensor contiguous() const
     {

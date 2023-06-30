@@ -561,9 +561,9 @@ std::vector<Tensor> square_backward_impl(Tensor a, Tensor grad_output)
 }
 
 
-
+// Function for when the derivative is one.
 template <typename T>
-static void add_backward_impl(TensorInfo<T> grad_output, TensorInfo<T> grad_a, TensorInfo<T> grad_b)
+static void one_backward_impl(TensorInfo<T> grad_output, TensorInfo<T> grad_a, TensorInfo<T> grad_b)
 {
     for (int64_t i = 0; i < grad_output.numel(); ++i)
     {
@@ -573,15 +573,13 @@ static void add_backward_impl(TensorInfo<T> grad_output, TensorInfo<T> grad_a, T
     }
 }
 
-
 std::vector<Tensor> add_backward_impl(Tensor grad_output)
 {
     Tensor grad_a = empty_like(grad_output);
     Tensor grad_b = empty_like(grad_output);
-    SWITCH_MACRO_ALL(grad_output.scalar_type(), add_backward_impl, grad_output, grad_a, grad_b);
+    SWITCH_MACRO_ALL(grad_output.scalar_type(), one_backward_impl, grad_output, grad_a, grad_b);
     return {grad_a, grad_b};
 }
-
 
 template <typename T>
 static void sub_backward_impl(TensorInfo<T> grad_output, TensorInfo<T> grad_a, TensorInfo<T> grad_b)
@@ -897,22 +895,11 @@ std::vector<Tensor> prod_backward_impl(Tensor a, int64_t dim, Tensor grad_output
     return {};
 }
 
-template <typename T>
-static void minmax_backward_impl(TensorInfo<T> grad_output, TensorInfo<T> grad_a, TensorInfo<T> grad_b)
-{
-    for (int64_t i = 0; i < grad_output.numel(); ++i)
-    {
-        T g       = grad_output[i];
-        grad_a[i] = g;
-        grad_b[i] = g;
-    }
-}
-
 std::vector<Tensor> min_backward_impl(Tensor grad_output)
 {
     Tensor grad_a = empty_like(grad_output);
     Tensor grad_b = empty_like(grad_output);
-    SWITCH_MACRO_FLOAT(grad_output.scalar_type(), minmax_backward_impl, grad_output, grad_a, grad_b);
+    SWITCH_MACRO_FLOAT(grad_output.scalar_type(), one_backward_impl, grad_output, grad_a, grad_b);
     return {grad_a, grad_b};
 }
 
@@ -920,7 +907,7 @@ std::vector<Tensor> max_backward_impl(Tensor grad_output)
 {
     Tensor grad_a = empty_like(grad_output);
     Tensor grad_b = empty_like(grad_output);
-    SWITCH_MACRO_FLOAT(grad_output.scalar_type(), minmax_backward_impl, grad_output, grad_a, grad_b);
+    SWITCH_MACRO_FLOAT(grad_output.scalar_type(), one_backward_impl, grad_output, grad_a, grad_b);
     return {grad_a, grad_b};
 }
 
@@ -1060,7 +1047,21 @@ Tensor operator+=(Tensor a, Tensor b)
     return a;
 }
 
+Tensor operator+=(Tensor a, double b)
+{
+    assert(!a.requires_grad());
+    SWITCH_MACRO_ALL(a.scalar_type(), add_impl, a, b, a);
+    return a;
+}
+
 Tensor operator-=(Tensor a, Tensor b)
+{
+    assert(!a.requires_grad());
+    SWITCH_MACRO_ALL(a.scalar_type(), sub_impl, a, b, a);
+    return a;
+}
+
+Tensor operator-=(Tensor a, double b)
 {
     assert(!a.requires_grad());
     SWITCH_MACRO_ALL(a.scalar_type(), sub_impl, a, b, a);
@@ -1074,7 +1075,21 @@ Tensor operator*=(Tensor a, Tensor b)
     return a;
 }
 
+Tensor operator*=(Tensor a, double b)
+{
+    assert(!a.requires_grad());
+    SWITCH_MACRO_ALL(a.scalar_type(), mult_impl, a, b, a);
+    return a;
+}
+
 Tensor operator/=(Tensor a, Tensor b)
+{
+    assert(!a.requires_grad());
+    SWITCH_MACRO_ALL(a.scalar_type(), div_impl, a, b, a);
+    return a;
+}
+
+Tensor operator/=(Tensor a, double b)
 {
     assert(!a.requires_grad());
     SWITCH_MACRO_ALL(a.scalar_type(), div_impl, a, b, a);

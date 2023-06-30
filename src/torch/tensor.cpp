@@ -9,30 +9,11 @@
 namespace TINY_TORCH_NAMESPACE
 {
 
-
-void Tensor::resize(int new_size)
-{
-    //    assert(impl_);
-    //    impl_->data.resize(new_size, 0);
-    //    if (impl_->autograd_meta)
-    //    {
-    //        impl_->autograd_meta->mutable_grad().resize(new_size);
-    //    }
-}
-// float& Tensor::operator[](int idx)
-//{
-//     return impl_->data[idx];
-// }
 int64_t Tensor::numel() const
 {
     return impl_->numel();
 }
-// Tensor::Tensor(std::vector<float> data) : impl_(std::make_shared<TensorImpl>(data)) {}
-// Tensor::Tensor(int size) : impl_(std::make_shared<TensorImpl>(size)) {}
-// void Tensor::ClearGrad()
-//{
-//    mutable_grad().impl_->data.clear();
-//}
+
 const Tensor& Tensor::grad() const
 {
     return impl_->autograd_meta->grad();
@@ -43,33 +24,9 @@ Tensor& Tensor::mutable_grad()
     return impl_->autograd_meta->mutable_grad();
 }
 
-
-// void Tensor::AddGradInplace(Tensor g)
-//{
-//     resize(g.size());
-//     for (int i = 0; i < size(); ++i)
-//     {
-//         mutable_grad().impl_->data[i] += g[i];
-//     }
-// }
-// void Tensor::AddInplace(Tensor g)
-//{
-//     resize(g.size());
-//     for (int i = 0; i < size(); ++i)
-//     {
-//         impl_->data[i] += g[i];
-//     }
-// }
 std::shared_ptr<Edge> Tensor::getEdge() const
 {
-    if (impl_->autograd_meta)
-    {
-        return impl_->autograd_meta->edge;
-    }
-    else
-    {
-        return nullptr;
-    }
+    return impl_->autograd_meta ? impl_->autograd_meta->edge : nullptr;
 }
 void Tensor::SetEdge(std::shared_ptr<Edge> edge)
 {
@@ -87,6 +44,10 @@ bool Tensor::requires_grad() const
 int64_t Tensor::element_size() const
 {
     return elementSize(dtype());
+}
+Device Tensor::device() const
+{
+    return impl_->options_.device_;
 }
 uint8_t* Tensor::ptr() const
 {
@@ -112,7 +73,6 @@ int64_t Tensor::stride(int64_t index) const
 {
     return impl_->strides_[index];
 }
-
 void Tensor::zero_()
 {
     fill_impl(*this, 0);
