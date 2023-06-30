@@ -88,6 +88,10 @@ uint8_t* Tensor::ptr() const
 {
     return impl_->ptr();
 }
+const SizeType& Tensor::strides() const
+{
+    return impl_->strides_;
+}
 const SizeType& Tensor::sizes() const
 {
     return impl_->sizes_;
@@ -120,7 +124,7 @@ TensorOptions Tensor::options() const
 
 
 
-TensorImpl::TensorImpl(SizeType sizes, TensorOptions options) : sizes_(sizes), options_(options)
+TensorImpl::TensorImpl(const SizeType& sizes, TensorOptions options) : sizes_(sizes), options_(options)
 {
     int64_t bytes_per_element = 4;
 

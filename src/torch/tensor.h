@@ -34,25 +34,35 @@ struct CustomClassHolder
 struct SizeType
 {
     SizeType() {}
-    SizeType(std::vector<int64_t> v) : data_(v) {}
+    SizeType(const std::vector<int64_t>& v) : data_(v) {}
+    SizeType(const std::initializer_list<int64_t>& v) : data_(v) {}
+    SizeType(const SizeType&) = default;
+    SizeType(SizeType&&) = default;
     int64_t& operator[](int64_t i) { return data_[i]; }
     const int64_t& operator[](int64_t i) const { return data_[i]; }
     int64_t size() const { return data_.size(); }
     void resize(int64_t s) { data_.resize(s); }
-    std::vector<int64_t> vec() const { return data_; }
-    operator std::vector<int64_t>() const { return data_; }
+    const std::vector<int64_t>& vec() const { return data_; }
+    operator const std::vector<int64_t>&() const { return data_; }
+
+    SizeType& operator=(const SizeType&) = default;
+    SizeType& operator=(SizeType&&) = default;
 
    private:
     std::vector<int64_t> data_;
 };
 inline bool operator==(SizeType s1, SizeType s2)
 {
-    throw std::runtime_error("not implemented");
-    return false;
+    return s1.vec() == s2.vec();
 }
 inline std::ostream& operator<<(std::ostream& strm, const SizeType& size)
 {
-    throw std::runtime_error("not implemented");
+    strm << "[ ";
+    for (int64_t i = 0; i < size.size(); ++i) 
+    {
+        strm << size[i] << ((i < size.size() - 1) ? ", " : " ");
+    }
+    strm << "]";
     return strm;
 }
 
@@ -69,12 +79,7 @@ struct TINYTORCH_API Tensor
     // float& operator[](int idx);
     void resize(int new_size);
 
-    const SizeType strides() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-
+    const SizeType& strides() const;
     const SizeType& sizes() const;
 
     ScalarType scalar_type() const;
@@ -339,7 +344,7 @@ struct AutogradMeta
 
 struct TensorImpl
 {
-    TensorImpl(SizeType sizes, TensorOptions options);
+    TensorImpl(const SizeType& sizes, TensorOptions options);
     // TensorImpl(std::vector<float> data) : data(data) {}
 
 

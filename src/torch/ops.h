@@ -12,12 +12,12 @@
 namespace TINY_TORCH_NAMESPACE
 {
 // Basic tensor generation
-TINYTORCH_API Tensor full(const std::vector<int64_t>& sizes, float value, TensorOptions options = TensorOptions());
-TINYTORCH_API Tensor ones(const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions());
-TINYTORCH_API Tensor empty(const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions());
-TINYTORCH_API Tensor zeros(const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions());
-TINYTORCH_API Tensor rand(const std::vector<int64_t>& sizes, TensorOptions options = TensorOptions());
-TINYTORCH_API Tensor randint(int low, int high, const std::vector<int64_t>& sizes,
+TINYTORCH_API Tensor full(const SizeType& sizes, float value, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor ones(const SizeType& sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor empty(const SizeType& sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor zeros(const SizeType& sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor rand(const SizeType& sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor randint(int low, int high, const SizeType& sizes,
                              TensorOptions options = TensorOptions());
 
 TINYTORCH_API Tensor full_like(Tensor t, float value);
@@ -27,13 +27,13 @@ TINYTORCH_API Tensor zeros_like(Tensor t);
 TINYTORCH_API Tensor rand_like(Tensor t);
 
 
-inline Tensor from_blob(void* data, const std::vector<int64_t>& sizes, const std::vector<int64_t>& stride,
+inline Tensor from_blob(void* data, const SizeType& sizes, const SizeType& stride,
                         ScalarType type = kFloat)
 {
     throw std::runtime_error("not implemented");
     return {};
 }
-inline Tensor from_blob(void* data, const std::vector<int64_t>& sizes, ScalarType type = kFloat)
+inline Tensor from_blob(void* data, const SizeType& sizes, ScalarType type = kFloat)
 {
     throw std::runtime_error("not implemented");
     return {};
@@ -172,7 +172,7 @@ std::vector<Tensor> mult_backward_impl(double b, Tensor a, Tensor grad_output); 
 std::vector<Tensor> div_backward_impl(Tensor a, Tensor b, Tensor grad_output);
 std::vector<Tensor> div_backward_impl(Tensor a, double b, Tensor grad_output); // Returns only one gradient, the one for the tensor.
 std::vector<Tensor> neg_backward_impl(Tensor grad_output);
-std::vector<Tensor> sum_backward_impl(const std::vector<int64_t>& input_sizes, Tensor grad_output);
+std::vector<Tensor> sum_backward_impl(const SizeType& input_sizes, Tensor grad_output);
 std::vector<Tensor> log_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> log1p_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> exp_backward_impl(Tensor a, Tensor grad_output);

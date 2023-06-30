@@ -53,7 +53,7 @@ struct Context
     std::map<std::string, Tensor> data;
     std::map<std::string, int> data_int;
     // TODO: besser
-    std::map<std::string, std::vector<int64_t>> data_sizes;
+    std::map<std::string, SizeType> data_sizes;
 
     std::map<std::string, IValue> saved_data;
 
