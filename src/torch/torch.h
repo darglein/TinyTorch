@@ -7,7 +7,7 @@
 #pragma once
 
 #include "tiny_torch.h"
-#include "cuda.h"
+#include "tiny_torch_cuda.h"
 
 
 namespace torch = TINY_TORCH_NAMESPACE;
