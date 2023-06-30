@@ -87,21 +87,41 @@ TensorOptions Tensor::options() const
     return impl_->options_;
 }
 
+Tensor Tensor::squeeze(int64_t dim) const 
+{
+    assert(size(dim) == 1);
+
+    std::vector<int64_t> new_sizes = sizes().vec();
+    new_sizes.erase(std::next(new_sizes.begin(), dim));
+    std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(impl_->storage_, new_sizes, options());
+    return Tensor(new_impl);
+}
+
 
 
 TensorImpl::TensorImpl(const SizeType& sizes, TensorOptions options) : sizes_(sizes), options_(options)
 {
-    int64_t bytes_per_element = elementSize(options.dtype_);
+    recompute_strides();
+    storage_ = std::make_shared<StorageImpl>(elementSize(options.dtype_) * numel(), kCPU);
+}
 
+TensorImpl::TensorImpl(std::shared_ptr<StorageImpl> storage, const SizeType& sizes, TensorOptions options)
+    : storage_(storage), sizes_(sizes), options_(options)
+{
+    recompute_strides();
+}
+
+void TensorImpl::recompute_strides() 
+{
     strides_.resize(dim());
     int64_t stride = 1;
     for (int64_t i = dim() - 1; i >= 0; --i)
     {
         strides_[i] = stride;
-        stride *= sizes[i];
+        stride *= sizes_[i];
     }
-    storage_ = std::make_shared<StorageImpl>(bytes_per_element * numel(), kCPU);
 }
+
 void TensorImpl::set_requires_grad(bool requires_grad)
 {
     if (requires_grad)
