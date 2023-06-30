@@ -180,6 +180,11 @@ inline Tensor min(Tensor a, Tensor b)
     throw std::runtime_error("not implemented");
     return {};
 }
+inline Tensor max(Tensor a, Tensor b)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
 TINYTORCH_API Tensor sum(Tensor a);
 
 TINYTORCH_API Tensor operator+=(Tensor a, Tensor b);
@@ -237,8 +242,16 @@ Tensor sum_impl(Tensor a);
 Tensor log_impl(Tensor a);
 Tensor log1p_impl(Tensor a);
 Tensor exp_impl(Tensor a);
+Tensor sign_impl(Tensor a);
+Tensor pow_impl(Tensor a, double b);
 Tensor sin_impl(Tensor a);
 Tensor cos_impl(Tensor a);
+Tensor relu_impl(Tensor a);
+Tensor sigmoid_impl(Tensor a);
+Tensor softplus_impl(Tensor a, double beta);
+Tensor prod_impl(Tensor a, int64_t dim);
+Tensor min_impl(Tensor a, Tensor b);
+Tensor max_impl(Tensor a, Tensor b);
 Tensor index_select_impl(Tensor input, int64_t dim, Tensor index);
 std::vector<Tensor> square_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> add_backward_impl(Tensor grad_output);
@@ -248,11 +261,13 @@ std::vector<Tensor> mult_backward_impl(Tensor a, double b, Tensor grad_output); 
 std::vector<Tensor> mult_backward_impl(double b, Tensor a, Tensor grad_output); // Returns only one gradient, the one for the tensor.
 std::vector<Tensor> div_backward_impl(Tensor a, Tensor b, Tensor grad_output);
 std::vector<Tensor> div_backward_impl(Tensor a, double b, Tensor grad_output); // Returns only one gradient, the one for the tensor.
+std::vector<Tensor> div_backward_impl(double a, Tensor b, Tensor grad_output); // Returns only one gradient, the one for the tensor.
 std::vector<Tensor> neg_backward_impl(Tensor grad_output);
 std::vector<Tensor> sum_backward_impl(const SizeType& input_sizes, Tensor grad_output);
 std::vector<Tensor> log_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> log1p_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> exp_backward_impl(Tensor a, Tensor grad_output);
+std::vector<Tensor> sign_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> sin_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> cos_backward_impl(Tensor a, Tensor grad_output);
 

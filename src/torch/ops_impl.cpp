@@ -327,6 +327,39 @@ Tensor exp_impl(Tensor a)
 }
 
 template <typename T>
+static void sign_impl(TensorInfo<T> a, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        T v = a[i];
+        result[i] = (v < T(0)) ? T(-1) : (v > T(0)) ? T(1) : T(0);
+    }
+}
+
+Tensor sign_impl(Tensor a)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_FLOAT(a.scalar_type(), sign_impl, a, result);
+    return result;
+}
+
+template <typename T>
+static void pow_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(std::pow(a[i], b));
+    }
+}
+
+Tensor pow_impl(Tensor a, double b)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_FLOAT(a.scalar_type(), pow_impl, a, b, result);
+    return result;
+}
+
+template <typename T>
 static void sin_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
@@ -355,6 +388,100 @@ Tensor cos_impl(Tensor a)
 {
     Tensor result = empty_like(a);
     SWITCH_MACRO_FLOAT(a.scalar_type(), cos_impl, a, result);
+    return result;
+}
+
+template <typename T>
+static void relu_impl(TensorInfo<T> a, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = std::max(a[i], T(0));
+    }
+}
+
+Tensor relu_impl(Tensor a)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_FLOAT(a.scalar_type(), relu_impl, a, result);
+    return result;
+}
+
+template <typename T>
+static void sigmoid_impl(TensorInfo<T> a, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(1) / (T(1) + std::exp(-a[i]));
+    }
+}
+
+Tensor sigmoid_impl(Tensor a)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_FLOAT(a.scalar_type(), sigmoid_impl, a, result);
+    return result;
+}
+
+template <typename T>
+static void softplus_impl(TensorInfo<T> a, double beta, TensorInfo<T> result)
+{
+    double inv_beta = 1.0 / beta;
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(inv_beta * std::log(1 + std::exp(beta * a[i])));
+    }
+}
+
+Tensor softplus_impl(Tensor a, double beta)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_FLOAT(a.scalar_type(), softplus_impl, a, beta, result);
+    return result;
+}
+
+template <typename T>
+static void prod_impl(TensorInfo<T> a, int64_t dim, TensorInfo<T> result)
+{
+    throw std::runtime_error("not implemented");
+}
+
+Tensor prod_impl(Tensor a, int64_t dim)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_FLOAT(a.scalar_type(), prod_impl, a, dim, result);
+    return result;
+}
+
+template <typename T>
+static void min_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = std::min(a[i], b[i]);
+    }
+}
+
+Tensor min_impl(Tensor a, Tensor b)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), min_impl, a, b, result);
+    return result;
+}
+
+template <typename T>
+static void max_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = std::max(a[i], b[i]);
+    }
+}
+
+Tensor max_impl(Tensor a, Tensor b)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), max_impl, a, b, result);
     return result;
 }
 
@@ -559,6 +686,24 @@ std::vector<Tensor> div_backward_impl(Tensor a, double b, Tensor grad_output)
 }
 
 template <typename T>
+static void div_backward_impl(double a, TensorInfo<T> b, TensorInfo<T> grad_output, TensorInfo<T> grad_b)
+{
+    for (int64_t i = 0; i < b.numel(); ++i)
+    {
+        auto g    = grad_output[i];
+        T b_      = b[i];
+        grad_b[i] = T(-a / (b_ * b_) * g);
+    }
+}
+
+std::vector<Tensor> div_backward_impl(double a, Tensor b, Tensor grad_output)
+{
+    Tensor grad_b = empty_like(b);
+    SWITCH_MACRO_ALL(b.scalar_type(), div_backward_impl, a, b, grad_output, grad_b);
+    return {grad_b};
+}
+
+template <typename T>
 static void neg_backward_impl(TensorInfo<T> grad_output, TensorInfo<T> grad_a)
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
@@ -639,6 +784,22 @@ std::vector<Tensor> exp_backward_impl(Tensor a, Tensor grad_output)
 {
     Tensor grad_a = empty_like(a);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), exp_backward_impl, a, grad_output, grad_a);
+    return {grad_a};
+}
+
+template <typename T>
+static void sign_backward_impl(TensorInfo<T> grad_output, TensorInfo<T> grad_a)
+{
+    for (int64_t i = 0; i < grad_a.numel(); ++i)
+    {
+
+    }
+}
+
+std::vector<Tensor> sign_backward_impl(Tensor a, Tensor grad_output)
+{
+    Tensor grad_a = empty_like(a);
+    SWITCH_MACRO_FLOAT(grad_output.scalar_type(), sign_backward_impl, grad_output, grad_a);
     return {grad_a};
 }
 

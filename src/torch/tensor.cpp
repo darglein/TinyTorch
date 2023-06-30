@@ -90,7 +90,7 @@ int64_t Tensor::element_size() const
 }
 uint8_t* Tensor::ptr() const
 {
-    return impl_->ptr();
+    return impl_->data_ptr();
 }
 const SizeType& Tensor::strides() const
 {
