@@ -13,7 +13,7 @@ namespace TINY_TORCH_NAMESPACE
 {
 // Internal implementation of forward/backward
 // Should NOT be called by the user
-void fill_impl_cpu(Tensor a, float value);
+void fill_impl_cpu(Tensor a, double value);
 Tensor square_impl_cpu(Tensor a);
 Tensor add_impl_cpu(Tensor a, Tensor b);
 Tensor add_impl_cpu(Tensor a, double b);
