@@ -125,11 +125,7 @@ struct TINYTORCH_API Tensor
     void set_requires_grad(bool requires_grad);
 
     bool requires_grad() const;
-    int64_t element_size() const
-    {
-        throw std::runtime_error("not implemented");
-        return 0;
-    }
+    int64_t element_size() const;
 
     Device device() const
     {
@@ -454,7 +450,38 @@ template <typename T>
 T* Tensor::data_ptr() const
 {
     assert(impl_);
-    assert(scalar_type() == kFloat);
+
+    auto dtype = scalar_type();
+
+    // TODO: Half!
+    if constexpr (std::is_same_v<T, uint8_t>)
+    {
+        assert(dtype == kUInt8);
+    }
+    else if constexpr (std::is_same_v<T, int16_t>)
+    {
+        assert(dtype == kInt16);
+    }
+    else if constexpr (std::is_same_v<T, int32_t>)
+    {
+        assert(dtype == kInt32);
+    }
+    else if constexpr (std::is_same_v<T, int64_t>)
+    {
+        assert(dtype == kLong);
+    }
+    else if constexpr (std::is_same_v<T, float>)
+    {
+        assert(dtype == kFloat);
+    }
+    else if constexpr (std::is_same_v<T, double>)
+    {
+        assert(dtype == kFloat64);
+    }
+    else
+    {
+        static_assert(false);
+    }
     return (T*)ptr();
 }
 
