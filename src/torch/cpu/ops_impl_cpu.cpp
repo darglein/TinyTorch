@@ -42,15 +42,15 @@ namespace TINY_TORCH_NAMESPACE
     }
 
 template <typename T>
-static void fill_impl_cpu(TensorInfo<T> a, float value)
+static void fill_impl_cpu(TensorInfo<T> a, double value)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        a[i] = value;
+        a[i] = T(value);
     }
 }
 
-void fill_impl_cpu(Tensor a, float value)
+void fill_impl_cpu(Tensor a, double value)
 {
     SWITCH_MACRO_FLOAT(a.scalar_type(), fill_impl_cpu, a, value);
 }
