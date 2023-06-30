@@ -8,6 +8,8 @@
 #include "torch/core/tensor.h"
 #include "torch/cpu/ops_impl_cpu.h"
 #include "torch/core/tensor_info.h"
+#include "torch/core/ops_impl_shared.h"
+
 namespace TINY_TORCH_NAMESPACE
 {
 
@@ -40,15 +42,15 @@ namespace TINY_TORCH_NAMESPACE
     }
 
 template <typename T>
-static void fill_impl_cpu(TensorInfo<T> a, float value)
+static void fill_impl_cpu(TensorInfo<T> a, double value)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        a[i] = value;
+        a[i] = T(value);
     }
 }
 
-void fill_impl_cpu(Tensor a, float value)
+void fill_impl_cpu(Tensor a, double value)
 {
     SWITCH_MACRO_FLOAT(a.scalar_type(), fill_impl_cpu, a, value);
 }
@@ -299,7 +301,7 @@ static void log1p_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[i] = std::log(a[i] + 1.f);
+        result[i] = std::log1p(a[i]);
     }
 }
 
@@ -396,7 +398,7 @@ static void relu_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[i] = std::max(a[i], T(0));
+        result[i] = relu(a[i]);
     }
 }
 
@@ -412,7 +414,7 @@ static void sigmoid_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[i] = T(1) / (T(1) + std::exp(-a[i]));
+        result[i] = sigmoid(a[i]);
     }
 }
 
@@ -426,10 +428,9 @@ Tensor sigmoid_impl_cpu(Tensor a)
 template <typename T>
 static void softplus_impl_cpu(TensorInfo<T> a, double beta, TensorInfo<T> result)
 {
-    double inv_beta = 1.0 / beta;
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[i] = T(inv_beta * std::log(1 + std::exp(beta * a[i])));
+        result[i] = softplus(a[i], T(beta));
     }
 }
 
@@ -652,9 +653,9 @@ static void div_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         auto g    = grad_output[i];
-        T b_      = b[i];
-        grad_a[i] = g / b_;
-        grad_b[i] = -a[i] / (b_ * b_) * g;
+        auto [ga, gb] = div_backward(a[i], b[i]);
+        grad_a[i] = ga * g;
+        grad_b[i] = gb * g;
     }
 }
 
@@ -672,7 +673,8 @@ static void div_backward_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> grad_
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         auto g    = grad_output[i];
-        grad_a[i] = T(g / b);
+        auto [ga, gb] = div_backward(a[i], T(b));
+        grad_a[i] = ga * g;
     }
 }
 
@@ -689,8 +691,8 @@ static void div_backward_impl_cpu(double a, TensorInfo<T> b, TensorInfo<T> grad_
     for (int64_t i = 0; i < b.numel(); ++i)
     {
         auto g    = grad_output[i];
-        T b_      = b[i];
-        grad_b[i] = T(-a / (b_ * b_) * g);
+        auto [ga, gb] = div_backward(T(a), b[i]);
+        grad_b[i] = gb * g;
     }
 }
 
@@ -742,7 +744,7 @@ static void log_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, Te
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
     {
-        grad_a[i] = grad_output[i] / a[i];
+        grad_a[i] = log_backward(a[i]) * grad_output[i];
     }
 }
 
@@ -758,7 +760,7 @@ static void log1p_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, 
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
     {
-        grad_a[i] = grad_output[i] / (a[i] + T(1));
+        grad_a[i] = log1p_backward(a[i]) * grad_output[i];
     }
 }
 
@@ -796,7 +798,7 @@ static void pow_backward_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> grad_
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
     {
-        grad_a[i] = T(b * std::pow(a[i], b - 1)) * grad_output[i];
+        grad_a[i] = pow_backward(a[i], T(b)) * grad_output[i];
     }
 }
 
@@ -812,7 +814,7 @@ static void sin_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, Te
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
     {
-        grad_a[i] = std::cos(a[i]) * grad_output[i];
+        grad_a[i] = sin_backward(a[i]) * grad_output[i];
     }
 }
 
@@ -828,7 +830,7 @@ static void cos_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, Te
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
     {
-        grad_a[i] = -std::sin(a[i]) * grad_output[i];
+        grad_a[i] = cos_backward(a[i]) * grad_output[i];
     }
 }
 
@@ -844,7 +846,7 @@ static void relu_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, T
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
     {
-        grad_a[i] = ((a[i] < T(0)) ? T(0) : T(1)) * grad_output[i];
+        grad_a[i] = relu_backward(a[i]) * grad_output[i];
     }
 }
 
@@ -860,8 +862,7 @@ static void sigmoid_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
     {
-        T expnegx = T(std::exp(-a[i]));
-        grad_a[i] = expnegx / ((T(1) + expnegx) * (T(1) + expnegx)) * grad_output[i];
+        grad_a[i] = sigmoid_backward(a[i]) * grad_output[i];
     }
 }
 
@@ -877,8 +878,7 @@ static void softplus_backward_impl_cpu(TensorInfo<T> a, double beta, TensorInfo<
 {
     for (int64_t i = 0; i < grad_a.numel(); ++i)
     {
-        T e = T(std::exp(beta * a[i]));
-        grad_a[i] = e / (e + T(1)) * grad_output[i];
+        grad_a[i] = softplus_backward(a[i], T(beta)) * grad_output[i];
     }
 }
 
