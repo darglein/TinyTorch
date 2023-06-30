@@ -17,29 +17,30 @@ namespace autograd
 {
 struct SquareNode : public FunctionNode<SquareNode>
 {
-    static std::vector<Tensor> forward(Context& ctx, const std::vector<Tensor>& t)
+    static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
-        ctx.data["t"] = t[0];
-        auto result   = square_impl_cpu(t[0]);
+        ctx->save_for_backward({a});
+        auto result   = square_impl_cpu(a);
         return {result};
     }
 
-    static std::vector<Tensor> backward(Context& ctx, const std::vector<Tensor>& grad)
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto grad_a = square_backward_impl_cpu(ctx.data["t"], grad[0]);
+        auto l = ctx->get_saved_variables();
+        auto grad_a = square_backward_impl_cpu(l[0], grad[0]);
         return grad_a;
     }
 };
 
 struct AddNode : public FunctionNode<AddNode>
 {
-    static std::vector<Tensor> forward(Context& ctx, const std::vector<Tensor>& t)
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
-        auto result = add_impl_cpu(t[0], t[1]);
+        auto result = add_impl_cpu(a, b);
         return {result};
     }
 
-    static std::vector<Tensor> backward(Context& ctx, const std::vector<Tensor>& grad)
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         auto grad_a = add_backward_impl_cpu(grad[0]);
         return grad_a;
@@ -48,13 +49,13 @@ struct AddNode : public FunctionNode<AddNode>
 
 struct SubNode : public FunctionNode<SubNode>
 {
-    static std::vector<Tensor> forward(Context& ctx, const std::vector<Tensor>& t)
+    static std::vector<Tensor> forward(Context* ctx,  Tensor a, Tensor b)
     {
-        auto result = sub_impl_cpu(t[0], t[1]);
+        auto result = sub_impl_cpu(a, b);
         return {result};
     }
 
-    static std::vector<Tensor> backward(Context& ctx, const std::vector<Tensor>& grad)
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         auto grad_a = sub_backward_impl_cpu(grad[0]);
         return grad_a;
@@ -64,34 +65,34 @@ struct SubNode : public FunctionNode<SubNode>
 
 struct MultNode : public FunctionNode<MultNode>
 {
-    static std::vector<Tensor> forward(Context& ctx, const std::vector<Tensor>& t)
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
-        ctx.data["t0"] = t[0];
-        ctx.data["t1"] = t[1];
-        auto result    = mult_impl_cpu(t[0], t[1]);
+        ctx->save_for_backward({a, b});
+        auto result    = mult_impl_cpu(a, b);
         return {result};
     }
 
-    static std::vector<Tensor> backward(Context& ctx, const std::vector<Tensor>& grad)
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto grad_a = mult_backward_impl_cpu(ctx.data["t0"], ctx.data["t1"], grad[0]);
+        auto l = ctx->get_saved_variables();
+        auto grad_a = mult_backward_impl_cpu(l[0], l[1], grad[0]);
         return grad_a;
     }
 };
 
 struct SumNode : public FunctionNode<SumNode>
 {
-    static std::vector<Tensor> forward(Context& ctx, const std::vector<Tensor>& t)
+    static std::vector<Tensor> forward(Context* ctx,  Tensor a)
     {
-        ctx.data_sizes["sizes"] = t[0].sizes();
-        auto result             = sum_impl_cpu(t[0]);
+        ctx->data_sizes["sizes"] = a.sizes();
+        auto result             = sum_impl_cpu(a);
         return {result};
     }
 
-    static std::vector<Tensor> backward(Context& ctx, const std::vector<Tensor>& grad)
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         assert(grad.size() == 1);
-        auto grad_a = sum_backward_impl_cpu(ctx.data_sizes["sizes"], grad[0]);
+        auto grad_a = sum_backward_impl_cpu(ctx->data_sizes["sizes"], grad[0]);
         return grad_a;
     }
 };
@@ -101,26 +102,26 @@ using namespace autograd;
 
 Tensor square(Tensor a)
 {
-    return SquareNode::forward_and_build_graph({a})[0];
+    return SquareNode::forward_and_build_graph(a)[0];
 }
 
 Tensor operator-(Tensor a, Tensor b)
 {
-    return SubNode::forward_and_build_graph({a, b})[0];
+    return SubNode::forward_and_build_graph(a, b)[0];
 }
 
 Tensor operator+(Tensor a, Tensor b)
 {
-    return AddNode::forward_and_build_graph({a, b})[0];
+    return AddNode::forward_and_build_graph(a, b)[0];
 }
 
 Tensor operator*(Tensor a, Tensor b)
 {
-    return MultNode::forward_and_build_graph({a, b})[0];
+    return MultNode::forward_and_build_graph(a, b)[0];
 }
 Tensor sum(Tensor a)
 {
-    return SumNode::forward_and_build_graph({a})[0];
+    return SumNode::forward_and_build_graph(a)[0];
 }
 
 

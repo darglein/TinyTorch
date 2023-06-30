@@ -65,21 +65,18 @@ struct IValue
 
 struct Context
 {
-    std::map<std::string, Tensor> data;
     std::map<std::string, int> data_int;
     // TODO: besser
     std::map<std::string, SizeType> data_sizes;
 
     std::map<std::string, IValue> saved_data;
 
+    std::vector<Tensor> saved_tensors;
+
     void set_materialize_grads(bool b) { throw std::runtime_error("not implemented"); }
 
-    std::vector<Tensor> get_saved_variables()
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    void save_for_backward(const std::vector<Tensor>& l) { throw std::runtime_error("not implemented"); }
+    std::vector<Tensor> get_saved_variables() { return saved_tensors; }
+    void save_for_backward(const std::vector<Tensor>& l) { saved_tensors = l; }
 };
 
 
@@ -91,7 +88,7 @@ struct Node
 
     // Computes and returns the gradients of the input tensor of the forward operator.
     // The input is the gradient of the forward output
-    virtual std::vector<Tensor> backward(const std::vector<Tensor>& fwd_output_grad) = 0;
+    virtual std::vector<Tensor> node_backward(const std::vector<Tensor>& fwd_output_grad) = 0;
 
     // A global counter to get correct node ordering
     int sequence_nr;
@@ -108,28 +105,53 @@ struct Node
 
 using AutogradContext = Context;
 using variable_list   = std::vector<Tensor>;
-using Variable = Tensor;
+using Variable        = Tensor;
 
+
+struct ExtractVariables
+{
+    template <typename T, typename... Args>
+    static void apply(std::vector<Tensor>& output, T&& arg, Args&&... args)
+    {
+        check_tensor(output, arg);
+        apply(output, args...);
+    }
+
+    static void apply(std::vector<Tensor>& output) {}
+
+    template <typename T>
+    static void check_tensor(std::vector<Tensor>& output, const T& arg)
+    {
+    }
+
+    static void check_tensor(std::vector<Tensor>& output, const Tensor& arg) { output.push_back(arg); }
+};
 
 template <typename T>
 struct FunctionNode : public Node
 {
     FunctionNode() {}
 
-    std::vector<Tensor> backward(const std::vector<Tensor>& fwd_output_grad) override
+    std::vector<Tensor> node_backward(const std::vector<Tensor>& fwd_output_grad) override
     {
         assert(fwd_output_grad.size() == num_input_gradients_of_backward);
 
         // backward
-        auto grad_list = T::backward(context, fwd_output_grad);
+        auto grad_list = T::backward(&context, fwd_output_grad);
         return grad_list;
     }
 
-    static std::vector<Tensor> forward_and_build_graph(const std::vector<Tensor>& t)
+    template <typename... Args>
+    static std::vector<Tensor> forward_and_build_graph(Args&&... args)
     {
         // Create node and set next edge
-        bool need_grad = false;
-        auto node      = std::make_shared<FunctionNode<T>>();
+        const size_t num_inputs = sizeof...(Args);
+        bool need_grad          = false;
+        auto node               = std::make_shared<FunctionNode<T>>();
+
+        std::vector<Tensor> t;
+        ExtractVariables::apply(t, args...);
+        assert(t.size() == num_inputs);
         for (int i = 0; i < t.size(); ++i)
         {
             node->next.push_back(t[i].getEdge());
@@ -141,7 +163,7 @@ struct FunctionNode : public Node
         }
 
         // Forward
-        auto result                           = T::forward(node->context, t);
+        auto result                           = T::forward(&node->context, std::forward<Args>(args)...);
         node->num_input_gradients_of_backward = result.size();
 
         // Set the edges of the output to point to this node
@@ -159,8 +181,7 @@ struct FunctionNode : public Node
     template <typename... Args>
     static std::vector<Tensor> apply(Args&&... args)
     {
-        throw std::runtime_error("not implemented");
-        return {};
+        return forward_and_build_graph(args...);
     }
 };
 
@@ -172,7 +193,7 @@ struct AccumulateGrad : public Node
 {
     AccumulateGrad(Tensor t) : t(t) { num_input_gradients_of_backward = 1; }
 
-    std::vector<Tensor> backward(const std::vector<Tensor>& input_grad) override
+    std::vector<Tensor> node_backward(const std::vector<Tensor>& input_grad) override
     {
         assert(input_grad.size() == 1);
         // t.AddGradInplace(input_grad[0]);

@@ -39,7 +39,7 @@ void backward(Tensor loss)
         node_stack.pop_back();
 
         // backpropagate gradients
-        auto next_gradients = current_node->backward(grad_map[current_node]);
+        auto next_gradients = current_node->node_backward(grad_map[current_node]);
 
         // Traverse to next nodes
         for (int i = 0; i < current_node->next.size(); ++i)
