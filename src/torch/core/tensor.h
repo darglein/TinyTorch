@@ -64,7 +64,7 @@ struct SizeType
    private:
     std::vector<int64_t> data_;
 };
-inline bool operator==(SizeType s1, SizeType s2)
+inline bool operator==(const SizeType& s1, const SizeType& s2)
 {
     return s1.vec() == s2.vec();
 }
@@ -307,7 +307,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor mean(SizeType sizes) const
+    Tensor mean(const SizeType& sizes) const
     {
         throw std::runtime_error("not implemented");
         return {};
@@ -338,7 +338,7 @@ struct TINYTORCH_API Tensor
     T item() const
     {
         assert(numel() == 1);
-        return *data_ptr<T>();
+        return *cpu().data_ptr<T>();
     }
     double toDouble() const
     {

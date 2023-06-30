@@ -33,7 +33,7 @@ int main()
     };
 
     // Create a simple optimizer
-    tinytorch::optim::SGDOptimizer optim(params, 0.1);
+    tinytorch::optim::SGDOptimizer optim(params, 0.1f);
 
     // Optimize the model for 50 iterations
     for (int i = 0; i < 50; ++i)
