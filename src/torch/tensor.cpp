@@ -84,6 +84,10 @@ bool Tensor::requires_grad() const
 {
     return impl_->requires_grad();
 }
+int64_t Tensor::element_size() const
+{
+    return elementSize(dtype());
+}
 uint8_t* Tensor::ptr() const
 {
     return impl_->ptr();
@@ -126,7 +130,7 @@ TensorOptions Tensor::options() const
 
 TensorImpl::TensorImpl(const SizeType& sizes, TensorOptions options) : sizes_(sizes), options_(options)
 {
-    int64_t bytes_per_element = 4;
+    int64_t bytes_per_element = elementSize(options.dtype_);
 
     strides_.resize(dim());
     int64_t stride = 1;

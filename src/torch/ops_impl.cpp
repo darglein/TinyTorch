@@ -358,23 +358,50 @@ Tensor cos_impl(Tensor a)
     return result;
 }
 
-
 template <typename T>
-static void index_select32_impl(TensorInfo<T> input, int64_t dim, TensorInfo<int32_t> index, TensorInfo<T> result)
+static void index_select_impl(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> index, TensorInfo<T> result)
 {
-    throw std::runtime_error("not implemented");
-}
+    int64_t dims = input.dims;
 
-template <typename T>
-static void index_select64_impl(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> index, TensorInfo<T> result)
-{
-    throw std::runtime_error("not implemented");
+    int64_t to_copy = input.numel() / input.sizes[dim];
+    for (int64_t index_index = 0; index_index < index.numel(); ++index_index)
+    {
+        int64_t slice = index[index_index];
+        int64_t input_start = slice * input.strides[dim];
+        int64_t result_start = index_index * result.strides[dim];
+        
+        for (int64_t c = 0; c < to_copy; ++c)
+        {
+            int64_t linearId = c;
+
+            int64_t input_offset = input_start;
+            int64_t result_offset = result_start;
+            for (int64_t i = dims - 1; i > 0; --i)
+            {
+                if (i != dim)
+                {
+                    int64_t curDimIndex  = linearId % input.sizes[i];
+                    input_offset += curDimIndex * input.strides[i];
+                    result_offset += curDimIndex * result.strides[i];
+                    linearId /= input.sizes[i];
+                }
+            }
+
+            if (dim != 0)
+            {
+                input_offset += linearId * input.strides[0];
+                result_offset += linearId * result.strides[0];
+            }
+
+            result.data[result_offset] = input.data[input_offset];
+        }
+    }
 }
 
 Tensor index_select_impl(Tensor input, int64_t dim, Tensor index)
 {
     assert(dim < input.dim());
-    assert(index.dtype() == kInt || index.dtype() == kLong);
+    assert(index.dtype() == kLong);
 
     auto numel = index.numel();
 
@@ -383,14 +410,7 @@ Tensor index_select_impl(Tensor input, int64_t dim, Tensor index)
 
     Tensor result = empty(result_size, input.options());
 
-    if (index.dtype() == kInt)
-    {
-        SWITCH_MACRO_ALL(input.scalar_type(), index_select32_impl, input, dim, index, result);
-    }
-    else
-    {
-        SWITCH_MACRO_ALL(input.scalar_type(), index_select64_impl, input, dim, index, result);
-    }
+    SWITCH_MACRO_ALL(input.scalar_type(), index_select_impl, input, dim, index, result);
 
     return result;
 }
@@ -666,13 +686,19 @@ Tensor empty(const SizeType& sizes, TensorOptions options)
 }
 
 
+template <typename T>
+static void full_impl(TensorInfo<T> t, float value)
+{
+    for (int64_t i = 0; i < t.numel(); ++i)
+    {
+        t[i] = T(value);
+    }
+}
+
 Tensor full(const SizeType& sizes, float value, TensorOptions options)
 {
     Tensor t = empty(sizes, options);
-    for (int64_t i = 0; i < t.numel(); ++i)
-    {
-        t.data_ptr<float>()[i] = value;
-    }
+    SWITCH_MACRO_ALL(t.scalar_type(), full_impl, t, value);
     return t;
 }
 
@@ -689,16 +715,22 @@ Tensor zeros(const SizeType& sizes, TensorOptions options)
 }
 
 
+template <typename T>
+static void rand_float_impl(TensorInfo<T> t, std::mt19937& mersenne_engine)
+{
+    std::uniform_real_distribution<float> dist{0.f, 1.f};
+    for (int64_t i = 0; i < t.numel(); ++i)
+    {
+        t[i] = T(dist(mersenne_engine));
+    }
+}
+
 Tensor rand(const SizeType& sizes, TensorOptions options)
 {
     static std::mt19937 mersenne_engine{572547235};
-    std::uniform_real_distribution<float> dist{0.f, 1.f};
-
+    
     Tensor t = empty(sizes, options);
-    for (int64_t i = 0; i < t.numel(); ++i)
-    {
-        t.data_ptr<float>()[i] = dist(mersenne_engine);
-    }
+    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl, t, mersenne_engine);
     return t;
 }
 
