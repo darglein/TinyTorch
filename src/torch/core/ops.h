@@ -26,6 +26,11 @@ TINYTORCH_API Tensor empty_like(Tensor t);
 TINYTORCH_API Tensor zeros_like(Tensor t);
 TINYTORCH_API Tensor rand_like(Tensor t);
 
+inline Tensor empty_like(Tensor t, TensorOptions options){
+    throw std::runtime_error("not implemented");
+    return {};
+}
+
 TINYTORCH_API void fill(Tensor& t, double value);
 
 inline Tensor range(int64_t start, int64_t end, int64_t a)
