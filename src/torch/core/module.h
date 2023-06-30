@@ -20,12 +20,43 @@ inline void set_num_threads(int n)
 
 namespace nn
 {
+template <bool value, typename T = void>
+using disable_if_t = std::enable_if_t<!value, T>;
+struct ModuleHolderIndicator {};
+// A type trait that is true for types that are `ModuleHolder`s.
+template <typename T>
+using is_module_holder = std::is_base_of<ModuleHolderIndicator, std::decay_t<T>>;
 
+template <typename T>
+using disable_if_module_holder_t = disable_if_t<is_module_holder<T>::value>;
+
+// Base template.
+template <bool is_module_holder_value, typename T, typename C>
+struct is_module_holder_of_impl;
+
+// False branch. `T` is not a `ModuleHolder` and thus not a `ModuleHolder` with
+// contained type `C`.
+template <typename T, typename C>
+struct is_module_holder_of_impl<false, T, C> : std::false_type {};
+
+// True branch. `T` is a `ModuleHolder` and thus we can legit access its
+// `ContainedType` and compare it against `C`.
+template <typename T, typename C>
+struct is_module_holder_of_impl<true, T, C>
+    : std::is_same<typename T::ContainedType, C> {};
+
+// Helper template.
+template <typename T, typename C>
+struct is_module_holder_of : is_module_holder_of_impl<
+                                 is_module_holder<T>::value,
+                                 std::decay_t<T>,
+                                 std::decay_t<C>> {};
 
 template <typename Contained>
 class ModuleHolder
 {
    public:
+    using ContainedType = Contained;
     std::shared_ptr<Contained> impl_;
 
     std::shared_ptr<Contained> ptr(){ return impl_;}
@@ -38,11 +69,22 @@ class ModuleHolder
                       "(e.g. `Linear linear = nullptr;` instead of `Linear linear;`).");
     }
 
-    template <typename Head, typename... Tail>
+//    template <typename Head, typename... Tail>
+//    explicit ModuleHolder(Head&& head, Tail&&... tail)
+//        : impl_(new Contained(std::forward<Head>(head), std::forward<Tail>(tail)...))
+//    {
+//    }
+
+    template <
+        typename Head,
+        typename... Tail,
+        typename = typename std::enable_if<
+            !(is_module_holder_of<Head, ContainedType>::value &&
+              (sizeof...(Tail) == 0))>::type>
     explicit ModuleHolder(Head&& head, Tail&&... tail)
-        : impl_(new Contained(std::forward<Head>(head), std::forward<Tail>(tail)...))
-    {
-    }
+        : impl_(new Contained(
+              std::forward<Head>(head),
+              std::forward<Tail>(tail)...)) {}
 
     /// Constructs the `ModuleHolder` from a pointer to the contained type.
     /// Example: `Linear(std::make_shared<LinearImpl>(...))`.

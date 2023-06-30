@@ -246,6 +246,16 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    Tensor clamp_(double mi, double ma) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor gather(int64_t dim, Tensor index) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
     Tensor norm(int64_t norm, int64_t dim, bool keep) const
     {
         throw std::runtime_error("not implemented");
