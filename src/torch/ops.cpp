@@ -16,14 +16,14 @@ namespace autograd
 {
 struct SquareNode : public FunctionNode<SquareNode>
 {
-    static std::vector<Tensor> forward(Context& ctx, std::vector<Tensor> t)
+    static std::vector<Tensor> forward(Context& ctx, const std::vector<Tensor>& t)
     {
         ctx.data["t"] = t[0];
         auto result   = square_impl(t[0]);
         return {result};
     }
 
-    static std::vector<Tensor> backward(Context& ctx, std::vector<Tensor> grad)
+    static std::vector<Tensor> backward(Context& ctx, const std::vector<Tensor>& grad)
     {
         auto grad_a = square_backward_impl(ctx.data["t"], grad[0]);
         return grad_a;
@@ -32,13 +32,13 @@ struct SquareNode : public FunctionNode<SquareNode>
 
 struct AddNode : public FunctionNode<AddNode>
 {
-    static std::vector<Tensor> forward(Context& ctx, std::vector<Tensor> t)
+    static std::vector<Tensor> forward(Context& ctx, const std::vector<Tensor>& t)
     {
         auto result = add_impl(t[0], t[1]);
         return {result};
     }
 
-    static std::vector<Tensor> backward(Context& ctx, std::vector<Tensor> grad)
+    static std::vector<Tensor> backward(Context& ctx, const std::vector<Tensor>& grad)
     {
         auto grad_a = add_backward_impl(grad[0]);
         return grad_a;
@@ -47,13 +47,13 @@ struct AddNode : public FunctionNode<AddNode>
 
 struct SubNode : public FunctionNode<SubNode>
 {
-    static std::vector<Tensor> forward(Context& ctx, std::vector<Tensor> t)
+    static std::vector<Tensor> forward(Context& ctx, const std::vector<Tensor>& t)
     {
         auto result = sub_impl(t[0], t[1]);
         return {result};
     }
 
-    static std::vector<Tensor> backward(Context& ctx, std::vector<Tensor> grad)
+    static std::vector<Tensor> backward(Context& ctx, const std::vector<Tensor>& grad)
     {
         auto grad_a = sub_backward_impl(grad[0]);
         return grad_a;
@@ -63,7 +63,7 @@ struct SubNode : public FunctionNode<SubNode>
 
 struct MultNode : public FunctionNode<MultNode>
 {
-    static std::vector<Tensor> forward(Context& ctx, std::vector<Tensor> t)
+    static std::vector<Tensor> forward(Context& ctx, const std::vector<Tensor>& t)
     {
         ctx.data["t0"] = t[0];
         ctx.data["t1"] = t[1];
@@ -71,7 +71,7 @@ struct MultNode : public FunctionNode<MultNode>
         return {result};
     }
 
-    static std::vector<Tensor> backward(Context& ctx, std::vector<Tensor> grad)
+    static std::vector<Tensor> backward(Context& ctx, const std::vector<Tensor>& grad)
     {
         auto grad_a = mult_backward_impl(ctx.data["t0"], ctx.data["t1"], grad[0]);
         return grad_a;
@@ -80,14 +80,14 @@ struct MultNode : public FunctionNode<MultNode>
 
 struct SumNode : public FunctionNode<SumNode>
 {
-    static std::vector<Tensor> forward(Context& ctx, std::vector<Tensor> t)
+    static std::vector<Tensor> forward(Context& ctx, const std::vector<Tensor>& t)
     {
         ctx.data_sizes["sizes"] = t[0].sizes();
         auto result             = sum_impl(t[0]);
         return {result};
     }
 
-    static std::vector<Tensor> backward(Context& ctx, std::vector<Tensor> grad)
+    static std::vector<Tensor> backward(Context& ctx, const std::vector<Tensor>& grad)
     {
         assert(grad.size() == 1);
         auto grad_a = sum_backward_impl(ctx.data_sizes["sizes"], grad[0]);

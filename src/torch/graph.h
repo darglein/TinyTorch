@@ -64,7 +64,7 @@ struct Context
         throw std::runtime_error("not implemented");
         return {};
     }
-    void save_for_backward(std::vector<Tensor> l) { throw std::runtime_error("not implemented"); }
+    void save_for_backward(const std::vector<Tensor>& l) { throw std::runtime_error("not implemented"); }
 };
 
 
@@ -76,7 +76,7 @@ struct Node
 
     // Computes and returns the gradients of the input tensor of the forward operator.
     // The input is the gradient of the forward output
-    virtual std::vector<Tensor> backward(std::vector<Tensor> fwd_output_grad) = 0;
+    virtual std::vector<Tensor> backward(const std::vector<Tensor>& fwd_output_grad) = 0;
 
     // A global counter to get correct node ordering
     int sequence_nr;
@@ -100,7 +100,7 @@ struct FunctionNode : public Node
 {
     FunctionNode() {}
 
-    std::vector<Tensor> backward(std::vector<Tensor> fwd_output_grad) override
+    std::vector<Tensor> backward(const std::vector<Tensor>& fwd_output_grad) override
     {
         assert(fwd_output_grad.size() == num_input_gradients_of_backward);
 
@@ -109,7 +109,7 @@ struct FunctionNode : public Node
         return grad_list;
     }
 
-    static std::vector<Tensor> forward_and_build_graph(std::vector<Tensor> t)
+    static std::vector<Tensor> forward_and_build_graph(const std::vector<Tensor>& t)
     {
         // Create node and set next edge
         bool need_grad = false;
@@ -149,7 +149,7 @@ struct AccumulateGrad : public Node
 {
     AccumulateGrad(Tensor t) : t(t) { num_input_gradients_of_backward = 1; }
 
-    std::vector<Tensor> backward(std::vector<Tensor> input_grad) override
+    std::vector<Tensor> backward(const std::vector<Tensor>& input_grad) override
     {
         assert(input_grad.size() == 1);
         // t.AddGradInplace(input_grad[0]);

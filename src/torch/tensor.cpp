@@ -60,7 +60,7 @@ Tensor& Tensor::mutable_grad()
 //         impl_->data[i] += g[i];
 //     }
 // }
-std::shared_ptr<Edge> Tensor::getEdge()
+std::shared_ptr<Edge> Tensor::getEdge() const
 {
     if (impl_->autograd_meta)
     {

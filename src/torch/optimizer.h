@@ -82,7 +82,7 @@ void sgd_step(TensorInfo<T> param, TensorInfo<T> param_grad, TensorInfo<T> veloc
 // implemented after https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
 struct SGDOptimizer
 {
-    SGDOptimizer(std::vector<Tensor> t, float lr) : lr(lr), params(t)
+    SGDOptimizer(const std::vector<Tensor>& t, float lr) : lr(lr), params(t)
     {
         velocities.resize(t.size());
         for (int i = 0; i < t.size(); ++i)

@@ -66,7 +66,10 @@ inline std::ostream& operator<<(std::ostream& strm, const SizeType& size)
     return strm;
 }
 
-
+// This removes a warning on MSVC: 
+// warning C4251: 'tinytorch::Tensor::impl_': class 'std::shared_ptr<tinytorch::TensorImpl>' 
+// needs to have dll-interface to be used by clients of struct 'tinytorch::Tensor'
+template class TINYTORCH_API std::shared_ptr<TensorImpl>;
 
 struct TINYTORCH_API Tensor
 {
@@ -90,7 +93,7 @@ struct TINYTORCH_API Tensor
 
     Tensor& mutable_grad();
 
-    std::shared_ptr<Edge> getEdge();
+    std::shared_ptr<Edge> getEdge() const;
     void SetEdge(std::shared_ptr<Edge> edge);
 
     template <typename T>
@@ -123,7 +126,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor view(std::vector<int64_t> sizes) const
+    Tensor view(const SizeType& sizes) const
     {
         throw std::runtime_error("not implemented");
         return {};
@@ -162,17 +165,17 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor permute(std::vector<int64_t> size) const
+    Tensor permute(const SizeType& size) const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor reshape(std::vector<int64_t> size) const
+    Tensor reshape(const SizeType& size) const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor repeat(std::vector<int64_t> size) const
+    Tensor repeat(const SizeType& size) const
     {
         throw std::runtime_error("not implemented");
         return {};
