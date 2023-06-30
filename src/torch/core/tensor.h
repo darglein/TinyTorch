@@ -156,7 +156,11 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return *this;
     }
-
+    Tensor pow(Tensor a) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
     void copy_(Tensor a) { throw std::runtime_error("not implemented"); }
 
     Tensor clone() const
@@ -253,6 +257,11 @@ struct TINYTORCH_API Tensor
         return {};
     }
     Tensor squeeze(int64_t dim) const;
+    Tensor prod(int64_t dim) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
     Tensor cumprod(int64_t dim) const
     {
         throw std::runtime_error("not implemented");
@@ -308,6 +317,11 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    Tensor index_select(int64_t i, Tensor index) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
     Tensor abs() const
     {
         throw std::runtime_error("not implemented");
@@ -352,6 +366,11 @@ struct TINYTORCH_API Tensor
         return 0;
     }
     bool is_contiguous() const
+    {
+        throw std::runtime_error("not implemented");
+        return true;
+    }
+    bool is_leaf() const
     {
         throw std::runtime_error("not implemented");
         return true;

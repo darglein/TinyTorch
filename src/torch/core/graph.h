@@ -46,6 +46,21 @@ struct IValue
         throw std::runtime_error("not implemented");
         return {};
     }
+    double toDouble()
+    {
+        throw std::runtime_error("not implemented");
+        return false;
+    }
+    bool toBool()
+    {
+        throw std::runtime_error("not implemented");
+        return false;
+    }
+    int64_t toInt()
+    {
+        throw std::runtime_error("not implemented");
+        return false;
+    }
 };
 
 struct Context
@@ -93,6 +108,7 @@ struct Node
 
 using AutogradContext = Context;
 using variable_list   = std::vector<Tensor>;
+using Variable = Tensor;
 
 
 template <typename T>
@@ -138,6 +154,13 @@ struct FunctionNode : public Node
             }
         }
         return result;
+    }
+
+    template <typename... Args>
+    static std::vector<Tensor> apply(Args&&... args)
+    {
+        throw std::runtime_error("not implemented");
+        return {};
     }
 };
 

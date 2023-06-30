@@ -11,6 +11,11 @@
 #include "torch/tiny_torch_config.h"
 namespace TINY_TORCH_NAMESPACE
 {
+inline void manual_seed(int64_t seed)
+{
+    throw std::runtime_error("not implemented");
+}
+
 // Basic tensor generation
 TINYTORCH_API Tensor full(const SizeType& sizes, float value, TensorOptions options = TensorOptions());
 TINYTORCH_API Tensor ones(const SizeType& sizes, TensorOptions options = TensorOptions());
@@ -26,7 +31,18 @@ TINYTORCH_API Tensor empty_like(Tensor t);
 TINYTORCH_API Tensor zeros_like(Tensor t);
 TINYTORCH_API Tensor rand_like(Tensor t);
 
+inline Tensor empty_like(Tensor t, TensorOptions options){
+    throw std::runtime_error("not implemented");
+    return {};
+}
+
 TINYTORCH_API void fill(Tensor& t, double value);
+
+inline std::pair<Tensor,Tensor> sort(Tensor t, int64_t a)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
 
 inline Tensor range(int64_t start, int64_t end, int64_t a)
 {
@@ -177,12 +193,32 @@ inline Tensor prod(Tensor b, int64_t dim)
     throw std::runtime_error("not implemented");
     return {};
 }
+inline Tensor cumprod(Tensor b, int64_t dim)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor cumsum(Tensor b, int64_t dim)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
 inline Tensor min(Tensor a, Tensor b)
 {
     throw std::runtime_error("not implemented");
     return {};
 }
 inline Tensor max(Tensor a, Tensor b)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor sum(Tensor a, SizeType s)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
 {
     throw std::runtime_error("not implemented");
     return {};
