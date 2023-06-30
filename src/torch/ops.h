@@ -268,7 +268,14 @@ std::vector<Tensor> log_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> log1p_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> exp_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> sign_backward_impl(Tensor a, Tensor grad_output);
+std::vector<Tensor> pow_backward_impl(Tensor a, double b, Tensor grad_output);
 std::vector<Tensor> sin_backward_impl(Tensor a, Tensor grad_output);
 std::vector<Tensor> cos_backward_impl(Tensor a, Tensor grad_output);
+std::vector<Tensor> relu_backward_impl(Tensor a, Tensor grad_output);
+std::vector<Tensor> sigmoid_backward_impl(Tensor a, Tensor grad_output);
+std::vector<Tensor> softplus_backward_impl(Tensor a, double beta, Tensor grad_output);
+std::vector<Tensor> prod_backward_impl(Tensor a, int64_t dim, Tensor grad_output);
+std::vector<Tensor> min_backward_impl(Tensor grad_output);
+std::vector<Tensor> max_backward_impl(Tensor grad_output);
 
 }  // namespace TINY_TORCH_NAMESPACE
