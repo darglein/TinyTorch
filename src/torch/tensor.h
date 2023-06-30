@@ -480,7 +480,7 @@ T* Tensor::data_ptr() const
     }
     else
     {
-        static_assert(false);
+        assert(false);
     }
     return (T*)ptr();
 }

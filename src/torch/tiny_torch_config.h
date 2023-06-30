@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "torch/tiny_torch_build_config.h"
+
 // Generic helper definitions for shared library support
 #if defined _WIN32 || defined __CYGWIN__
 #    define TINYTORCH_HELPER_DLL_IMPORT __declspec(dllimport)

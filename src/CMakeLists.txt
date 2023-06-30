@@ -9,6 +9,17 @@ if (UNIX)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fvisibility=hidden>)
 endif ()
 
+
+
+set(MY_BUILDCONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
+configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/torch/tiny_torch_build_config.h.in"
+        "${MY_BUILDCONFIG_DIR}/torch/tiny_torch_build_config.h"
+        @ONLY
+)
+target_include_directories(torch PUBLIC ${MY_BUILDCONFIG_DIR})
+
+
 #############  source #############
 
 FILE(GLOB_RECURSE ALL_SRC  *.cpp)
