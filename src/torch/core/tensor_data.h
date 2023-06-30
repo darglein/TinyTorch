@@ -46,6 +46,11 @@ enum ScalarType
     kHalf,
 };
 
+template<typename T>
+struct CppTypeToScalarType{
+    static constexpr ScalarType value = kByte;
+};
+
 using Dtype = ScalarType;
 
 struct StorageImpl
