@@ -25,18 +25,18 @@ namespace TINY_TORCH_NAMESPACE
             assert(false);                              \
     }
 
-    // TODO: Half!
-#define SWITCH_MACRO_ALL(real_scalar_type, func, ...) \
-    switch (real_scalar_type)                           \
-    {                                                   \
+// TODO: Half!
+#define SWITCH_MACRO_ALL(real_scalar_type, func, ...)  \
+    switch (real_scalar_type)                          \
+    {                                                  \
         CASE_MACRO(func, uint8_t, kUInt8, __VA_ARGS__) \
         CASE_MACRO(func, int16_t, kInt16, __VA_ARGS__) \
         CASE_MACRO(func, int32_t, kInt32, __VA_ARGS__) \
-        CASE_MACRO(func, int64_t, kLong, __VA_ARGS__)   \
-        CASE_MACRO(func, float, kFloat, __VA_ARGS__)    \
-        CASE_MACRO(func, double, kDouble, __VA_ARGS__)  \
-        default:                                        \
-            assert(false);                              \
+        CASE_MACRO(func, int64_t, kLong, __VA_ARGS__)  \
+        CASE_MACRO(func, float, kFloat, __VA_ARGS__)   \
+        CASE_MACRO(func, double, kDouble, __VA_ARGS__) \
+        default:                                       \
+            assert(false);                             \
     }
 
 template <typename T>
@@ -359,30 +359,15 @@ Tensor cos_impl(Tensor a)
 }
 
 
-// TODO: These are not correct yet. They need an outer loop over all other dimensions.
 template <typename T>
-static void index_select32_impl(TensorInfo<T> slice, TensorInfo<int32_t> index, TensorInfo<T> result)
+static void index_select32_impl(TensorInfo<T> input, int64_t dim, TensorInfo<int32_t> index, TensorInfo<T> result)
 {
-#if 0
-    for (int64_t i = 0; i < result.numel(); ++i)
-    {
-        result[i] = slice[index[i]];
-    }
-#endif
-
     throw std::runtime_error("not implemented");
 }
 
 template <typename T>
-static void index_select64_impl(TensorInfo<T> slice, TensorInfo<int64_t> index, TensorInfo<T> result)
+static void index_select64_impl(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> index, TensorInfo<T> result)
 {
-#if 0
-    for (int64_t i = 0; i < index.numel(); ++i)
-    {
-        result[i] = slice[index[i]];
-    }
-#endif
-
     throw std::runtime_error("not implemented");
 }
 
@@ -398,15 +383,13 @@ Tensor index_select_impl(Tensor input, int64_t dim, Tensor index)
 
     Tensor result = empty(result_size, input.options());
 
-    Tensor slice = input.select(dim, 0);
-    
     if (index.dtype() == kInt)
     {
-        SWITCH_MACRO_ALL(input.scalar_type(), index_select32_impl, slice, index, result);
+        SWITCH_MACRO_ALL(input.scalar_type(), index_select32_impl, input, dim, index, result);
     }
     else
     {
-        SWITCH_MACRO_ALL(input.scalar_type(), index_select64_impl, slice, index, result);
+        SWITCH_MACRO_ALL(input.scalar_type(), index_select64_impl, input, dim, index, result);
     }
 
     return result;
