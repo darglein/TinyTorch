@@ -106,6 +106,10 @@ struct TINYTORCH_API Tensor
     template <typename T>
     T* data_ptr() const;
 
+    void* data_ptr() const{
+        return ptr();
+    }
+
     uint8_t* ptr() const;
 
     int64_t dim() const;
@@ -147,7 +151,11 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    void index_copy_(int64_t dim, Tensor ids, Tensor value) { throw std::runtime_error("not implemented"); }
+    Tensor& index_copy_(int64_t dim, Tensor ids, Tensor value)
+    {
+        throw std::runtime_error("not implemented");
+        return *this;
+    }
 
     void copy_(Tensor a) { throw std::runtime_error("not implemented"); }
 
