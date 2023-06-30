@@ -28,6 +28,8 @@ class ModuleHolder
    public:
     std::shared_ptr<Contained> impl_;
 
+    std::shared_ptr<Contained> ptr(){ return impl_;}
+
     ModuleHolder()
     {
         static_assert(std::is_default_constructible<Contained>::value,
@@ -77,6 +79,7 @@ class ModuleHolder
 
 struct Module
 {
+    virtual ~Module(){}
     std::map<std::string, Tensor> named_parameters()
     {
         throw std::runtime_error("not implemented");
@@ -108,6 +111,20 @@ struct Module
     {
         return register_module(std::move(name), module_holder.ptr());
     }
+
+    template <typename ModuleType>
+    std::shared_ptr<ModuleType> replace_module(std::string name, ModuleHolder<ModuleType> module_holder)
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+        // return register_module(std::move(name), module_holder.ptr());
+    }
+
+    std::vector<Tensor> buffers()
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
 };
 
 struct AnyModule
@@ -136,15 +153,21 @@ struct AnyModule
 
 
 template <typename ModuleType>
-void load(nn::ModuleHolder<ModuleType> module_holder, std::string name)
+inline void load(nn::ModuleHolder<ModuleType> module_holder, std::string name)
 {
     throw std::runtime_error("not implemented");
 }
 
 template <typename ModuleType>
-void save(nn::ModuleHolder<ModuleType> module_holder, std::string name)
+inline void save(nn::ModuleHolder<ModuleType> module_holder, std::string name)
 {
     throw std::runtime_error("not implemented");
 }
+
+inline void save(Tensor t, std::string name)
+{
+    throw std::runtime_error("not implemented");
+}
+
 
 }  // namespace TINY_TORCH_NAMESPACE

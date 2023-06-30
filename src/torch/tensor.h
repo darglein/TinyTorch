@@ -23,6 +23,19 @@
 namespace TINY_TORCH_NAMESPACE
 {
 
+struct TensorImpl;
+}
+namespace std
+{
+// This removes a warning on MSVC:
+// warning C4251: 'tinytorch::Tensor::impl_': class 'std::shared_ptr<tinytorch::TensorImpl>'
+// needs to have dll-interface to be used by clients of struct 'tinytorch::Tensor'
+template class TINYTORCH_API shared_ptr<tinytorch::TensorImpl>;
+}  // namespace std
+
+namespace TINY_TORCH_NAMESPACE
+{
+
 struct Edge;
 struct Tensor;
 struct TensorImpl;
@@ -37,7 +50,7 @@ struct SizeType
     SizeType(const std::vector<int64_t>& v) : data_(v) {}
     SizeType(const std::initializer_list<int64_t>& v) : data_(v) {}
     SizeType(const SizeType&) = default;
-    SizeType(SizeType&&) = default;
+    SizeType(SizeType&&)      = default;
     int64_t& operator[](int64_t i) { return data_[i]; }
     const int64_t& operator[](int64_t i) const { return data_[i]; }
     int64_t size() const { return data_.size(); }
@@ -46,7 +59,7 @@ struct SizeType
     operator const std::vector<int64_t>&() const { return data_; }
 
     SizeType& operator=(const SizeType&) = default;
-    SizeType& operator=(SizeType&&) = default;
+    SizeType& operator=(SizeType&&)      = default;
 
    private:
     std::vector<int64_t> data_;
@@ -58,7 +71,7 @@ inline bool operator==(SizeType s1, SizeType s2)
 inline std::ostream& operator<<(std::ostream& strm, const SizeType& size)
 {
     strm << "[ ";
-    for (int64_t i = 0; i < size.size(); ++i) 
+    for (int64_t i = 0; i < size.size(); ++i)
     {
         strm << size[i] << ((i < size.size() - 1) ? ", " : " ");
     }
@@ -66,10 +79,7 @@ inline std::ostream& operator<<(std::ostream& strm, const SizeType& size)
     return strm;
 }
 
-// This removes a warning on MSVC: 
-// warning C4251: 'tinytorch::Tensor::impl_': class 'std::shared_ptr<tinytorch::TensorImpl>' 
-// needs to have dll-interface to be used by clients of struct 'tinytorch::Tensor'
-template class TINYTORCH_API std::shared_ptr<TensorImpl>;
+
 
 struct TINYTORCH_API Tensor
 {
@@ -131,6 +141,11 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    Tensor operator[](int64_t dim) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
     Tensor slice(int64_t dim, int64_t start, int64_t end, int64_t step = 1) const
     {
         throw std::runtime_error("not implemented");
@@ -147,6 +162,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    void index_copy_(int64_t dim, Tensor ids, Tensor value) { throw std::runtime_error("not implemented"); }
 
     void copy_(Tensor a) { throw std::runtime_error("not implemented"); }
 
@@ -165,6 +181,8 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    Tensor flip(const SizeType& size) const { throw std::runtime_error("not implemented"); }
+    void resize_(const SizeType& size) { throw std::runtime_error("not implemented"); }
     Tensor permute(const SizeType& size) const
     {
         throw std::runtime_error("not implemented");
@@ -226,12 +244,37 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    Tensor clamp_max_(double m) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor norm(int64_t norm, int64_t dim, bool keep) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
     Tensor unsqueeze(int64_t dim) const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
     Tensor squeeze(int64_t dim) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor cumprod(int64_t dim) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor cumsum(int64_t dim) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor fill_(double a) const
     {
         throw std::runtime_error("not implemented");
         return {};
@@ -271,6 +314,11 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    Tensor mean(SizeType sizes) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
     Tensor abs() const
     {
         throw std::runtime_error("not implemented");
@@ -282,6 +330,7 @@ struct TINYTORCH_API Tensor
         return {};
     }
     void backward() const { throw std::runtime_error("not implemented"); }
+    void backward(Tensor t) const { throw std::runtime_error("not implemented"); }
     Tensor std() const
     {
         throw std::runtime_error("not implemented");
@@ -304,6 +353,11 @@ struct TINYTORCH_API Tensor
         return 0;
     }
     double toFloat() const
+    {
+        throw std::runtime_error("not implemented");
+        return 0;
+    }
+    int toInt() const
     {
         throw std::runtime_error("not implemented");
         return 0;
@@ -381,10 +435,11 @@ struct TensorImpl
     template <typename T>
     T* data_ptr()
     {
-        return (T*)ptr();
+        return (T*)data_ptr();
     }
 
-    uint8_t* ptr() { return (storage_->byte_ptr() + storage_offset_); }
+
+    uint8_t* data_ptr() { return (storage_->byte_ptr() + storage_offset_); }
 
     int64_t storage_offset_ = 0;
     std::shared_ptr<StorageImpl> storage_;

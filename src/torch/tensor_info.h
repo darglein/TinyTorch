@@ -128,20 +128,4 @@ TensorInfo<T, MAX_DIMS>::TensorInfo(T* p, int dim, int64_t sz[max_dims], int64_t
 
 
 
-// Translate a linear index for the apply to a T* offset;
-// specialized on `Dims` to reduce nvcc compilation time
-template <typename T, int MaxDims>
-struct IndexToOffset
-{
-    static int64_t get(int64_t linearId, const TensorInfo<T, MaxDims>& info) {}
-};
-
-// Uses dynamic (runtime) instead of static (compiletime) dims
-template <typename T>
-struct IndexToOffset<T, -1>
-{
-    static inline int64_t get(int64_t linearId, const TensorInfo<T, -1>& info) {}
-};
-
-
 }  // namespace TINY_TORCH_NAMESPACE

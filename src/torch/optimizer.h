@@ -18,10 +18,16 @@ namespace optim
 
 struct AdamOptions
 {
+    typedef std::tuple<double, double> betas_t;
+
     AdamOptions(double lr = 1e-3) : lr_(lr) {}
     double& lr() { return lr_; }
-    double lr_ = 1e-3;
-    typedef std::tuple<double, double> betas_t;
+    double& eps() { return eps_; }
+    betas_t& betas() { return betas_; }
+    void eps(double e) { eps_ = e; }
+    void betas(betas_t b) { betas_ = b; }
+
+    double lr_           = 1e-3;
     betas_t betas_       = std::make_tuple(0.9, 0.999);
     double eps_          = 1e-8;
     double weight_decay_ = 0;
@@ -33,6 +39,7 @@ struct RMSpropOptions
 {
     RMSpropOptions(double lr = 1e-2) : lr_(lr) {}
     double& lr() { return lr_; }
+    void eps(double e) { eps_ = e; }
     double lr_           = 1e-2;
     double alpha_        = 0.99;
     double eps_          = 1e-8;
