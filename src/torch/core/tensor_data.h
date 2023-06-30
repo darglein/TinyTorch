@@ -16,7 +16,7 @@
 #include <random>
 #include <vector>
 
-#include "tiny_torch_config.h"
+#include "torch/tiny_torch_config.h"
 
 namespace TINY_TORCH_NAMESPACE
 {

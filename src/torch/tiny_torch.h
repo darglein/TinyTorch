@@ -8,14 +8,14 @@
 
 
 
-#include "backward.h"
-#include "graph.h"
-#include "ops.h"
-#include "optimizer.h"
-#include "tensor.h"
-#include "module.h"
+#include "torch/core/backward.h"
+#include "torch/core/graph.h"
+#include "torch/core/ops.h"
+#include "torch/core/optimizer.h"
+#include "torch/core/tensor.h"
+#include "torch/core/module.h"
 
-#include "tiny_torch_config.h"
+#include "torch/tiny_torch_config.h"
 
 #define TINY_TORCH
 

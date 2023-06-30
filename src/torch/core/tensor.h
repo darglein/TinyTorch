@@ -18,7 +18,7 @@
 
 #include "tensor_data.h"
 #include "tensor_options.h"
-#include "tiny_torch_config.h"
+#include "torch/tiny_torch_config.h"
 
 namespace TINY_TORCH_NAMESPACE
 {

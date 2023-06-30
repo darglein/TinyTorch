@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include "tensor.h"
+#include "torch/core/tensor.h"
 
-#include "tensor_info.h"
-#include "tiny_torch_config.h"
+#include "torch/core/tensor_info.h"
+#include "torch/tiny_torch_config.h"
 
 namespace TINY_TORCH_NAMESPACE
 {

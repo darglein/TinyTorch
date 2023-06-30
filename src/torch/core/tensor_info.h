@@ -7,7 +7,7 @@
 #pragma once
 
 #include "assert.h"
-#include "tensor.h"
+#include "torch/core/tensor.h"
 
 #include <algorithm>
 #include <ctime>
@@ -18,7 +18,7 @@
 #include <vector>
 
 #include "tensor_data.h"
-#include "tiny_torch_config.h"
+#include "torch/tiny_torch_config.h"
 #include <type_traits>
 
 namespace TINY_TORCH_NAMESPACE

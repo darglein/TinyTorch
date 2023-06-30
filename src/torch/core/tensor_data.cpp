@@ -5,6 +5,11 @@
  */
 #include "tensor_data.h"
 
+#ifdef TT_HAS_CUDA
+#    include <cuda_runtime.h>
+#endif
+
+
 namespace TINY_TORCH_NAMESPACE
 {
 StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(device)
@@ -15,7 +20,11 @@ StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(dev
     }
     else
     {
+#ifdef TT_HAS_CUDA
+        cudaMalloc(&data_ptr_, size);
+#else
         assert(false);
+#endif
     }
 }
 StorageImpl::~StorageImpl()
@@ -26,8 +35,12 @@ StorageImpl::~StorageImpl()
     }
     else
     {
+#ifdef TT_HAS_CUDA
+        cudaFree(data_ptr_);
+#else
         assert(false);
+#endif
     }
 }
 
-}
+}  // namespace TINY_TORCH_NAMESPACE

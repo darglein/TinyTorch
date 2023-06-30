@@ -5,12 +5,12 @@
  */
 
 #pragma once
-#include "ops.h"
-#include "tensor.h"
+#include "torch/core/ops.h"
+#include "torch/core/tensor.h"
 
 #include <map>
 
-#include "tiny_torch_config.h"
+#include "torch/tiny_torch_config.h"
 
 namespace TINY_TORCH_NAMESPACE
 {

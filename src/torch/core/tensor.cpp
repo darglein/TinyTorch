@@ -3,9 +3,10 @@
  * Licensed under the MIT License.
  * See LICENSE file for more information.
  */
-#include "tensor.h"
+#include "torch/core/tensor.h"
 
-#include "ops.h"
+#include "torch/core/ops.h"
+
 namespace TINY_TORCH_NAMESPACE
 {
 
@@ -75,7 +76,7 @@ int64_t Tensor::stride(int64_t index) const
 }
 void Tensor::zero_()
 {
-    fill_impl(*this, 0);
+    fill(*this, 0);
 }
 ScalarType Tensor::scalar_type() const
 {

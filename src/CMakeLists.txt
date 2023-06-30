@@ -9,6 +9,10 @@ if (UNIX)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fvisibility=hidden>)
 endif ()
 
+if(TT_HAS_CUDA)
+
+    target_link_libraries(torch PUBLIC CUDA::cudart)
+    endif()
 
 
 set(MY_BUILDCONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")

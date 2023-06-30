@@ -1,7 +1,7 @@
 #pragma once
 #include "graph.h"
-#include "ops.h"
-#include "tensor.h"
+#include "torch/core/ops.h"
+#include "torch/core/tensor.h"
 
 namespace TINY_TORCH_NAMESPACE
 {

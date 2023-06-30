@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "tensor.h"
+#include "torch/core/tensor.h"
 
 #include <map>
 
