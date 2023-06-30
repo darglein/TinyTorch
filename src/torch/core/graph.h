@@ -35,11 +35,15 @@ struct Edge
 };
 
 
-namespace autograd
-{
-
 struct IValue
 {
+    IValue(){}
+
+    IValue(bool b){}
+    IValue(double d){}
+    IValue(int32_t i){}
+    IValue(int64_t i){}
+
     template <typename T>
     std::shared_ptr<T> toCustomClass()
     {
@@ -62,6 +66,10 @@ struct IValue
         return false;
     }
 };
+
+
+namespace autograd
+{
 
 struct Context
 {
