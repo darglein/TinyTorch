@@ -45,6 +45,7 @@ struct TensorInfo
             sizes[i]   = t.size(i);
             strides[i] = t.stride(i);
         }
+        contiguous = t.is_contiguous();
     }
 
     int64_t numel()
@@ -64,6 +65,11 @@ struct TensorInfo
 
     int64_t IndexToOffset(int64_t linearId)
     {
+        if (contiguous)
+        {
+            return linearId;
+        }
+
         if constexpr (is_dynamic)
         {
             int64_t offset = 0;
@@ -95,14 +101,11 @@ struct TensorInfo
         }
     }
 
-    // Contiguous tensors of more than one dimension are collapsed down
-    // to one tensor
-    inline bool isContiguous() const { return (dims == 1 && strides[0] == 1); }
-
     T* data;
     int64_t sizes[max_dims];
     int64_t strides[max_dims];
     int64_t dims;
+    bool contiguous;
 };
 
 
@@ -123,6 +126,18 @@ TensorInfo<T, MAX_DIMS>::TensorInfo(T* p, int dim, int64_t sz[max_dims], int64_t
     {
         sizes[i]   = sz[i];
         strides[i] = st[i];
+    }
+
+    contiguous              = true;
+    int64_t expected_stride = 1;
+    for (int64_t i = dim - 1; i >= 0; --i)
+    {
+        if (strides[i] != expected_stride)
+        {
+            contiguous = false;
+            break;
+        }
+        expected_stride *= sizes[i];
     }
 }
 

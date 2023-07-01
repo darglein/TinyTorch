@@ -86,6 +86,29 @@ TensorOptions Tensor::options() const
     return impl_->options_;
 }
 
+Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) const 
+{
+    int64_t dims = this->dim();
+
+    assert(dim < dims);
+    assert(start < end);
+    assert(end <= size(dim));
+    assert((end - start) % step == 0);
+
+    int64_t offset = start * stride(dim);
+    offset *= element_size();
+
+    std::vector<int64_t> new_sizes = sizes().vec();
+    new_sizes[dim]                 = (end - start) / step;
+
+    auto new_strides = strides();
+
+    std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
+        impl_->storage_, impl_->storage_offset_ + offset, std::move(new_sizes), std::move(new_strides), options());
+
+    return Tensor(new_impl);
+}
+
 Tensor Tensor::unsqueeze(int64_t dim) const
 {
     assert(dim >= -this->dim() - 1 && dim < this->dim() + 1);
@@ -111,6 +134,7 @@ Tensor Tensor::unsqueeze(int64_t dim) const
 
 Tensor Tensor::squeeze(int64_t dim) const
 {
+    assert(dim < this->dim());
     assert(size(dim) == 1);
 
     std::vector<int64_t> new_sizes = sizes().vec();
@@ -137,6 +161,20 @@ Tensor Tensor::squeeze() const
         impl_->storage_, impl_->storage_offset_, std::move(new_sizes), std::move(new_strides), options());
 
     return Tensor(new_impl);
+}
+
+bool Tensor::is_contiguous() const
+{
+    int64_t expected_stride = 1;
+    for (int64_t i = dim() - 1; i >= 0; --i)
+    {
+        if (stride(i) != expected_stride)
+        {
+            return false;
+        }
+        expected_stride *= size(i);
+    }
+    return true;
 }
 
 
