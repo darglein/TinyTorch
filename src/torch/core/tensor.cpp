@@ -9,7 +9,6 @@
 
 namespace TINY_TORCH_NAMESPACE
 {
-
 int64_t Tensor::numel() const
 {
     return impl_->numel();
@@ -87,13 +86,56 @@ TensorOptions Tensor::options() const
     return impl_->options_;
 }
 
-Tensor Tensor::squeeze(int64_t dim) const 
+Tensor Tensor::unsqueeze(int64_t dim) const
+{
+    assert(dim >= -this->dim() - 1 && dim < this->dim() + 1);
+
+    if (dim < 0)
+    {
+        dim = dim + this->dim() + 1;
+    }
+
+    std::vector<int64_t> new_sizes = sizes().vec();
+    new_sizes.insert(std::next(new_sizes.begin(), dim), 1);
+
+    int64_t stride_to_insert = (dim == 0) ? 1 : stride(dim - 1);
+
+    std::vector<int64_t> new_strides = strides().vec();
+    new_strides.insert(std::next(new_strides.begin(), dim), stride_to_insert);
+
+    std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
+        impl_->storage_, impl_->storage_offset_, std::move(new_sizes), std::move(new_strides), options());
+
+    return Tensor(new_impl);
+}
+
+Tensor Tensor::squeeze(int64_t dim) const
 {
     assert(size(dim) == 1);
 
     std::vector<int64_t> new_sizes = sizes().vec();
     new_sizes.erase(std::next(new_sizes.begin(), dim));
-    std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(impl_->storage_, new_sizes, options());
+
+    std::vector<int64_t> new_strides = strides().vec();
+    new_strides.erase(std::next(new_strides.begin(), dim));
+
+    std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
+        impl_->storage_, impl_->storage_offset_, std::move(new_sizes), std::move(new_strides), options());
+
+    return Tensor(new_impl);
+}
+
+Tensor Tensor::squeeze() const
+{
+    std::vector<int64_t> new_sizes = sizes().vec();
+    new_sizes.erase(std::remove(new_sizes.begin(), new_sizes.end(), 1), new_sizes.end());
+
+    std::vector<int64_t> new_strides = strides().vec();
+    new_strides.erase(std::remove(new_strides.begin(), new_strides.end(), 1), new_strides.end());
+
+    std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
+        impl_->storage_, impl_->storage_offset_, std::move(new_sizes), std::move(new_strides), options());
+
     return Tensor(new_impl);
 }
 
@@ -105,13 +147,23 @@ TensorImpl::TensorImpl(const SizeType& sizes, TensorOptions options) : sizes_(si
     storage_ = std::make_shared<StorageImpl>(elementSize(options.dtype_) * numel(), kCPU);
 }
 
-TensorImpl::TensorImpl(std::shared_ptr<StorageImpl> storage, const SizeType& sizes, TensorOptions options)
-    : storage_(storage), sizes_(sizes), options_(options)
+TensorImpl::TensorImpl(std::shared_ptr<StorageImpl> storage, int64_t storage_offset, const SizeType& sizes,
+                       const SizeType& strides, TensorOptions options)
+    : storage_(storage), storage_offset_(storage_offset), sizes_(sizes), strides_(strides), options_(options)
 {
-    recompute_strides();
 }
 
-void TensorImpl::recompute_strides() 
+TensorImpl::TensorImpl(std::shared_ptr<StorageImpl> storage, int64_t storage_offset, SizeType&& sizes,
+                       SizeType&& strides, TensorOptions options)
+    : storage_(storage),
+      storage_offset_(storage_offset),
+      sizes_(std::move(sizes)),
+      strides_(std::move(strides)),
+      options_(options)
+{
+}
+
+void TensorImpl::recompute_strides()
 {
     strides_.resize(dim());
     int64_t stride = 1;

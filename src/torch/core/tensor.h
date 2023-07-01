@@ -48,6 +48,7 @@ struct SizeType
 {
     SizeType() {}
     SizeType(const std::vector<int64_t>& v) : data_(v) {}
+    SizeType(std::vector<int64_t>&& v) : data_(std::move(v)) {}
     SizeType(const std::initializer_list<int64_t>& v) : data_(v) {}
     SizeType(const SizeType&) = default;
     SizeType(SizeType&&)      = default;
@@ -261,12 +262,9 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor unsqueeze(int64_t dim) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor unsqueeze(int64_t dim) const;
     Tensor squeeze(int64_t dim) const;
+    Tensor squeeze() const;
     Tensor prod(int64_t dim) const
     {
         throw std::runtime_error("not implemented");
@@ -412,28 +410,15 @@ struct AutogradMeta
 struct TensorImpl
 {
     TensorImpl(const SizeType& sizes, TensorOptions options);
-    TensorImpl(std::shared_ptr<StorageImpl> storage, const SizeType& sizes, TensorOptions options);
-    // TensorImpl(std::vector<float> data) : data(data) {}
-
+    TensorImpl(std::shared_ptr<StorageImpl> storage, int64_t storage_offset, const SizeType& sizes,
+               const SizeType& strides, TensorOptions options);
+    TensorImpl(std::shared_ptr<StorageImpl> storage, int64_t storage_offset, SizeType&& sizes, SizeType&& strides,
+               TensorOptions options);
 
     void set_requires_grad(bool requires_grad);
-
-    bool requires_grad() const
-    {
-        if (autograd_meta)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
+    bool requires_grad() const { return autograd_meta != nullptr; }
 
     int64_t dim() const { return sizes_.size(); }
-
-
-    std::unique_ptr<AutogradMeta> autograd_meta;
 
     int64_t numel() const
     {
@@ -442,14 +427,11 @@ struct TensorImpl
         return res;
     }
 
-
     template <typename T>
     T* data_ptr()
     {
         return (T*)data_ptr();
     }
-
-
     uint8_t* data_ptr() { return (storage_->byte_ptr() + storage_offset_); }
 
     int64_t storage_offset_ = 0;
@@ -457,8 +439,9 @@ struct TensorImpl
     SizeType sizes_;
     SizeType strides_;
     TensorOptions options_;
-    // required for .backward()
-    // std::vector<float> grad;
+
+    std::unique_ptr<AutogradMeta> autograd_meta;
+
 
 private:
     void recompute_strides();
