@@ -98,10 +98,11 @@ Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) cons
     int64_t offset = start * stride(dim);
     offset *= element_size();
 
-    std::vector<int64_t> new_sizes = sizes().vec();
+    std::vector<int64_t> new_sizes = sizes();
     new_sizes[dim]                 = (end - start) / step;
 
     auto new_strides = strides();
+    new_strides[dim] *= step;
 
     std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
         impl_->storage_, impl_->storage_offset_ + offset, std::move(new_sizes), std::move(new_strides), options());
@@ -118,12 +119,12 @@ Tensor Tensor::unsqueeze(int64_t dim) const
         dim = dim + this->dim() + 1;
     }
 
-    std::vector<int64_t> new_sizes = sizes().vec();
+    std::vector<int64_t> new_sizes = sizes();
     new_sizes.insert(std::next(new_sizes.begin(), dim), 1);
 
     int64_t stride_to_insert = (dim == 0) ? 1 : stride(dim - 1);
 
-    std::vector<int64_t> new_strides = strides().vec();
+    std::vector<int64_t> new_strides = strides();
     new_strides.insert(std::next(new_strides.begin(), dim), stride_to_insert);
 
     std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
@@ -137,10 +138,10 @@ Tensor Tensor::squeeze(int64_t dim) const
     assert(dim < this->dim());
     assert(size(dim) == 1);
 
-    std::vector<int64_t> new_sizes = sizes().vec();
+    std::vector<int64_t> new_sizes = sizes();
     new_sizes.erase(std::next(new_sizes.begin(), dim));
 
-    std::vector<int64_t> new_strides = strides().vec();
+    std::vector<int64_t> new_strides = strides();
     new_strides.erase(std::next(new_strides.begin(), dim));
 
     std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
@@ -151,10 +152,10 @@ Tensor Tensor::squeeze(int64_t dim) const
 
 Tensor Tensor::squeeze() const
 {
-    std::vector<int64_t> new_sizes = sizes().vec();
+    std::vector<int64_t> new_sizes = sizes();
     new_sizes.erase(std::remove(new_sizes.begin(), new_sizes.end(), 1), new_sizes.end());
 
-    std::vector<int64_t> new_strides = strides().vec();
+    std::vector<int64_t> new_strides = strides();
     new_strides.erase(std::remove(new_strides.begin(), new_strides.end(), 1), new_strides.end());
 
     std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
