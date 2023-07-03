@@ -228,6 +228,11 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    bool allclose(Tensor value) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
 
     Tensor clamp(double mi, double ma) const
     {
@@ -298,6 +303,16 @@ struct TINYTORCH_API Tensor
         return {};
     }
     std::pair<Tensor, Tensor> min(int64_t index) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    std::pair<Tensor, Tensor> max(int64_t index) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor std(int64_t index) const
     {
         throw std::runtime_error("not implemented");
         return {};

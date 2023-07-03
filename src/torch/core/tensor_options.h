@@ -60,6 +60,13 @@ struct TINYTORCH_API TensorOptions
         dtype_ = d;
         return *this;
     }
+
+    template<typename T>
+    TensorOptions& dtype()
+    {
+        throw std::runtime_error("not implemented");
+        return *this;
+    }
 };
 
 
