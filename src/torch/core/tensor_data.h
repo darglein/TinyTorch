@@ -91,7 +91,7 @@ inline int64_t elementSize(ScalarType type)
         case kHalf:
             return 2;
         default:
-            assert(false);
+            CHECK(false);
     }
     return 0;
 }

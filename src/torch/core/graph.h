@@ -61,7 +61,7 @@ struct IValue
     std::shared_ptr<T> toCustomClass()
     {
         auto result = std::dynamic_pointer_cast<T>(custom_class);
-        assert(result);
+        CHECK(result);
         return result;
     }
 
@@ -159,7 +159,7 @@ struct FunctionNode : public Node
 
     std::vector<Tensor> node_backward(const std::vector<Tensor>& fwd_output_grad) override
     {
-        assert(fwd_output_grad.size() == num_input_gradients_of_backward);
+        CHECK_EQ(fwd_output_grad.size() ,num_input_gradients_of_backward);
 
         // backward
         auto grad_list = T::backward(&context, fwd_output_grad);
@@ -176,7 +176,7 @@ struct FunctionNode : public Node
 
         std::vector<Tensor> t;
         ExtractVariables::apply(t, args...);
-        assert(t.size() == num_inputs);
+        CHECK_EQ(t.size() , num_inputs);
         for (int i = 0; i < num_inputs; ++i)
         {
             node->next.push_back(t[i].getEdge());
@@ -220,7 +220,7 @@ struct AccumulateGrad : public Node
 
     std::vector<Tensor> node_backward(const std::vector<Tensor>& input_grad) override
     {
-        assert(input_grad.size() == 1);
+        CHECK_EQ(input_grad.size() , 1);
         // t.AddGradInplace(input_grad[0]);
         t.mutable_grad() += input_grad[0];
         return {};

@@ -9,10 +9,12 @@ if (UNIX)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fvisibility=hidden>)
 endif ()
 
-if(TT_HAS_CUDA)
 
+target_link_libraries(torch PUBLIC glog::glog)
+
+if (TT_HAS_CUDA)
     target_link_libraries(torch PUBLIC CUDA::cudart)
-    endif()
+endif ()
 
 
 set(MY_BUILDCONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
@@ -26,8 +28,8 @@ target_include_directories(torch PUBLIC ${MY_BUILDCONFIG_DIR})
 
 #############  source #############
 
-FILE(GLOB_RECURSE ALL_SRC  *.cpp)
-FILE(GLOB_RECURSE ALL_HEADER  *.h)
+FILE(GLOB_RECURSE ALL_SRC *.cpp)
+FILE(GLOB_RECURSE ALL_HEADER *.h)
 
 target_sources(torch PRIVATE ${ALL_SRC} PUBLIC ${ALL_HEADER})
 

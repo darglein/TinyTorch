@@ -377,7 +377,7 @@ struct TINYTORCH_API Tensor
     template <typename T>
     T item() const
     {
-        assert(numel() == 1);
+        CHECK_EQ(numel() , 1);
         return *cpu().data_ptr<T>();
     }
     double toDouble() const
@@ -468,7 +468,7 @@ private:
 template <typename T>
 T* Tensor::data_ptr() const
 {
-    assert(impl_);
+    CHECK(impl_);
 
     auto dtype = scalar_type();
     (void) dtype;
@@ -476,31 +476,31 @@ T* Tensor::data_ptr() const
     // TODO: Half!
     if constexpr (std::is_same_v<T, uint8_t>)
     {
-        assert(dtype == kUInt8);
+        CHECK_EQ(dtype , kUInt8);
     }
     else if constexpr (std::is_same_v<T, int16_t>)
     {
-        assert(dtype == kInt16);
+        CHECK_EQ(dtype , kInt16);
     }
     else if constexpr (std::is_same_v<T, int32_t>)
     {
-        assert(dtype == kInt32);
+        CHECK_EQ(dtype , kInt32);
     }
     else if constexpr (std::is_same_v<T, int64_t>)
     {
-        assert(dtype == kLong);
+        CHECK_EQ(dtype , kLong);
     }
     else if constexpr (std::is_same_v<T, float>)
     {
-        assert(dtype == kFloat);
+        CHECK_EQ(dtype , kFloat);
     }
     else if constexpr (std::is_same_v<T, double>)
     {
-        assert(dtype == kFloat64);
+        CHECK_EQ(dtype , kFloat64);
     }
     else
     {
-        assert(false);
+        CHECK(false);
     }
     return (T*)ptr();
 }

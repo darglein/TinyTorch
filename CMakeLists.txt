@@ -19,6 +19,14 @@ else ()
     message(STATUS "Disable CUDA support (CUDAToolkit not found)")
 endif ()
 
+
+#### Submodules ####
+
+set(WITH_GFLAGS OFF CACHE INTERNAL "")
+set(WITH_GTEST OFF CACHE INTERNAL "")
+set(WITH_UNWIND OFF CACHE INTERNAL "")
+add_subdirectory(External/glog)
+
 ############# SOURCE ###############
 
 add_subdirectory(src)

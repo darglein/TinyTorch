@@ -30,7 +30,7 @@ std::shared_ptr<Edge> Tensor::getEdge() const
 }
 void Tensor::SetEdge(std::shared_ptr<Edge> edge)
 {
-    assert(impl_->autograd_meta);
+    CHECK(impl_->autograd_meta);
     impl_->autograd_meta->edge = edge;
 }
 void Tensor::set_requires_grad(bool requires_grad)
@@ -90,10 +90,10 @@ Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) cons
 {
     int64_t dims = this->dim();
 
-    assert(dim < dims);
-    assert(start < end);
-    assert(end <= size(dim));
-    assert((end - start) % step == 0);
+    CHECK_LT(dim , dims);
+    CHECK_LT(start ,end);
+    CHECK_LE(end ,size(dim));
+    CHECK_EQ((end - start) % step , 0);
 
     int64_t offset = start * stride(dim);
     offset *= element_size();
@@ -112,7 +112,7 @@ Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) cons
 
 Tensor Tensor::unsqueeze(int64_t dim) const
 {
-    assert(dim >= -this->dim() - 1 && dim < this->dim() + 1);
+    CHECK(dim >= -this->dim() - 1 && dim < this->dim() + 1);
 
     if (dim < 0)
     {
@@ -135,8 +135,8 @@ Tensor Tensor::unsqueeze(int64_t dim) const
 
 Tensor Tensor::squeeze(int64_t dim) const
 {
-    assert(dim < this->dim());
-    assert(size(dim) == 1);
+    CHECK_LT(dim , this->dim());
+    CHECK_EQ(size(dim) , 1);
 
     std::vector<int64_t> new_sizes = sizes();
     new_sizes.erase(std::next(new_sizes.begin(), dim));

@@ -91,7 +91,7 @@ struct SumNode : public FunctionNode<SumNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        assert(grad.size() == 1);
+        CHECK_EQ(grad.size() , 1);
         auto grad_a = sum_backward_impl_cpu(ctx->data_sizes["sizes"], grad[0]);
         return grad_a;
     }
