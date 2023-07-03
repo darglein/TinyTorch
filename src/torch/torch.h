@@ -10,5 +10,5 @@
 #include "tiny_torch_cuda.h"
 
 
-namespace torch = TINY_TORCH_NAMESPACE;
-namespace at    = TINY_TORCH_NAMESPACE;
+namespace torch = tinytorch;
+namespace at    = tinytorch;

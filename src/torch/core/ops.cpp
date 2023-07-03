@@ -10,7 +10,7 @@
 #include "graph.h"
 
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 
 namespace autograd
@@ -130,4 +130,4 @@ void fill(Tensor& t, double value)
     fill_impl_cpu(t, value);
 }
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

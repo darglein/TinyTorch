@@ -10,7 +10,7 @@
 
 #include <map>
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 
 inline void set_num_threads(int n)
@@ -74,6 +74,8 @@ class ModuleHolder
 //        : impl_(new Contained(std::forward<Head>(head), std::forward<Tail>(tail)...))
 //    {
 //    }
+
+    // explicit ModuleHolder(const ModuleHolder<Contained>& other) : impl_(other.impl_){}
 
     template <
         typename Head,
@@ -212,4 +214,4 @@ inline void save(Tensor t, std::string name)
 }
 
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

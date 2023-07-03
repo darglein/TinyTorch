@@ -10,7 +10,7 @@
 #endif
 
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(device)
 {
@@ -43,4 +43,4 @@ StorageImpl::~StorageImpl()
     }
 }
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

@@ -12,8 +12,15 @@
 
 #include "torch/tiny_torch_config.h"
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
+
+template <typename _Tp, typename... _Args>
+std::shared_ptr<_Tp> make_intrusive(_Args&&... __args)
+{
+    return std::make_shared<_Tp>(std::forward<_Args>(__args)...);
+}
+
 namespace autograd
 {
 struct Node;
@@ -37,19 +44,27 @@ struct Edge
 
 struct IValue
 {
-    IValue(){}
+    IValue() {}
 
-    IValue(bool b){}
-    IValue(double d){}
-    IValue(int32_t i){}
-    IValue(int64_t i){}
+    IValue(bool b) {}
+    IValue(double d) {}
+    IValue(int32_t i) {}
+    IValue(int64_t i) {}
+
+    template <typename T>
+    IValue(std::shared_ptr<T> i)
+    {
+        custom_class = i;
+    }
 
     template <typename T>
     std::shared_ptr<T> toCustomClass()
     {
-        throw std::runtime_error("not implemented");
-        return {};
+        auto result = std::dynamic_pointer_cast<T>(custom_class);
+        assert(result);
+        return result;
     }
+
     double toDouble()
     {
         throw std::runtime_error("not implemented");
@@ -65,6 +80,8 @@ struct IValue
         throw std::runtime_error("not implemented");
         return false;
     }
+
+    std::shared_ptr<CustomClassHolder> custom_class;
 };
 
 
@@ -160,7 +177,7 @@ struct FunctionNode : public Node
         std::vector<Tensor> t;
         ExtractVariables::apply(t, args...);
         assert(t.size() == num_inputs);
-        for (int i = 0; i < t.size(); ++i)
+        for (int i = 0; i < num_inputs; ++i)
         {
             node->next.push_back(t[i].getEdge());
             // if(node->next.)
@@ -228,4 +245,4 @@ struct AutoGradMode
     AutoGradMode(bool b) { throw std::runtime_error("not implemented"); }
 };
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

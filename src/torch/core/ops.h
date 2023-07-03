@@ -9,7 +9,7 @@
 
 #include "tensor_options.h"
 #include "torch/tiny_torch_config.h"
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 inline void manual_seed(int64_t seed)
 {
@@ -32,6 +32,10 @@ TINYTORCH_API Tensor zeros_like(Tensor t);
 TINYTORCH_API Tensor rand_like(Tensor t);
 
 inline Tensor empty_like(Tensor t, TensorOptions options){
+    throw std::runtime_error("not implemented");
+    return {};
+}
+inline Tensor ones_like(Tensor t, TensorOptions options){
     throw std::runtime_error("not implemented");
     return {};
 }
@@ -255,4 +259,4 @@ inline void load(Tensor&, std::string)
 }
 
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

@@ -20,7 +20,7 @@
 #include "tensor_options.h"
 #include "torch/tiny_torch_config.h"
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 
 struct TensorImpl;
@@ -33,7 +33,7 @@ namespace std
 template class TINYTORCH_API shared_ptr<tinytorch::TensorImpl>;
 }  // namespace std
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 
 struct Edge;
@@ -42,6 +42,7 @@ struct TensorImpl;
 
 struct CustomClassHolder
 {
+    virtual ~CustomClassHolder(){}
 };
 
 struct SizeType
@@ -238,7 +239,17 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    Tensor clamp_min_(double m) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
     Tensor clamp_max_(double m) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor clamp_max(double m) const
     {
         throw std::runtime_error("not implemented");
         return {};
@@ -445,6 +456,7 @@ T* Tensor::data_ptr() const
     assert(impl_);
 
     auto dtype = scalar_type();
+    (void) dtype;
 
     // TODO: Half!
     if constexpr (std::is_same_v<T, uint8_t>)
@@ -478,4 +490,4 @@ T* Tensor::data_ptr() const
     return (T*)ptr();
 }
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

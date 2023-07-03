@@ -2,7 +2,7 @@
 
 #include "torch/tiny_torch_config.h"
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 #ifdef TT_HAS_CUDA
 #    include <cuda_runtime_api.h>
@@ -90,4 +90,4 @@ inline TT_HD T softplus_backward(T x, T beta)
 
 
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

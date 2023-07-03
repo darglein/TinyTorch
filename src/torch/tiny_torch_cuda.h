@@ -11,17 +11,17 @@
 #if __has_include("cuda_runtime.h")
 #    include "cuda_runtime.h"
 
-#ifdef __CUDACC__
-#define CUDA_KERNEL_ASSERT(cond)                                         \
-  if (!(cond)) {                                           \
-    __assert_fail(                                                       \
-        #cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
-  }
-#else
-    #define CUDA_KERNEL_ASSERT(cond) assert(cond)
-#endif
+#    ifdef __CUDACC__
+#        define CUDA_KERNEL_ASSERT(cond) \
+            if (!(cond))                 \
+            {                            \
+                assert(cond);             \
+            }
+#    else
+#        define CUDA_KERNEL_ASSERT(cond) assert(cond)
+#    endif
 #    if defined(__CUDA_RUNTIME_H__) || defined(__CUDACC__)
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 namespace cuda
 {
@@ -39,6 +39,6 @@ struct CUDACachingAllocator
 
 
 }  // namespace cuda
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch
 #    endif
 #endif

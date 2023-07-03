@@ -18,7 +18,7 @@
 
 #include "torch/tiny_torch_config.h"
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 
 struct Half
@@ -98,4 +98,4 @@ inline int64_t elementSize(ScalarType type)
 
 
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

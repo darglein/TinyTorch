@@ -11,7 +11,7 @@
 #include "torch/core/tensor_info.h"
 #include "torch/tiny_torch_config.h"
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 namespace optim
 {
@@ -136,4 +136,4 @@ struct SGDOptimizer
     std::vector<Tensor> velocities;
 };
 }  // namespace optim
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

@@ -7,7 +7,7 @@
 
 #include "torch/core/ops.h"
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 int64_t Tensor::numel() const
 {
@@ -225,4 +225,4 @@ void TensorImpl::set_requires_grad(bool requires_grad)
         autograd_meta = nullptr;
     }
 }
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

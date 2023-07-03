@@ -9,7 +9,7 @@
 
 #include "torch/core/tensor_options.h"
 #include "torch/tiny_torch_config.h"
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 // Internal implementation of forward/backward
 // Should NOT be called by the user
@@ -67,4 +67,4 @@ std::vector<Tensor> prod_backward_impl_cpu(Tensor a, int64_t dim, Tensor grad_ou
 std::vector<Tensor> min_backward_impl_cpu(Tensor grad_output);
 std::vector<Tensor> max_backward_impl_cpu(Tensor grad_output);
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

@@ -19,7 +19,7 @@
 #include "tensor_data.h"
 #include "torch/tiny_torch_config.h"
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 
 
@@ -63,4 +63,4 @@ struct TINYTORCH_API TensorOptions
 };
 
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

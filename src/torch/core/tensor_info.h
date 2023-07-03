@@ -21,7 +21,7 @@
 #include "torch/tiny_torch_config.h"
 #include <type_traits>
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 
 
@@ -143,4 +143,4 @@ TensorInfo<T, MAX_DIMS>::TensorInfo(T* p, int dim, int64_t sz[max_dims], int64_t
 
 
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch

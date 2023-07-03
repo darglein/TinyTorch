@@ -10,7 +10,7 @@
 #include "torch/core/tensor_info.h"
 #include "torch/core/ops_impl_shared.h"
 
-namespace TINY_TORCH_NAMESPACE
+namespace tinytorch
 {
 
 #define CASE_MACRO(func, type, scalar_type, ...) \
@@ -1142,4 +1142,4 @@ Tensor operator/=(Tensor a, double b)
 
 
 
-}  // namespace TINY_TORCH_NAMESPACE
+}  // namespace tinytorch
