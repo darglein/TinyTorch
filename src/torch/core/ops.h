@@ -47,8 +47,13 @@ inline std::pair<Tensor,Tensor> sort(Tensor t, int64_t a)
     throw std::runtime_error("not implemented");
     return {};
 }
-
 inline Tensor range(int64_t start, int64_t end, int64_t a)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
+
+inline Tensor range(int64_t start, int64_t end, TensorOptions options)
 {
     throw std::runtime_error("not implemented");
     return {};

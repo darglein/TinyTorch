@@ -22,10 +22,12 @@ endif ()
 
 #### Submodules ####
 
-set(WITH_GFLAGS OFF CACHE INTERNAL "")
-set(WITH_GTEST OFF CACHE INTERNAL "")
-set(WITH_UNWIND OFF CACHE INTERNAL "")
-add_subdirectory(External/glog)
+if (NOT TARGET glog::glog)
+    set(WITH_GFLAGS OFF CACHE INTERNAL "")
+    set(WITH_GTEST OFF CACHE INTERNAL "")
+    set(WITH_UNWIND OFF CACHE INTERNAL "")
+    add_subdirectory(External/glog)
+endif ()
 
 ############# SOURCE ###############
 

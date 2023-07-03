@@ -22,6 +22,11 @@ struct AdamOptions
 
     AdamOptions(double lr = 1e-3) : lr_(lr) {}
     double& lr() { return lr_; }
+    AdamOptions& lr(double lr)
+    {
+        lr_ = lr;
+        return *this;
+    }
     double& eps() { return eps_; }
     betas_t& betas() { return betas_; }
     void eps(double e) { eps_ = e; }
@@ -91,6 +96,21 @@ void sgd_step(TensorInfo<T> param, TensorInfo<T> param_grad, TensorInfo<T> veloc
         w = w - lr * g;
     }
 }
+
+
+struct Adam
+{
+    Adam(std::vector<Tensor> params, AdamOptions optoins) { throw std::runtime_error("not implemented"); }
+
+    void step() { throw std::runtime_error("not implemented"); }
+    void add_param_group(std::pair<std::vector<Tensor>, std::unique_ptr<AdamOptions>> group)
+    {
+        throw std::runtime_error("not implemented");
+    }
+
+    void zero_grad() { throw std::runtime_error("not implemented"); }
+};
+
 
 // implemented after https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
 struct SGDOptimizer
