@@ -14,8 +14,8 @@ void backward(Tensor loss)
     std::map<std::shared_ptr<autograd::Node>, std::vector<Tensor>> grad_map;
 
 
-    assert(loss.numel() == 1);
-    assert(loss.getEdge());
+    CHECK_EQ(loss.numel() ,1);
+    CHECK(loss.getEdge());
 
     // Start traversal at the root node
     auto root_node = loss.getEdge()->function;

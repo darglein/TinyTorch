@@ -53,6 +53,13 @@ struct CppTypeToScalarType{
 
 using Dtype = ScalarType;
 
+
+template<typename T>
+ScalarType dtype(){
+    throw std::runtime_error("not implemented");
+    return {};
+}
+
 struct StorageImpl
 {
     StorageImpl(int64_t size, Device device);
@@ -91,7 +98,7 @@ inline int64_t elementSize(ScalarType type)
         case kHalf:
             return 2;
         default:
-            assert(false);
+            CHECK(false);
     }
     return 0;
 }

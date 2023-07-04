@@ -24,7 +24,7 @@ namespace tinytorch
         CASE_MACRO(func, float, kFloat, __VA_ARGS__)    \
         CASE_MACRO(func, double, kDouble, __VA_ARGS__)  \
         default:                                        \
-            assert(false);                              \
+            CHECK(false);                              \
     }
 
 // TODO: Half!
@@ -38,7 +38,7 @@ namespace tinytorch
         CASE_MACRO(func, float, kFloat, __VA_ARGS__)   \
         CASE_MACRO(func, double, kDouble, __VA_ARGS__) \
         default:                                       \
-            assert(false);                             \
+            CHECK(false);                             \
     }
 
 template <typename T>
@@ -448,7 +448,7 @@ static void prod_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result
 
     int64_t to_prod = input.sizes[dim];
     int64_t count   = input.numel() / input.sizes[dim];
-    assert(count == result.numel());
+    CHECK_EQ(count , result.numel());
 
     for (int64_t c = 0; c < count; ++c)
     {
@@ -484,7 +484,7 @@ static void prod_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result
 
 Tensor prod_impl_cpu(Tensor input, int64_t dim)
 {
-    assert(dim < input.dim());
+    CHECK_LT(dim , input.dim());
 
     auto result_size = input.sizes().vec();
     result_size[dim] = 1;
@@ -572,8 +572,8 @@ static void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<i
 
 Tensor index_select_impl_cpu(Tensor input, int64_t dim, Tensor index)
 {
-    assert(dim < input.dim());
-    assert(index.dtype() == kLong);
+    CHECK_LT(dim , input.dim());
+    CHECK_EQ(index.dtype() , kLong);
 
     auto numel = index.numel();
 
@@ -777,7 +777,7 @@ static void sum_backward_impl_cpu(TensorInfo<T> grad_output, TensorInfo<T> grad_
 
 std::vector<Tensor> sum_backward_impl_cpu(const SizeType& input_sizes, Tensor grad_output)
 {
-    assert(grad_output.numel() == 1);
+    CHECK_EQ(grad_output.numel() , 1);
     Tensor grad_a = empty(input_sizes);
     SWITCH_MACRO_ALL(grad_output.scalar_type(), sum_backward_impl_cpu, grad_output, grad_a);
     return {grad_a};
@@ -1086,56 +1086,56 @@ std::ostream& operator<<(std::ostream& strm, Tensor t)
 
 Tensor operator+=(Tensor a, Tensor b)
 {
-    assert(!a.requires_grad());
+    CHECK(!a.requires_grad());
     SWITCH_MACRO_ALL(a.scalar_type(), add_impl_cpu, a, b, a);
     return a;
 }
 
 Tensor operator+=(Tensor a, double b)
 {
-    assert(!a.requires_grad());
+    CHECK(!a.requires_grad());
     SWITCH_MACRO_ALL(a.scalar_type(), add_impl_cpu, a, b, a);
     return a;
 }
 
 Tensor operator-=(Tensor a, Tensor b)
 {
-    assert(!a.requires_grad());
+    CHECK(!a.requires_grad());
     SWITCH_MACRO_ALL(a.scalar_type(), sub_impl_cpu, a, b, a);
     return a;
 }
 
 Tensor operator-=(Tensor a, double b)
 {
-    assert(!a.requires_grad());
+    CHECK(!a.requires_grad());
     SWITCH_MACRO_ALL(a.scalar_type(), sub_impl_cpu, a, b, a);
     return a;
 }
 
 Tensor operator*=(Tensor a, Tensor b)
 {
-    assert(!a.requires_grad());
+    CHECK(!a.requires_grad());
     SWITCH_MACRO_ALL(a.scalar_type(), mult_impl_cpu, a, b, a);
     return a;
 }
 
 Tensor operator*=(Tensor a, double b)
 {
-    assert(!a.requires_grad());
+    CHECK(!a.requires_grad());
     SWITCH_MACRO_ALL(a.scalar_type(), mult_impl_cpu, a, b, a);
     return a;
 }
 
 Tensor operator/=(Tensor a, Tensor b)
 {
-    assert(!a.requires_grad());
+    CHECK(!a.requires_grad());
     SWITCH_MACRO_ALL(a.scalar_type(), div_impl_cpu, a, b, a);
     return a;
 }
 
 Tensor operator/=(Tensor a, double b)
 {
-    assert(!a.requires_grad());
+    CHECK(!a.requires_grad());
     SWITCH_MACRO_ALL(a.scalar_type(), div_impl_cpu, a, b, a);
     return a;
 }

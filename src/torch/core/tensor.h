@@ -42,7 +42,7 @@ struct TensorImpl;
 
 struct CustomClassHolder
 {
-    virtual ~CustomClassHolder(){}
+    virtual ~CustomClassHolder() {}
 };
 
 struct SizeType
@@ -108,9 +108,7 @@ struct TINYTORCH_API Tensor
     template <typename T>
     T* data_ptr() const;
 
-    void* data_ptr() const{
-        return ptr();
-    }
+    void* data_ptr() const { return ptr(); }
 
     uint8_t* ptr() const;
 
@@ -228,8 +226,18 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    bool allclose(Tensor value) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
 
     Tensor clamp(double mi, double ma) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor round() const
     {
         throw std::runtime_error("not implemented");
         return {};
@@ -264,7 +272,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor norm(int64_t norm, int64_t dim, bool keep) const
+    Tensor norm(int64_t norm, int64_t dim, bool keepdim=false) const
     {
         throw std::runtime_error("not implemented");
         return {};
@@ -292,12 +300,32 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    void uniform_()
+    {
+        throw std::runtime_error("not implemented");
+    }
+    void operator=(double a)
+    {
+        CHECK_EQ(dim(), 1);
+        CHECK_EQ(numel(), 1);
+        fill_(a);
+    }
     Tensor min() const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
     std::pair<Tensor, Tensor> min(int64_t index) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    std::pair<Tensor, Tensor> max(int64_t index) const
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    Tensor std(int64_t index) const
     {
         throw std::runtime_error("not implemented");
         return {};
@@ -347,8 +375,18 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    inline Tensor repeat_interleave(int64_t start)
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
+    inline Tensor transpose(int64_t start, int64_t end)
+    {
+        throw std::runtime_error("not implemented");
+        return {};
+    }
     void backward() const { throw std::runtime_error("not implemented"); }
-    void backward(Tensor t) const { throw std::runtime_error("not implemented"); }
+    void backward(Tensor t, bool retain_grad = false) const { throw std::runtime_error("not implemented"); }
     Tensor std() const
     {
         throw std::runtime_error("not implemented");
@@ -362,7 +400,7 @@ struct TINYTORCH_API Tensor
     template <typename T>
     T item() const
     {
-        assert(numel() == 1);
+        CHECK_EQ(numel(), 1);
         return *cpu().data_ptr<T>();
     }
     double toDouble() const
@@ -446,46 +484,46 @@ struct TensorImpl
     std::unique_ptr<AutogradMeta> autograd_meta;
 
 
-private:
+   private:
     void recompute_strides();
 };
 
 template <typename T>
 T* Tensor::data_ptr() const
 {
-    assert(impl_);
+    CHECK(impl_);
 
     auto dtype = scalar_type();
-    (void) dtype;
+    (void)dtype;
 
     // TODO: Half!
     if constexpr (std::is_same_v<T, uint8_t>)
     {
-        assert(dtype == kUInt8);
+        CHECK_EQ(dtype, kUInt8);
     }
     else if constexpr (std::is_same_v<T, int16_t>)
     {
-        assert(dtype == kInt16);
+        CHECK_EQ(dtype, kInt16);
     }
     else if constexpr (std::is_same_v<T, int32_t>)
     {
-        assert(dtype == kInt32);
+        CHECK_EQ(dtype, kInt32);
     }
     else if constexpr (std::is_same_v<T, int64_t>)
     {
-        assert(dtype == kLong);
+        CHECK_EQ(dtype, kLong);
     }
     else if constexpr (std::is_same_v<T, float>)
     {
-        assert(dtype == kFloat);
+        CHECK_EQ(dtype, kFloat);
     }
     else if constexpr (std::is_same_v<T, double>)
     {
-        assert(dtype == kFloat64);
+        CHECK_EQ(dtype, kFloat64);
     }
     else
     {
-        assert(false);
+        CHECK(false);
     }
     return (T*)ptr();
 }

@@ -23,7 +23,7 @@ StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(dev
 #ifdef TT_HAS_CUDA
         cudaMalloc(&data_ptr_, size);
 #else
-        assert(false);
+        CHECK(false);
 #endif
     }
 }
@@ -38,7 +38,7 @@ StorageImpl::~StorageImpl()
 #ifdef TT_HAS_CUDA
         cudaFree(data_ptr_);
 #else
-        assert(false);
+        CHECK(false);
 #endif
     }
 }

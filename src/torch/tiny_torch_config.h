@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "glog/logging.h"
 #include "torch/tiny_torch_build_config.h"
 
 // Generic helper definitions for shared library support
