@@ -214,6 +214,10 @@ bool Tensor::is_contiguous() const
     }
     return true;
 }
+Tensor Tensor::to(ScalarType new_type) const
+{
+    return tinytorch::to(*this, new_type);
+}
 
 
 

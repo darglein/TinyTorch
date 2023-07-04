@@ -163,11 +163,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor to(ScalarType new_type) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor to(ScalarType new_type) const;
     Tensor to(Device new_type) const
     {
         throw std::runtime_error("not implemented");
