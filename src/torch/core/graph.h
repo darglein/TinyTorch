@@ -170,14 +170,14 @@ struct FunctionNode : public Node
     static std::vector<Tensor> forward_and_build_graph(Args&&... args)
     {
         // Create node and set next edge
-        const size_t num_inputs = sizeof...(Args);
+        // const size_t num_inputs = sizeof...(Args);
         bool need_grad          = false;
         auto node               = std::make_shared<FunctionNode<T>>();
 
         std::vector<Tensor> t;
         ExtractVariables::apply(t, args...);
-        CHECK_EQ(t.size() , num_inputs);
-        for (int i = 0; i < num_inputs; ++i)
+        // CHECK_EQ(t.size() , num_inputs);
+        for (int i = 0; i < t.size(); ++i)
         {
             node->next.push_back(t[i].getEdge());
             // if(node->next.)

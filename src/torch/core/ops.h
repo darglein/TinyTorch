@@ -11,10 +11,8 @@
 #include "torch/tiny_torch_config.h"
 namespace tinytorch
 {
-inline void manual_seed(int64_t seed)
-{
-    throw std::runtime_error("not implemented");
-}
+TINYTORCH_API void manual_seed(int64_t seed);
+TINYTORCH_API int64_t get_seed();
 
 // Basic tensor generation
 TINYTORCH_API Tensor full(const SizeType& sizes, float value, TensorOptions options = TensorOptions());
@@ -102,15 +100,10 @@ inline Tensor operator-(double a, Tensor b)
     return {};
 }
 TINYTORCH_API Tensor operator*(Tensor a, Tensor b);
-inline Tensor operator*(double a, Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+TINYTORCH_API Tensor operator*(double a, Tensor b);
 inline Tensor operator*(Tensor a, double b)
 {
-    throw std::runtime_error("not implemented");
-    return {};
+    return b * a;
 }
 inline Tensor operator/(Tensor a, Tensor b)
 {
@@ -127,11 +120,7 @@ inline Tensor operator/(double a, Tensor b)
     throw std::runtime_error("not implemented");
     return {};
 }
-inline Tensor operator-(Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+TINYTORCH_API Tensor operator-(Tensor b);
 inline Tensor operator==(Tensor a, double b)
 {
     throw std::runtime_error("not implemented");
