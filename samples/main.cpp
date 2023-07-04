@@ -25,28 +25,33 @@ int main()
     // The model itself
     auto model = [&](tinytorch::Tensor x) -> tinytorch::Tensor
     {
-        x = x * params[0];
-        x = x + params[1];
-        x = x * params[2];
-        x = x + params[3];
+        x = x + params[0] + 5;
+         x = x * -params[0];
+        x = x + params[1] + 5;
+        x = x * params[2] * -1.;
+        x = x + 2 * params[3];
         return x;
     };
 
     // Create a simple optimizer
-    tinytorch::optim::SGDOptimizer optim(params, 0.1f);
+    tinytorch::optim::Adam optim(params, 0.01f);
 
     // Optimize the model for 50 iterations
     for (int i = 0; i < 50; ++i)
     {
-        optim.ZeroGrad();
+        optim.zero_grad();
 
         auto prediction = model(observation);
 
         auto loss = sum(square(prediction - target));
 
+        // std::cout << params[0].grad() << std::endl;
         backward(loss);
-        optim.Step();
-        std::cout << "Step " << i << " Loss: " << loss << std::endl;
+        // std::cout << "params " << params[0]<< std::endl;
+        // std::cout << "grad   " << params[0].grad() << std::endl;
+        optim.step();
+
+        std::cout << "Step " << i << " Loss: " << loss << std::endl<< std::endl;
     }
     return 0;
 }

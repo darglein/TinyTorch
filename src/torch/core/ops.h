@@ -78,16 +78,13 @@ TINYTORCH_API std::ostream& operator<<(std::ostream& strm, Tensor t);
 // These operators should be called by the user and support Auto-Diff
 TINYTORCH_API Tensor square(Tensor a);
 TINYTORCH_API Tensor operator+(Tensor a, Tensor b);
+
+TINYTORCH_API Tensor operator+(Tensor a, double b);
 inline Tensor operator+(double a, Tensor b)
 {
-    throw std::runtime_error("not implemented");
-    return {};
+   return b + a;
 }
-inline Tensor operator+(Tensor a, double b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+
 TINYTORCH_API Tensor operator-(Tensor a, Tensor b);
 inline Tensor operator-(Tensor a, double b)
 {

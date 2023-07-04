@@ -113,7 +113,27 @@ struct MultTensorScalarNode : public FunctionNode<MultTensorScalarNode>
         double b = ctx->saved_data["b"].toDouble();
         auto l      = ctx->get_saved_variables();
         auto grad_a = mult_backward_impl_cpu(l[0], b, grad[0]);
-        return grad_a;
+        return {grad_a[0], {}};
+    }
+};
+
+
+struct AddTensorScalarNode : public FunctionNode<MultTensorScalarNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, double b)
+    {
+        ctx->saved_data["b"] = b;
+        ctx->save_for_backward({a});
+        auto result = add_impl_cpu(a, b);
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        double b = ctx->saved_data["b"].toDouble();
+        auto l      = ctx->get_saved_variables();
+        auto grad_a = grad[0].clone();
+        return {grad_a, {}};
     }
 };
 
@@ -173,6 +193,10 @@ Tensor operator-(Tensor b)
 Tensor operator*(double a, Tensor b)
 {
     return MultTensorScalarNode::forward_and_build_graph(b, a)[0];
+}
+Tensor operator+(Tensor a, double b)
+{
+    return AddTensorScalarNode::forward_and_build_graph(a, b)[0];
 }
 
 

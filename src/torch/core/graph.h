@@ -47,7 +47,7 @@ struct IValue
     IValue() {}
 
     IValue(bool b) {}
-    IValue(double d) {}
+    IValue(double d) { v_double = d; }
     IValue(int32_t i) {}
     IValue(int64_t i) {}
 
@@ -65,11 +65,7 @@ struct IValue
         return result;
     }
 
-    double toDouble()
-    {
-        throw std::runtime_error("not implemented");
-        return false;
-    }
+    double toDouble() { return v_double; }
     bool toBool()
     {
         throw std::runtime_error("not implemented");
@@ -81,6 +77,7 @@ struct IValue
         return false;
     }
 
+    double v_double;
     std::shared_ptr<CustomClassHolder> custom_class;
 };
 
@@ -104,29 +101,6 @@ struct Context
     void save_for_backward(const std::vector<Tensor>& l) { saved_tensors = l; }
 };
 
-
-struct Node
-{
-    // Create a node and give it a unique increasing sequence number
-    Node() : sequence_nr(current_seq_nr++) {}
-    virtual ~Node() {}
-
-    // Computes and returns the gradients of the input tensor of the forward operator.
-    // The input is the gradient of the forward output
-    virtual std::vector<Tensor> node_backward(const std::vector<Tensor>& fwd_output_grad) = 0;
-
-    // A global counter to get correct node ordering
-    int sequence_nr;
-    inline static int current_seq_nr;
-
-    // The next edges are the inputs of the forward operator
-    std::vector<std::shared_ptr<Edge>> next;
-
-    // Variables that are required for the backward pass
-    Context context;
-
-    int64_t num_input_gradients_of_backward = 0;
-};
 
 using AutogradContext = Context;
 using variable_list   = std::vector<Tensor>;
@@ -152,6 +126,32 @@ struct ExtractVariables
     static void check_tensor(std::vector<Tensor>& output, const Tensor& arg) { output.push_back(arg); }
 };
 
+
+struct Node
+{
+    // Create a node and give it a unique increasing sequence number
+    Node() : sequence_nr(current_seq_nr++) {}
+    virtual ~Node() {}
+
+    // Computes and returns the gradients of the input tensor of the forward operator.
+    // The input is the gradient of the forward output
+    virtual std::vector<Tensor> node_backward(const std::vector<Tensor>& fwd_output_grad) = 0;
+
+    // A global counter to get correct node ordering
+    int sequence_nr;
+    inline static int current_seq_nr;
+
+    // The next edges are the inputs of the forward operator
+    std::vector<std::shared_ptr<Edge>> next;
+
+    // Variables that are required for the backward pass
+    Context context;
+
+    int64_t num_input_gradients_of_backward = 0;
+    int64_t num_inputs_of_forward           = 0;
+};
+
+
 template <typename T>
 struct FunctionNode : public Node
 {
@@ -159,10 +159,11 @@ struct FunctionNode : public Node
 
     std::vector<Tensor> node_backward(const std::vector<Tensor>& fwd_output_grad) override
     {
-        CHECK_EQ(fwd_output_grad.size() ,num_input_gradients_of_backward);
+        CHECK_EQ(fwd_output_grad.size(), num_input_gradients_of_backward);
 
         // backward
         auto grad_list = T::backward(&context, fwd_output_grad);
+        CHECK_EQ(grad_list.size(), num_inputs_of_forward);
         return grad_list;
     }
 
@@ -170,9 +171,9 @@ struct FunctionNode : public Node
     static std::vector<Tensor> forward_and_build_graph(Args&&... args)
     {
         // Create node and set next edge
-        // const size_t num_inputs = sizeof...(Args);
-        bool need_grad          = false;
-        auto node               = std::make_shared<FunctionNode<T>>();
+        bool need_grad              = false;
+        auto node                   = std::make_shared<FunctionNode<T>>();
+        node->num_inputs_of_forward = sizeof...(Args);
 
         std::vector<Tensor> t;
         ExtractVariables::apply(t, args...);
@@ -220,7 +221,7 @@ struct AccumulateGrad : public Node
 
     std::vector<Tensor> node_backward(const std::vector<Tensor>& input_grad) override
     {
-        CHECK_EQ(input_grad.size() , 1);
+        CHECK_EQ(input_grad.size(), 1);
         // t.AddGradInplace(input_grad[0]);
         t.mutable_grad() += input_grad[0];
         return {};
