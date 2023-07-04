@@ -17,48 +17,11 @@
 #include <vector>
 
 #include "torch/tiny_torch_config.h"
+#include "types.h"
 
 namespace tinytorch
 {
 
-struct Half
-{
-};
-enum Device
-{
-    kCPU,
-    kCUDA
-};
-
-enum ScalarType
-{
-    kByte,
-    kUInt8 = kByte,
-    kInt16,
-    kShort = kInt16,
-    kInt32,
-    kInt = kInt32,
-    kLong,
-    kFloat32,
-    kFloat = kFloat32,
-    kFloat64,
-    kDouble = kFloat64,
-    kHalf,
-};
-
-template<typename T>
-struct CppTypeToScalarType{
-    static constexpr ScalarType value = kByte;
-};
-
-using Dtype = ScalarType;
-
-
-template<typename T>
-ScalarType dtype(){
-    throw std::runtime_error("not implemented");
-    return {};
-}
 
 struct StorageImpl
 {
