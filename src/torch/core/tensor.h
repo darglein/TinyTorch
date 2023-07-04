@@ -6,6 +6,8 @@
 
 #pragma once
 
+#define NOMINMAX
+
 #include "assert.h"
 
 #include <algorithm>
@@ -403,21 +405,9 @@ struct TINYTORCH_API Tensor
         CHECK_EQ(numel(), 1);
         return *cpu().data_ptr<T>();
     }
-    double toDouble() const
-    {
-        throw std::runtime_error("not implemented");
-        return 0;
-    }
-    double toFloat() const
-    {
-        throw std::runtime_error("not implemented");
-        return 0;
-    }
-    int toInt() const
-    {
-        throw std::runtime_error("not implemented");
-        return 0;
-    }
+    double toDouble() const { return item<double>(); }
+    double toFloat() const { return item<float>(); }
+    int toInt() const { return item<int>(); }
     bool is_contiguous() const;
     bool is_leaf() const
     {
