@@ -86,13 +86,50 @@ TensorOptions Tensor::options() const
     return impl_->options_;
 }
 
+static void fill_neg_one_dim(SizeType& new_sizes, int64_t old_numel)
+{
+    int64_t new_numel = 1;
+    int64_t* neg_dim  = nullptr;
+    for (int64_t& i : new_sizes.vec())
+    {
+        if (i == -1)
+        {
+            CHECK_EQ(neg_dim, nullptr);
+            neg_dim = &i;
+        }
+        else
+        {
+            new_numel *= i;
+        }
+    }
+
+    if (neg_dim)
+    {
+        CHECK_EQ(old_numel % new_numel, 0);
+        *neg_dim = old_numel / new_numel;
+        new_numel *= *neg_dim;
+    }
+
+    CHECK_EQ(old_numel, new_numel);
+}
+
+Tensor Tensor::view(const SizeType& sizes) const
+{
+    SizeType new_sizes = sizes;
+    fill_neg_one_dim(new_sizes, numel());
+    
+    throw std::runtime_error("not implemented");
+
+    return {};
+}
+
 Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) const 
 {
     int64_t dims = this->dim();
 
-    CHECK_LT(dim , dims);
-    CHECK_LT(start ,end);
-    CHECK_LE(end ,size(dim));
+    CHECK_LT(dim, dims);
+    CHECK_LT(start, end);
+    CHECK_LE(end, size(dim));
     CHECK_EQ((end - start) % step , 0);
 
     int64_t offset = start * stride(dim);

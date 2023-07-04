@@ -59,6 +59,7 @@ struct SizeType
     const int64_t& operator[](int64_t i) const { return data_[i]; }
     int64_t size() const { return data_.size(); }
     void resize(int64_t s) { data_.resize(s); }
+    std::vector<int64_t>& vec() { return data_; }
     const std::vector<int64_t>& vec() const { return data_; }
     operator const std::vector<int64_t>&() const { return data_; }
 
@@ -128,11 +129,7 @@ struct TINYTORCH_API Tensor
     bool requires_grad() const;
     int64_t element_size() const;
 
-    Tensor view(const SizeType& sizes) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor view(const SizeType& sizes) const;
     Tensor operator[](int64_t index) const
     {
         throw std::runtime_error("not implemented");
