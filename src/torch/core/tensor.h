@@ -133,7 +133,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor operator[](int64_t dim) const
+    Tensor operator[](int64_t index) const
     {
         throw std::runtime_error("not implemented");
         return {};
