@@ -4,11 +4,13 @@
  * See LICENSE file for more information.
  */
 
+#include "torch/cpu/ops_impl_cpu.h"
+
 #include "torch/core/ops.h"
 #include "torch/core/tensor.h"
-#include "torch/cpu/ops_impl_cpu.h"
-#include "torch/core/tensor_info.h"
+
 #include "torch/core/ops_impl_shared.h"
+#include "torch/core/tensor_info.h"
 
 namespace tinytorch
 {
@@ -24,7 +26,7 @@ namespace tinytorch
         CASE_MACRO(func, float, kFloat, __VA_ARGS__)    \
         CASE_MACRO(func, double, kDouble, __VA_ARGS__)  \
         default:                                        \
-            CHECK(false);                              \
+            CHECK(false);                               \
     }
 
 // TODO: Half!
@@ -38,7 +40,7 @@ namespace tinytorch
         CASE_MACRO(func, float, kFloat, __VA_ARGS__)   \
         CASE_MACRO(func, double, kDouble, __VA_ARGS__) \
         default:                                       \
-            CHECK(false);                             \
+            CHECK(false);                              \
     }
 
 template <typename T>
@@ -241,6 +243,15 @@ static void div_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
     }
 }
 
+template <typename T>
+static void equals_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(a[i] == b);
+    }
+}
+
 Tensor div_impl_cpu(Tensor a, double b)
 {
     Tensor result = empty_like(a);
@@ -333,7 +344,7 @@ static void sign_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        T v = a[i];
+        T v       = a[i];
         result[i] = (v < T(0)) ? T(-1) : (v > T(0)) ? T(1) : T(0);
     }
 }
@@ -448,7 +459,7 @@ static void prod_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result
 
     int64_t to_prod = input.sizes[dim];
     int64_t count   = input.numel() / input.sizes[dim];
-    CHECK_EQ(count , result.numel());
+    CHECK_EQ(count, result.numel());
 
     for (int64_t c = 0; c < count; ++c)
     {
@@ -484,7 +495,7 @@ static void prod_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result
 
 Tensor prod_impl_cpu(Tensor input, int64_t dim)
 {
-    CHECK_LT(dim , input.dim());
+    CHECK_LT(dim, input.dim());
 
     auto result_size = input.sizes().vec();
     result_size[dim] = 1;
@@ -538,21 +549,21 @@ static void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<i
     int64_t to_copy = input.numel() / input.sizes[dim];
     for (int64_t index_index = 0; index_index < index.numel(); ++index_index)
     {
-        int64_t slice = index[index_index];
-        int64_t input_start = slice * input.strides[dim];
+        int64_t slice        = index[index_index];
+        int64_t input_start  = slice * input.strides[dim];
         int64_t result_start = index_index * result.strides[dim];
-        
+
         for (int64_t c = 0; c < to_copy; ++c)
         {
             int64_t linearId = c;
 
-            int64_t input_offset = input_start;
+            int64_t input_offset  = input_start;
             int64_t result_offset = result_start;
             for (int64_t i = dims - 1; i > 0; --i)
             {
                 if (i != dim)
                 {
-                    int64_t curDimIndex  = linearId % input.sizes[i];
+                    int64_t curDimIndex = linearId % input.sizes[i];
                     input_offset += curDimIndex * input.strides[i];
                     result_offset += curDimIndex * result.strides[i];
                     linearId /= input.sizes[i];
@@ -572,8 +583,8 @@ static void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<i
 
 Tensor index_select_impl_cpu(Tensor input, int64_t dim, Tensor index)
 {
-    CHECK_LT(dim , input.dim());
-    CHECK_EQ(index.dtype() , kLong);
+    CHECK_LT(dim, input.dim());
+    CHECK_EQ(index.dtype(), kLong);
 
     auto numel = index.numel();
 
@@ -648,7 +659,7 @@ std::vector<Tensor> sub_backward_impl_cpu(Tensor grad_output)
 
 template <typename T>
 static void mult_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> grad_output, TensorInfo<T> grad_a,
-                               TensorInfo<T> grad_b)
+                                   TensorInfo<T> grad_b)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
@@ -692,14 +703,14 @@ std::vector<Tensor> mult_backward_impl_cpu(double b, Tensor a, Tensor grad_outpu
 
 template <typename T>
 static void div_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> grad_output, TensorInfo<T> grad_a,
-                              TensorInfo<T> grad_b)
+                                  TensorInfo<T> grad_b)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        auto g    = grad_output[i];
+        auto g        = grad_output[i];
         auto [ga, gb] = div_backward(a[i], b[i]);
-        grad_a[i] = ga * g;
-        grad_b[i] = gb * g;
+        grad_a[i]     = ga * g;
+        grad_b[i]     = gb * g;
     }
 }
 
@@ -716,9 +727,9 @@ static void div_backward_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> grad_
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        auto g    = grad_output[i];
+        auto g        = grad_output[i];
         auto [ga, gb] = div_backward(a[i], T(b));
-        grad_a[i] = ga * g;
+        grad_a[i]     = ga * g;
     }
 }
 
@@ -734,9 +745,9 @@ static void div_backward_impl_cpu(double a, TensorInfo<T> b, TensorInfo<T> grad_
 {
     for (int64_t i = 0; i < b.numel(); ++i)
     {
-        auto g    = grad_output[i];
+        auto g        = grad_output[i];
         auto [ga, gb] = div_backward(T(a), b[i]);
-        grad_b[i] = gb * g;
+        grad_b[i]     = gb * g;
     }
 }
 
@@ -777,7 +788,7 @@ static void sum_backward_impl_cpu(TensorInfo<T> grad_output, TensorInfo<T> grad_
 
 std::vector<Tensor> sum_backward_impl_cpu(const SizeType& input_sizes, Tensor grad_output)
 {
-    CHECK_EQ(grad_output.numel() , 1);
+    CHECK_EQ(grad_output.numel(), 1);
     Tensor grad_a = empty(input_sizes);
     SWITCH_MACRO_ALL(grad_output.scalar_type(), sum_backward_impl_cpu, grad_output, grad_a);
     return {grad_a};
@@ -1009,7 +1020,7 @@ static void rand_float_impl_cpu(TensorInfo<T> t, std::mt19937& mersenne_engine)
 Tensor rand(const SizeType& sizes, TensorOptions options)
 {
     static std::mt19937 mersenne_engine{572547235};
-    
+
     Tensor t = empty(sizes, options);
     SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl_cpu, t, mersenne_engine);
     return t;
@@ -1140,6 +1151,41 @@ Tensor operator/=(Tensor a, double b)
     return a;
 }
 
+Tensor operator==(Tensor a, double b)
+{
+    CHECK(!a.requires_grad());
+    Tensor t2 = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), equals_impl_cpu, a, b, t2);
+    return t2;
+}
 
+
+template <typename T>
+static void to_double_cpu(TensorInfo<T> a, TensorInfo<double> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = a[i];
+    }
+}
+
+template <typename T>
+static void from_double_cpu( TensorInfo<double> a, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = a[i];
+    }
+}
+
+Tensor to(Tensor a, ScalarType other_type)
+{
+    Tensor t2 = empty_like(a, TensorOptions().dtype(kDouble));
+    SWITCH_MACRO_ALL(a.scalar_type(), to_double_cpu, a, t2);
+
+    Tensor result = empty_like(a, TensorOptions().dtype(other_type));
+    SWITCH_MACRO_ALL(result.scalar_type(), from_double_cpu, t2, result);
+    return result;
+}
 
 }  // namespace tinytorch

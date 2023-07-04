@@ -18,6 +18,10 @@
 
 #include "torch/tiny_torch_config.h"
 
+#if defined(__CUDACC__)
+#include "cuda_fp16.h"
+#endif
+
 namespace tinytorch
 {
 
@@ -54,7 +58,7 @@ template <typename T>
 struct CppTypeToScalarType
 {
 };
-#if defined(__CUDA_RUNTIME_H__) || defined(__CUDACC__)
+#if defined(__CUDACC__)
 template <>
 struct CppTypeToScalarType<__half>
 {

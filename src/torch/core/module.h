@@ -20,37 +20,6 @@ inline void set_num_threads(int n)
 
 namespace nn
 {
-template <bool value, typename T = void>
-using disable_if_t = std::enable_if_t<!value, T>;
-struct ModuleHolderIndicator {};
-// A type trait that is true for types that are `ModuleHolder`s.
-template <typename T>
-using is_module_holder = std::is_base_of<ModuleHolderIndicator, std::decay_t<T>>;
-
-template <typename T>
-using disable_if_module_holder_t = disable_if_t<is_module_holder<T>::value>;
-
-// Base template.
-template <bool is_module_holder_value, typename T, typename C>
-struct is_module_holder_of_impl;
-
-// False branch. `T` is not a `ModuleHolder` and thus not a `ModuleHolder` with
-// contained type `C`.
-template <typename T, typename C>
-struct is_module_holder_of_impl<false, T, C> : std::false_type {};
-
-// True branch. `T` is a `ModuleHolder` and thus we can legit access its
-// `ContainedType` and compare it against `C`.
-template <typename T, typename C>
-struct is_module_holder_of_impl<true, T, C>
-    : std::is_same<typename T::ContainedType, C> {};
-
-// Helper template.
-template <typename T, typename C>
-struct is_module_holder_of : is_module_holder_of_impl<
-                                 is_module_holder<T>::value,
-                                 std::decay_t<T>,
-                                 std::decay_t<C>> {};
 
 template <typename Contained>
 class ModuleHolder
@@ -59,7 +28,7 @@ class ModuleHolder
     using ContainedType = Contained;
     std::shared_ptr<Contained> impl_;
 
-    std::shared_ptr<Contained> ptr(){ return impl_;}
+    std::shared_ptr<Contained> ptr() { return impl_; }
 
     ModuleHolder()
     {
@@ -69,24 +38,11 @@ class ModuleHolder
                       "(e.g. `Linear linear = nullptr;` instead of `Linear linear;`).");
     }
 
-//    template <typename Head, typename... Tail>
-//    explicit ModuleHolder(Head&& head, Tail&&... tail)
-//        : impl_(new Contained(std::forward<Head>(head), std::forward<Tail>(tail)...))
-//    {
-//    }
-
-    // explicit ModuleHolder(const ModuleHolder<Contained>& other) : impl_(other.impl_){}
-
-    template <
-        typename Head,
-        typename... Tail,
-        typename = typename std::enable_if<
-            !(is_module_holder_of<Head, ContainedType>::value &&
-              (sizeof...(Tail) == 0))>::type>
+    template <typename Head, typename... Tail>
     explicit ModuleHolder(Head&& head, Tail&&... tail)
-        : impl_(new Contained(
-              std::forward<Head>(head),
-              std::forward<Tail>(tail)...)) {}
+        : impl_(new Contained(std::forward<Head>(head), std::forward<Tail>(tail)...))
+    {
+    }
 
     /// Constructs the `ModuleHolder` from a pointer to the contained type.
     /// Example: `Linear(std::make_shared<LinearImpl>(...))`.
@@ -123,7 +79,7 @@ class ModuleHolder
 
 struct Module
 {
-    virtual ~Module(){}
+    virtual ~Module() {}
     std::map<std::string, Tensor> named_parameters()
     {
         throw std::runtime_error("not implemented");
@@ -134,20 +90,16 @@ struct Module
     void zero_grad() { throw std::runtime_error("not implemented"); }
     void train(bool on = true) { throw std::runtime_error("not implemented"); }
 
-    std::vector<Tensor> parameters()
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
 
-    void register_buffer(std::string name, Tensor t) { throw std::runtime_error("not implemented"); }
-    void register_parameter(std::string name, Tensor t) { throw std::runtime_error("not implemented"); }
+
+    void register_buffer(std::string name, Tensor t) { buffers_[name] = t; }
+    void register_parameter(std::string name, Tensor t) { parameters_[name] = t; }
 
     template <typename ModuleType>
     std::shared_ptr<ModuleType> register_module(std::string name, std::shared_ptr<ModuleType> module)
     {
-        throw std::runtime_error("not implemented");
-        return {};
+        modules_[name] = module;
+        return module;
     }
 
     template <typename ModuleType>
@@ -159,16 +111,32 @@ struct Module
     template <typename ModuleType>
     std::shared_ptr<ModuleType> replace_module(std::string name, ModuleHolder<ModuleType> module_holder)
     {
-        throw std::runtime_error("not implemented");
-        return {};
-        // return register_module(std::move(name), module_holder.ptr());
+        modules_[name] = module_holder.ptr();
+        return  module_holder.ptr();
+    }
+    std::vector<Tensor> parameters()
+    {
+        std::vector<Tensor> result;
+        for (auto b : parameters_)
+        {
+            result.push_back(b.second);
+        }
+        return result;
     }
 
     std::vector<Tensor> buffers()
     {
-        throw std::runtime_error("not implemented");
-        return {};
+        std::vector<Tensor> result;
+        for (auto b : buffers_)
+        {
+            result.push_back(b.second);
+        }
+        return result;
     }
+
+    std::map<std::string, Tensor> buffers_;
+    std::map<std::string, Tensor> parameters_;
+    std::map<std::string, std::shared_ptr<Module>> modules_;
 };
 
 struct AnyModule

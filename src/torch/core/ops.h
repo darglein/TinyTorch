@@ -118,11 +118,7 @@ inline Tensor operator/(double a, Tensor b)
     return {};
 }
 TINYTORCH_API Tensor operator-(Tensor b);
-inline Tensor operator==(Tensor a, double b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+TINYTORCH_API Tensor operator==(Tensor a, double b);
 inline Tensor operator<(Tensor a, double b)
 {
     throw std::runtime_error("not implemented");
@@ -218,6 +214,10 @@ inline Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
     throw std::runtime_error("not implemented");
     return {};
 }
+
+TINYTORCH_API Tensor to(Tensor b, ScalarType other_type);
+
+
 TINYTORCH_API Tensor sum(Tensor a);
 
 TINYTORCH_API Tensor operator+=(Tensor a, Tensor b);

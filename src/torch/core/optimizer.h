@@ -70,7 +70,6 @@ void adam_step(TensorInfo<T> param, TensorInfo<T> param_grad, TensorInfo<T> m1s,
         // assert(param.grad().size() == param.size());
 
         auto gradient    = param_grad[i];
-        auto gradient_sq = gradient * gradient;
         auto m1          = m1s[i];
         auto m2          = m2s[i];
         auto beta1       = std::get<0>(options.betas_);
