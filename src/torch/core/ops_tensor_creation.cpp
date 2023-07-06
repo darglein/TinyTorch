@@ -4,10 +4,13 @@
  * See LICENSE file for more information.
  */
 
+#include "ops_tensor_creation.h"
+
 #include "graph.h"
 #include "torch/core/ops.h"
 
 #include "torch/cpu/ops_impl_cpu.h"
+
 
 
 namespace tinytorch
@@ -164,6 +167,10 @@ Tensor range(double start, double end, TensorOptions options, double step)
     Tensor t      = empty({count}, options);
     range_impl_cpu(t, start, end, step);
     return t;
+}
+Tensor range(double start, double end, double step)
+{
+    return range(start, end, TensorOptions(), step);
 }
 
 
