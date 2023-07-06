@@ -383,10 +383,9 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor set_data(Tensor t)
+    void set_data(Tensor t)
     {
-        throw std::runtime_error("not implemented");
-        return {};
+        this->impl_ = t.impl_;
     }
     inline Tensor repeat_interleave(int64_t start)
     {
@@ -407,8 +406,8 @@ struct TINYTORCH_API Tensor
     }
     Tensor item() const
     {
-        throw std::runtime_error("not implemented");
-        return {};
+        CHECK_EQ(numel(), 1);
+        return reshape({1});
     }
     template <typename T>
     T item() const

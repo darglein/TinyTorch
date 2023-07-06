@@ -19,7 +19,7 @@
 #include "torch/tiny_torch_config.h"
 
 #if defined(__CUDACC__)
-#include "cuda_fp16.h"
+#    include "cuda_fp16.h"
 #endif
 
 namespace tinytorch
@@ -37,21 +37,21 @@ enum Device
 enum ScalarType
 {
     // interger types
-    kUInt8,
-    kByte = kUInt8,
-    kInt16,
+    kUInt8 = 0,
+    kByte  = kUInt8,
+    kInt16 = 1,
     kShort = kInt16,
-    kInt32,
-    kInt = kInt32,
-    kInt64,
-    kLong = kInt64,
+    kInt32 = 2,
+    kInt   = kInt32,
+    kInt64 = 3,
+    kLong  = kInt64,
     // floating point types
-    kFloat16,
-    kHalf = kFloat16,
-    kFloat32,
-    kFloat = kFloat32,
-    kFloat64,
-    kDouble = kFloat64,
+    kFloat16 = 4,
+    kHalf    = kFloat16,
+    kFloat32 = 5,
+    kFloat   = kFloat32,
+    kFloat64 = 6,
+    kDouble  = kFloat64,
 };
 
 
