@@ -53,7 +53,7 @@ struct is_module_holder_of : is_module_holder_of_impl<
                                  std::decay_t<C>> {};
 
 template <typename Contained>
-class ModuleHolder
+class ModuleHolder : ModuleHolderIndicator
 {
    public:
     using ContainedType = Contained;
