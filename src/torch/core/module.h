@@ -22,7 +22,7 @@ namespace nn
 {
 
 template <typename Contained>
-class ModuleHolder
+class ModuleHolder : ModuleHolderIndicator
 {
    public:
     using ContainedType = Contained;
