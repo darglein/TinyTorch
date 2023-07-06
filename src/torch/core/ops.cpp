@@ -13,22 +13,7 @@
 
 namespace tinytorch
 {
-static int64_t& current_seed()
-{
-    static thread_local int64_t s = 9036515235;
-    return s;
-}
 
-
-void manual_seed(int64_t seed)
-{
-    current_seed() = seed;
-}
-
-int64_t get_seed()
-{
-    return current_seed();
-}
 
 namespace autograd
 {

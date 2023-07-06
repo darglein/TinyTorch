@@ -26,6 +26,7 @@ namespace tinytorch
 struct StorageImpl
 {
     StorageImpl(int64_t size, Device device);
+    StorageImpl(void* data_ptr, int64_t size, Device device);
 
     StorageImpl& operator=(StorageImpl&& other) = default;
     StorageImpl& operator=(const StorageImpl&)  = delete;
@@ -38,33 +39,10 @@ struct StorageImpl
 
    protected:
     Device device_;
+    bool has_ownership = false;
     void* data_ptr_ = nullptr;
     int64_t size_;
 };
-
-inline int64_t elementSize(ScalarType type)
-{
-    switch (type)
-    {
-        case kUInt8:
-            return 1;
-        case kInt16:
-            return 2;
-        case kInt32:
-            return 4;
-        case kLong:
-            return 8;
-        case kFloat32:
-            return 4;
-        case kFloat64:
-            return 8;
-        case kHalf:
-            return 2;
-        default:
-            CHECK(false);
-    }
-    return 0;
-}
 
 
 

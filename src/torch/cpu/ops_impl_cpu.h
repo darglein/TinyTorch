@@ -13,6 +13,7 @@ namespace tinytorch
 {
 // Internal implementation of forward/backward
 // Should NOT be called by the user
+void range_impl_cpu(Tensor a, double start, double end, double step);
 void fill_impl_cpu(Tensor a, double value);
 Tensor square_impl_cpu(Tensor a);
 Tensor add_impl_cpu(Tensor a, Tensor b);

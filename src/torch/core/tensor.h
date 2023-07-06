@@ -62,6 +62,15 @@ struct SizeType
     std::vector<int64_t>& vec() { return data_; }
     const std::vector<int64_t>& vec() const { return data_; }
     operator const std::vector<int64_t>&() const { return data_; }
+    int64_t numel() const
+    {
+        int64_t result = 1;
+        for (auto v : data_)
+        {
+            result *= v;
+        }
+        return result;
+    }
 
     SizeType& operator=(const SizeType&) = default;
     SizeType& operator=(SizeType&&)      = default;
@@ -69,6 +78,18 @@ struct SizeType
    private:
     std::vector<int64_t> data_;
 };
+
+inline SizeType CompactStrideForSize(SizeType size)
+{
+    std::vector<int64_t> result(size.size());
+    result.back() = 1;
+    for (int i = size.size() - 2; i >= 0; i--)
+    {
+        result[i] = result[i + 1] * size[i + 1];
+    }
+    return SizeType(result);
+}
+
 inline bool operator==(const SizeType& s1, const SizeType& s2)
 {
     return s1.vec() == s2.vec();
@@ -267,7 +288,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor norm(int64_t norm, int64_t dim, bool keepdim=false) const
+    Tensor norm(int64_t norm, int64_t dim, bool keepdim = false) const
     {
         throw std::runtime_error("not implemented");
         return {};
@@ -295,10 +316,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    void uniform_()
-    {
-        throw std::runtime_error("not implemented");
-    }
+    void uniform_() { throw std::runtime_error("not implemented"); }
     void operator=(double a)
     {
         CHECK_EQ(dim(), 1);
@@ -444,12 +462,7 @@ struct TensorImpl
 
     int64_t dim() const { return sizes_.size(); }
 
-    int64_t numel() const
-    {
-        int64_t res = 1;
-        for (auto v : sizes_.vec()) res *= v;
-        return res;
-    }
+    int64_t numel() const { return sizes_.numel(); }
 
     template <typename T>
     T* data_ptr()

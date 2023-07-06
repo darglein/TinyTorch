@@ -16,30 +16,44 @@ StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(dev
 {
     if (device_ == kCPU)
     {
-        data_ptr_ = malloc(size);
+        data_ptr_     = malloc(size);
+        has_ownership = true;
     }
     else
     {
 #ifdef TT_HAS_CUDA
         cudaMalloc(&data_ptr_, size);
+        has_ownership = true;
 #else
         CHECK(false);
 #endif
     }
 }
+
+
+StorageImpl::StorageImpl(void* data_ptr, int64_t size, Device device) : size_(size), device_(device)
+{
+    data_ptr_     = data_ptr;
+    has_ownership = false;
+}
+
+
 StorageImpl::~StorageImpl()
 {
-    if (device_ == kCPU)
+    if (has_ownership == true)
     {
-        free(data_ptr_);
-    }
-    else
-    {
+        if (device_ == kCPU)
+        {
+            free(data_ptr_);
+        }
+        else
+        {
 #ifdef TT_HAS_CUDA
-        cudaFree(data_ptr_);
+            cudaFree(data_ptr_);
 #else
-        CHECK(false);
+            CHECK(false);
 #endif
+        }
     }
 }
 

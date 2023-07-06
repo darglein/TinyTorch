@@ -54,6 +54,32 @@ enum ScalarType
     kDouble = kFloat64,
 };
 
+
+inline int64_t elementSize(ScalarType type)
+{
+    switch (type)
+    {
+        case kUInt8:
+            return 1;
+        case kInt16:
+            return 2;
+        case kInt32:
+            return 4;
+        case kLong:
+            return 8;
+        case kFloat32:
+            return 4;
+        case kFloat64:
+            return 8;
+        case kHalf:
+            return 2;
+        default:
+            CHECK(false);
+    }
+    return 0;
+}
+
+
 template <typename T>
 struct CppTypeToScalarType
 {

@@ -57,6 +57,52 @@ void fill_impl_cpu(Tensor a, double value)
     SWITCH_MACRO_FLOAT(a.scalar_type(), fill_impl_cpu, a, value);
 }
 
+
+template <typename T>
+static void range_impl_cpu(TensorInfo<T> a, double start, double end, double step)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        a[i] = start + i * step;
+    }
+}
+void range_impl_cpu(Tensor a, double start, double end, double step)
+{
+    SWITCH_MACRO_FLOAT(a.scalar_type(), range_impl_cpu, a, start, end, step);
+}
+
+
+template <typename T>
+static void rand_float_impl_cpu(TensorInfo<T> t, std::mt19937& mersenne_engine)
+{
+    std::uniform_real_distribution<float> dist{0.f, 1.f};
+    for (int64_t i = 0; i < t.numel(); ++i)
+    {
+        t[i] = T(dist(mersenne_engine));
+    }
+}
+template <typename T>
+static void rand_int_impl_cpu(TensorInfo<T> t, std::mt19937& mersenne_engine, int low, int high)
+{
+    std::uniform_int_distribution<int> dist{low, high};
+    for (int64_t i = 0; i < t.numel(); ++i)
+    {
+        t[i] = T(dist(mersenne_engine));
+    }
+}
+
+void uniform(Tensor& t)
+{
+    static std::mt19937 mersenne_engine{572547235};
+    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl_cpu, t, mersenne_engine);
+}
+void uniform_int(Tensor& t, int low, int high)
+{
+    static std::mt19937 mersenne_engine{572547235};
+    SWITCH_MACRO_ALL(t.scalar_type(), rand_int_impl_cpu, t, mersenne_engine, low, high);
+}
+
+
 template <typename T>
 static void square_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
@@ -967,119 +1013,6 @@ std::vector<Tensor> max_backward_impl_cpu(Tensor grad_output)
 }
 
 
-// ================================================================================
-// Tensor Create operators
-
-
-Tensor empty(const SizeType& sizes, TensorOptions options)
-{
-    Tensor t(std::make_shared<TensorImpl>(sizes, options));
-    return t;
-}
-
-
-template <typename T>
-static void full_impl_cpu(TensorInfo<T> t, float value)
-{
-    for (int64_t i = 0; i < t.numel(); ++i)
-    {
-        t[i] = T(value);
-    }
-}
-
-Tensor full(const SizeType& sizes, float value, TensorOptions options)
-{
-    Tensor t = empty(sizes, options);
-    SWITCH_MACRO_ALL(t.scalar_type(), full_impl_cpu, t, value);
-    return t;
-}
-
-
-Tensor ones(const SizeType& sizes, TensorOptions options)
-{
-    return full(sizes, 1, options);
-}
-
-
-Tensor zeros(const SizeType& sizes, TensorOptions options)
-{
-    return full(sizes, 0, options);
-}
-
-
-template <typename T>
-static void rand_float_impl_cpu(TensorInfo<T> t, std::mt19937& mersenne_engine)
-{
-    std::uniform_real_distribution<float> dist{0.f, 1.f};
-    for (int64_t i = 0; i < t.numel(); ++i)
-    {
-        t[i] = T(dist(mersenne_engine));
-    }
-}
-
-Tensor rand(const SizeType& sizes, TensorOptions options)
-{
-    static std::mt19937 mersenne_engine{572547235};
-
-    Tensor t = empty(sizes, options);
-    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl_cpu, t, mersenne_engine);
-    return t;
-}
-
-Tensor randint(int low, int high, const SizeType& sizes, TensorOptions options)
-{
-    static std::mt19937 mersenne_engine{572547235};
-    std::uniform_int_distribution<int> dist{low, high};
-
-    Tensor t = empty(sizes, options);
-    for (int64_t i = 0; i < t.numel(); ++i)
-    {
-        t.data_ptr<int>()[i] = dist(mersenne_engine);
-    }
-    return t;
-}
-
-Tensor ones_like(Tensor t)
-{
-    return full_like(t, 1);
-}
-Tensor full_like(Tensor t, float value)
-{
-    Tensor t2 = empty_like(t);
-    for (int64_t i = 0; i < t.numel(); ++i)
-    {
-        t2.data_ptr<float>()[i] = value;
-    }
-    return t2;
-}
-
-Tensor empty_like(Tensor t)
-{
-    Tensor t2(std::make_shared<TensorImpl>(t.sizes(), t.options()));
-    return t2;
-}
-Tensor zeros_like(Tensor t)
-{
-    Tensor t2 = empty_like(t);
-    for (int64_t i = 0; i < t.numel(); ++i)
-    {
-        t2.data_ptr<float>()[i] = 0;
-    }
-    return t2;
-}
-Tensor rand_like(Tensor t)
-{
-    static std::mt19937 mersenne_engine{572547235};
-    std::uniform_real_distribution<float> dist{0.f, 1.f};
-
-    Tensor t2 = empty_like(t);
-    for (int64_t i = 0; i < t.numel(); ++i)
-    {
-        t2.data_ptr<float>()[i] = dist(mersenne_engine);
-    }
-    return t2;
-}
-
 template <typename T>
 void print_impl_cpu(std::ostream& strm, TensorInfo<T> a)
 {
@@ -1170,7 +1103,7 @@ static void to_double_cpu(TensorInfo<T> a, TensorInfo<double> result)
 }
 
 template <typename T>
-static void from_double_cpu( TensorInfo<double> a, TensorInfo<T> result)
+static void from_double_cpu(TensorInfo<double> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
