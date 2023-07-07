@@ -4,8 +4,9 @@
  * See LICENSE file for more information.
  */
 
+#include "torch/core/ops_functions.h"
+
 #include "graph.h"
-#include "torch/core/ops.h"
 
 #include "torch/cpu/ops_impl_cpu.h"
 
@@ -13,192 +14,45 @@
 namespace tinytorch
 {
 
-
-namespace autograd
+Tensor repeat(Tensor t, SizeType sizes)
 {
-struct SquareNode : public FunctionNode<SquareNode>
-{
-    static std::vector<Tensor> forward(Context* ctx, Tensor a)
+    CHECK_EQ(t.dim(), sizes.size());
+
+    int repeat_dim = -1;
+    for (int i = 0; i < sizes.size(); ++i)
     {
-        ctx->save_for_backward({a});
-        auto result = square_impl_cpu(a);
-        return {result};
+        if (sizes[i] > 1)
+        {
+            CHECK_EQ(repeat_dim, -1);
+            repeat_dim = i;
+        }
     }
 
-    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
-    {
-        auto l      = ctx->get_saved_variables();
-        auto grad_a = square_backward_impl_cpu(l[0], grad[0]);
-        return grad_a;
-    }
-};
 
-struct AddNode : public FunctionNode<AddNode>
-{
-    static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
+    auto new_size        = t.sizes().vec();
+    new_size[repeat_dim] = new_size[repeat_dim] * sizes[repeat_dim];
+
+
+    Tensor result = empty(new_size, t.options());
+
+    for (int i = 0; i < sizes[repeat_dim]; ++i)
     {
-        auto result = add_impl_cpu(a, b);
-        return {result};
+        result.slice(repeat_dim, i * t.size(repeat_dim), (i + 1) * t.size(repeat_dim)).copy_(t);
     }
 
-    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
-    {
-        auto grad_a = add_backward_impl_cpu(grad[0]);
-        return grad_a;
-    }
-};
-
-struct SubNode : public FunctionNode<SubNode>
-{
-    static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
-    {
-        auto result = sub_impl_cpu(a, b);
-        return {result};
-    }
-
-    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
-    {
-        auto grad_a = sub_backward_impl_cpu(grad[0]);
-        return grad_a;
-    }
-};
-
-
-struct MultNode : public FunctionNode<MultNode>
-{
-    static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
-    {
-        ctx->save_for_backward({a, b});
-        auto result = mult_impl_cpu(a, b);
-        return {result};
-    }
-
-    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
-    {
-        auto l      = ctx->get_saved_variables();
-        auto grad_a = mult_backward_impl_cpu(l[0], l[1], grad[0]);
-        return grad_a;
-    }
-};
-
-
-struct MultTensorScalarNode : public FunctionNode<MultTensorScalarNode>
-{
-    static std::vector<Tensor> forward(Context* ctx, Tensor a, double b)
-    {
-        ctx->saved_data["b"] = b;
-        ctx->save_for_backward({a});
-        auto result = mult_impl_cpu(a, b);
-        return {result};
-    }
-
-    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
-    {
-        double b    = ctx->saved_data["b"].toDouble();
-        auto l      = ctx->get_saved_variables();
-        auto grad_a = mult_backward_impl_cpu(l[0], b, grad[0]);
-        return {grad_a[0], {}};
-    }
-};
-
-
-struct AddTensorScalarNode : public FunctionNode<MultTensorScalarNode>
-{
-    static std::vector<Tensor> forward(Context* ctx, Tensor a, double b)
-    {
-        ctx->saved_data["b"] = b;
-        ctx->save_for_backward({a});
-        auto result = add_impl_cpu(a, b);
-        return {result};
-    }
-
-    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
-    {
-        double b    = ctx->saved_data["b"].toDouble();
-        auto l      = ctx->get_saved_variables();
-        auto grad_a = grad[0].clone();
-        return {grad_a, {}};
-    }
-};
-
-struct SumNode : public FunctionNode<SumNode>
-{
-    static std::vector<Tensor> forward(Context* ctx, Tensor a)
-    {
-        ctx->data_sizes["sizes"] = a.sizes();
-        auto result              = sum_impl_cpu(a);
-        return {result};
-    }
-
-    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
-    {
-        CHECK_EQ(grad.size(), 1);
-        auto grad_a = sum_backward_impl_cpu(ctx->data_sizes["sizes"], grad[0]);
-        return grad_a;
-    }
-};
-}  // namespace autograd
-
-using namespace autograd;
-
-Tensor square(Tensor a)
-{
-    return SquareNode::forward_and_build_graph(a)[0];
+    //     std::cout << "new_size " << new_size << std::endl;
+    // throw std::runtime_error("lsdf");
+    return result;
 }
-
-Tensor operator-(Tensor a, Tensor b)
-{
-    return SubNode::forward_and_build_graph(a, b)[0];
-}
-
-Tensor operator+(Tensor a, Tensor b)
-{
-    return AddNode::forward_and_build_graph(a, b)[0];
-}
-
-Tensor operator*(Tensor a, Tensor b)
-{
-    return MultNode::forward_and_build_graph(a, b)[0];
-}
-Tensor sum(Tensor a)
-{
-    return SumNode::forward_and_build_graph(a)[0];
-}
-
-
-Tensor tinytorch::min(Tensor a)
-{
-    return min_impl_cpu(a);
-}
-Tensor tinytorch::max(Tensor a)
-{
-    return max_impl_cpu(a);
-}
-Tensor min(Tensor a, Tensor b)
-{
-    return min_impl_cpu(a, b);
-}
-Tensor max(Tensor a, Tensor b)
-{
-    return max_impl_cpu(a, b);
-}
-
 
 void fill(Tensor& t, double value)
 {
     fill_impl_cpu(t, value);
 }
-Tensor operator-(Tensor b)
+
+Tensor index_select(Tensor input, int64_t dim, Tensor index)
 {
-    return b * (-1);
-}
-Tensor operator*(double a, Tensor b)
-{
-    return MultTensorScalarNode::forward_and_build_graph(b, a)[0];
-}
-Tensor operator+(Tensor a, double b)
-{
-    return AddTensorScalarNode::forward_and_build_graph(a, b)[0];
+    return index_select_impl_cpu(input, dim, index);
 }
 
 

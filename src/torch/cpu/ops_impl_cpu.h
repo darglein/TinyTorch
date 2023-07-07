@@ -27,6 +27,7 @@ Tensor mult_impl_cpu(Tensor a, double b);
 Tensor mult_impl_cpu(double a, Tensor b);
 Tensor div_impl_cpu(Tensor a, Tensor b);
 Tensor div_impl_cpu(Tensor a, double b);
+Tensor div_impl_cpu(double a, Tensor b);
 Tensor neg_impl_cpu(Tensor a);
 Tensor sum_impl_cpu(Tensor a);
 Tensor log_impl_cpu(Tensor a);

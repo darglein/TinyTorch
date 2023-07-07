@@ -9,9 +9,9 @@
 #include "torch/core/ops.h"
 #include "torch/core/tensor.h"
 
+#include "torch/core/ops_functions.h"
 #include "torch/core/ops_impl_shared.h"
 #include "torch/core/tensor_info.h"
-#include "torch/core/ops_functions.h"
 
 
 namespace tinytorch
@@ -291,6 +291,30 @@ static void div_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
     }
 }
 
+
+template <typename T>
+static void div_impl_cpu(double a, TensorInfo<T> b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < b.numel(); ++i)
+    {
+        result[i] = T(a / b[i]);
+    }
+}
+Tensor div_impl_cpu(double a, Tensor b)
+{
+    Tensor result = empty_like(b);
+    SWITCH_MACRO_ALL(b.scalar_type(), div_impl_cpu, a, b, result);
+    return result;
+}
+
+Tensor div_impl_cpu(Tensor a, double b)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), div_impl_cpu, a, b, result);
+    return result;
+}
+
+
 template <typename T>
 static void equals_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
 {
@@ -300,12 +324,6 @@ static void equals_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
     }
 }
 
-Tensor div_impl_cpu(Tensor a, double b)
-{
-    Tensor result = empty_like(a);
-    SWITCH_MACRO_ALL(a.scalar_type(), div_impl_cpu, a, b, result);
-    return result;
-}
 
 template <typename T>
 static void neg_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
@@ -576,7 +594,7 @@ Tensor min_impl_cpu(Tensor a, Tensor b)
 template <typename T>
 static void min_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
-    result[0]  = std::numeric_limits<T>::max();
+    result[0] = std::numeric_limits<T>::max();
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         result[0] = std::min(a[i], result[0]);
@@ -585,7 +603,7 @@ static void min_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 
 Tensor min_impl_cpu(Tensor a)
 {
-    Tensor result = empty({1},a.options());
+    Tensor result = empty({1}, a.options());
     SWITCH_MACRO_ALL(a.scalar_type(), min_impl_cpu, a, result);
     return result;
 }
@@ -593,7 +611,7 @@ Tensor min_impl_cpu(Tensor a)
 template <typename T>
 static void max_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
-        for (int64_t i = 0; i < a.numel(); ++i)
+    for (int64_t i = 0; i < a.numel(); ++i)
     {
         result[i] = std::max(a[i], b[i]);
     }
@@ -609,7 +627,7 @@ Tensor max_impl_cpu(Tensor a, Tensor b)
 template <typename T>
 static void max_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
-    result[0]  = std::numeric_limits<T>::min();
+    result[0] = std::numeric_limits<T>::min();
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         result[0] = std::max(a[i], result[0]);
@@ -618,7 +636,7 @@ static void max_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 
 Tensor max_impl_cpu(Tensor a)
 {
-    Tensor result = empty({1},a.options());
+    Tensor result = empty({1}, a.options());
     SWITCH_MACRO_ALL(a.scalar_type(), max_impl_cpu, a, result);
     return result;
 }
@@ -1047,8 +1065,6 @@ std::vector<Tensor> max_backward_impl_cpu(Tensor grad_output)
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), one_backward_impl_cpu, grad_output, grad_a, grad_b);
     return {grad_a, grad_b};
 }
-
-
 template <typename T>
 void print_impl_cpu(std::ostream& strm, TensorInfo<T> a)
 {
@@ -1166,8 +1182,11 @@ static void copy_cpu(TensorInfo<T> src, TensorInfo<T> dst)
     }
 }
 
-void copy(Tensor src, Tensor target) {
-    SWITCH_MACRO_ALL(src.scalar_type(), copy_cpu, src,target);
+void copy(Tensor src, Tensor target)
+{
+    CHECK_EQ(src.numel(), target.numel());
+    SWITCH_MACRO_ALL(src.scalar_type(), copy_cpu, src, target);
 }
+
 
 }  // namespace tinytorch

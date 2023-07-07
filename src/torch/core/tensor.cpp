@@ -5,6 +5,7 @@
  */
 #include "torch/core/tensor.h"
 
+#include "torch/core/backward.h"
 #include "torch/core/ops.h"
 
 #include "torch/core/tensor_impl.h"
@@ -16,13 +17,18 @@ int64_t Tensor::numel() const
     return impl_->numel();
 }
 
-const Tensor& Tensor::grad() const
+Tensor Tensor::grad() const
 {
+    if (!impl_->autograd_meta)
+    {
+        return {};
+    }
     return impl_->autograd_meta->grad();
 }
 
 Tensor& Tensor::mutable_grad()
 {
+    CHECK(impl_->autograd_meta);
     return impl_->autograd_meta->mutable_grad();
 }
 
@@ -236,7 +242,26 @@ void Tensor::fill_(double a)
 
 Tensor Tensor::reshape(const SizeType& size) const
 {
-    Tensor result = empty(size, options());
+    auto sizes       = size;
+    int negative_dim = -1;
+    for (int i = 0; i < sizes.size(); ++i)
+    {
+        if (sizes[i] < 0)
+        {
+            CHECK_EQ(negative_dim, -1);
+            negative_dim = i;
+        }
+    }
+
+    if (negative_dim >= 0)
+    {
+        sizes[negative_dim] = 1;
+        sizes[negative_dim] = numel() / sizes.numel();
+    }
+
+    CHECK_EQ(sizes.numel(), numel());
+
+    Tensor result = empty(sizes, options());
     tinytorch::copy(*this, result);
     return result;
 }
@@ -257,6 +282,18 @@ Tensor Tensor::min() const
 Tensor Tensor::max() const
 {
     return tinytorch::max(*this);
+}
+Tensor Tensor::repeat(const SizeType& size) const
+{
+    return tinytorch::repeat(*this, size);
+}
+void Tensor::backward() const
+{
+    tinytorch::backward(*this);
+}
+void Tensor::backward(Tensor t, bool retain_grad) const
+{
+    tinytorch::backward(*this, t);
 }
 
 }  // namespace tinytorch

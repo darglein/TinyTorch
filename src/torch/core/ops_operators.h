@@ -24,39 +24,19 @@ inline Tensor operator+(double a, Tensor b)
    return b + a;
 }
 
+TINYTORCH_API Tensor operator-(Tensor b);
 TINYTORCH_API Tensor operator-(Tensor a, Tensor b);
-inline Tensor operator-(Tensor a, double b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor operator-(double a, Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+TINYTORCH_API Tensor operator-(Tensor a, double b);
+TINYTORCH_API Tensor operator-(double a, Tensor b);
+
 TINYTORCH_API Tensor operator*(Tensor a, Tensor b);
 TINYTORCH_API Tensor operator*(double a, Tensor b);
-inline Tensor operator*(Tensor a, double b)
-{
-    return b * a;
-}
-inline Tensor operator/(Tensor a, Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor operator/(Tensor a, double b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor operator/(double a, Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-TINYTORCH_API Tensor operator-(Tensor b);
+TINYTORCH_API Tensor operator*(Tensor a, double b);
+
+TINYTORCH_API Tensor operator/(Tensor a, Tensor b);
+TINYTORCH_API Tensor operator/(Tensor a, double b);
+TINYTORCH_API Tensor operator/(double a, Tensor b);
+
 TINYTORCH_API Tensor operator==(Tensor a, double b);
 inline Tensor operator<(Tensor a, double b)
 {

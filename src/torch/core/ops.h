@@ -8,3 +8,4 @@
 #include "ops_tensor_creation.h"
 #include "ops_operators.h"
 #include "ops_functions.h"
+#include "ops_math_functions.h"

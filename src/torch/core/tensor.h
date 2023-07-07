@@ -122,8 +122,7 @@ struct TINYTORCH_API Tensor
     Device device() const;
     TensorOptions options() const;
 
-    const Tensor& grad() const;
-
+    Tensor grad() const;
     Tensor& mutable_grad();
 
     std::shared_ptr<Edge> getEdge() const;
@@ -198,11 +197,7 @@ struct TINYTORCH_API Tensor
         return {};
     }
     Tensor reshape(const SizeType& size) const;
-    Tensor repeat(const SizeType& size) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor repeat(const SizeType& size) const;
     Tensor detach() const
     {
         throw std::runtime_error("not implemented");
@@ -372,8 +367,8 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    void backward() const { throw std::runtime_error("not implemented"); }
-    void backward(Tensor t, bool retain_grad = false) const { throw std::runtime_error("not implemented"); }
+    void backward() const;
+    void backward(Tensor t, bool retain_grad = false) const;
     Tensor std() const
     {
         throw std::runtime_error("not implemented");

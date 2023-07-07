@@ -7,6 +7,6 @@ namespace tinytorch
 {
 
 
-TINYTORCH_API void backward(Tensor loss);
+TINYTORCH_API void backward(Tensor loss, Tensor grad = {});
 
 }  // namespace tinytorch

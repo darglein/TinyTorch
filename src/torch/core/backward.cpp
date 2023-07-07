@@ -5,7 +5,7 @@ namespace tinytorch
 
 
 
-void backward(Tensor loss)
+void backward(Tensor loss, Tensor grad)
 {
     // for graph traversal
     std::vector<std::shared_ptr<autograd::Node>> node_stack;
@@ -14,17 +14,25 @@ void backward(Tensor loss)
     std::map<std::shared_ptr<autograd::Node>, std::vector<Tensor>> grad_map;
 
 
-    CHECK_EQ(loss.numel() ,1);
     CHECK(loss.getEdge());
 
     // Start traversal at the root node
     auto root_node = loss.getEdge()->function;
     node_stack.push_back(root_node);
 
-    // The gradient of the final loss is 1
-    Tensor one = full({1}, 1);
 
-    grad_map[root_node] = {one};
+    if (grad.defined())
+    {
+        CHECK_EQ(loss.sizes(), grad.sizes());
+        grad_map[root_node] = {grad};
+    }
+    else
+    {
+        CHECK_EQ(loss.numel(), 1);
+        // The gradient of the final loss is 1
+        Tensor one = full({1}, 1);
+        grad_map[root_node] = {one};
+    }
 
     while (!node_stack.empty())
     {
