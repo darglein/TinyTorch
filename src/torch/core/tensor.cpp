@@ -4,6 +4,7 @@
  * See LICENSE file for more information.
  */
 #include "torch/core/tensor.h"
+#include "torch/core/tensor_impl.h"
 
 #include "torch/core/ops.h"
 
@@ -117,20 +118,20 @@ Tensor Tensor::view(const SizeType& sizes) const
 {
     SizeType new_sizes = sizes;
     fill_neg_one_dim(new_sizes, numel());
-    
+
     throw std::runtime_error("not implemented");
 
     return {};
 }
 
-Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) const 
+Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) const
 {
     int64_t dims = this->dim();
 
     CHECK_LT(dim, dims);
     CHECK_LT(start, end);
     CHECK_LE(end, size(dim));
-    CHECK_EQ((end - start) % step , 0);
+    CHECK_EQ((end - start) % step, 0);
 
     int64_t offset = start * stride(dim);
     offset *= element_size();
@@ -172,8 +173,8 @@ Tensor Tensor::unsqueeze(int64_t dim) const
 
 Tensor Tensor::squeeze(int64_t dim) const
 {
-    CHECK_LT(dim , this->dim());
-    CHECK_EQ(size(dim) , 1);
+    CHECK_LT(dim, this->dim());
+    CHECK_EQ(size(dim), 1);
 
     std::vector<int64_t> new_sizes = sizes();
     new_sizes.erase(std::next(new_sizes.begin(), dim));
@@ -216,54 +217,23 @@ bool Tensor::is_contiguous() const
 }
 Tensor Tensor::to(ScalarType new_type) const
 {
+    if (dtype() == new_type)
+    {
+        return *this;
+    }
     return tinytorch::to(*this, new_type);
 }
-
-
-
-TensorImpl::TensorImpl(const SizeType& sizes, TensorOptions options) : sizes_(sizes), options_(options)
+Tensor Tensor::sum() const
 {
-    recompute_strides();
-    storage_ = std::make_shared<StorageImpl>(elementSize(options.dtype_) * numel(), kCPU);
+    return tinytorch::sum(*this);
+}
+void Tensor::fill_(double a)
+{
+    tinytorch::fill(*this, a);
+}
+Tensor Tensor::reshape(const SizeType& size) const
+{
+    return impl_->reshape(size);
 }
 
-TensorImpl::TensorImpl(std::shared_ptr<StorageImpl> storage, int64_t storage_offset, const SizeType& sizes,
-                       const SizeType& strides, TensorOptions options)
-    : storage_(storage), storage_offset_(storage_offset), sizes_(sizes), strides_(strides), options_(options)
-{
-}
-
-TensorImpl::TensorImpl(std::shared_ptr<StorageImpl> storage, int64_t storage_offset, SizeType&& sizes,
-                       SizeType&& strides, TensorOptions options)
-    : storage_(storage),
-      storage_offset_(storage_offset),
-      sizes_(std::move(sizes)),
-      strides_(std::move(strides)),
-      options_(options)
-{
-}
-
-void TensorImpl::recompute_strides()
-{
-    strides_.resize(dim());
-    int64_t stride = 1;
-    for (int64_t i = dim() - 1; i >= 0; --i)
-    {
-        strides_[i] = stride;
-        stride *= sizes_[i];
-    }
-}
-
-void TensorImpl::set_requires_grad(bool requires_grad)
-{
-    if (requires_grad)
-    {
-        autograd_meta        = std::make_unique<AutogradMeta>();
-        autograd_meta->_grad = zeros(sizes_);
-    }
-    else
-    {
-        autograd_meta = nullptr;
-    }
-}
 }  // namespace tinytorch

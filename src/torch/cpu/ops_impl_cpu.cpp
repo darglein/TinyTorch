@@ -332,7 +332,7 @@ static void sum_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 
 Tensor sum_impl_cpu(Tensor a)
 {
-    Tensor result = zeros({1});
+    Tensor result = zeros({1}, a.options());
     SWITCH_MACRO_ALL(a.scalar_type(), sum_impl_cpu, a, result);
     return result;
 }

@@ -187,6 +187,10 @@ struct TINYTORCH_API Tensor
     Tensor to(ScalarType new_type) const;
     Tensor to(Device new_type) const
     {
+        if (device() == new_type)
+        {
+            return *this;
+        }
         throw std::runtime_error("not implemented");
         return {};
     }
@@ -197,11 +201,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor reshape(const SizeType& size) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor reshape(const SizeType& size) const;
     Tensor repeat(const SizeType& size) const
     {
         throw std::runtime_error("not implemented");
@@ -217,11 +217,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return *this;
     }
-    Tensor cpu() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor cpu() const { return to(kCPU); }
     Tensor index_add(int64_t dim, Tensor index, Tensor data) const
     {
         throw std::runtime_error("not implemented");
@@ -239,8 +235,7 @@ struct TINYTORCH_API Tensor
     }
     Tensor cuda() const
     {
-        throw std::runtime_error("not implemented");
-        return {};
+        return to(kCUDA);
     }
     bool allclose(Tensor value) const
     {
@@ -311,11 +306,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor fill_(double a) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    void fill_(double a);
     void uniform_() { throw std::runtime_error("not implemented"); }
     void operator=(double a)
     {
@@ -348,11 +339,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor sum() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor sum() const;
     Tensor sum(int64_t dim, bool squeeze_dim) const
     {
         throw std::runtime_error("not implemented");
@@ -383,10 +370,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    void set_data(Tensor t)
-    {
-        this->impl_ = t.impl_;
-    }
+    void set_data(Tensor t) { this->impl_ = t.impl_; }
     inline Tensor repeat_interleave(int64_t start)
     {
         throw std::runtime_error("not implemented");
@@ -435,52 +419,6 @@ struct TINYTORCH_API Tensor
 
    private:
     std::shared_ptr<TensorImpl> impl_;
-};
-
-
-struct AutogradMeta
-{
-    Tensor _grad;
-    std::shared_ptr<Edge> edge;
-    bool _requires_grad = false;
-
-    Tensor& mutable_grad() { return _grad; }
-    const Tensor& grad() const { return _grad; }
-};
-
-struct TensorImpl
-{
-    TensorImpl(const SizeType& sizes, TensorOptions options);
-    TensorImpl(std::shared_ptr<StorageImpl> storage, int64_t storage_offset, const SizeType& sizes,
-               const SizeType& strides, TensorOptions options);
-    TensorImpl(std::shared_ptr<StorageImpl> storage, int64_t storage_offset, SizeType&& sizes, SizeType&& strides,
-               TensorOptions options);
-
-    void set_requires_grad(bool requires_grad);
-    bool requires_grad() const { return autograd_meta != nullptr; }
-
-    int64_t dim() const { return sizes_.size(); }
-
-    int64_t numel() const { return sizes_.numel(); }
-
-    template <typename T>
-    T* data_ptr()
-    {
-        return (T*)data_ptr();
-    }
-    uint8_t* data_ptr() { return (storage_->byte_ptr() + storage_offset_); }
-
-    int64_t storage_offset_ = 0;
-    std::shared_ptr<StorageImpl> storage_;
-    SizeType sizes_;
-    SizeType strides_;
-    TensorOptions options_;
-
-    std::unique_ptr<AutogradMeta> autograd_meta;
-
-
-   private:
-    void recompute_strides();
 };
 
 template <typename T>
