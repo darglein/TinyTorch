@@ -13,6 +13,8 @@ namespace tinytorch
 {
 
 
+TINYTORCH_API void copy(Tensor src, Tensor target);
+
 TINYTORCH_API void fill(Tensor& t, double value);
 TINYTORCH_API void uniform(Tensor& t);
 TINYTORCH_API void uniform_int(Tensor& t, int low, int high);
@@ -93,16 +95,11 @@ inline Tensor cumsum(Tensor b, int64_t dim)
     throw std::runtime_error("not implemented");
     return {};
 }
-inline Tensor min(Tensor a, Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor max(Tensor a, Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+TINYTORCH_API Tensor min(Tensor a, Tensor b);
+TINYTORCH_API Tensor max(Tensor a, Tensor b);
+TINYTORCH_API Tensor min(Tensor a);
+TINYTORCH_API Tensor max(Tensor a);
+
 inline Tensor sum(Tensor a, SizeType s)
 {
     throw std::runtime_error("not implemented");

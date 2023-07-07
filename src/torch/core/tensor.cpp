@@ -4,9 +4,10 @@
  * See LICENSE file for more information.
  */
 #include "torch/core/tensor.h"
-#include "torch/core/tensor_impl.h"
 
 #include "torch/core/ops.h"
+
+#include "torch/core/tensor_impl.h"
 
 namespace tinytorch
 {
@@ -231,9 +232,31 @@ void Tensor::fill_(double a)
 {
     tinytorch::fill(*this, a);
 }
+
+
 Tensor Tensor::reshape(const SizeType& size) const
 {
-    return impl_->reshape(size);
+    Tensor result = empty(size, options());
+    tinytorch::copy(*this, result);
+    return result;
+}
+Tensor Tensor::clone() const
+{
+    Tensor result = empty_like(*this);
+    tinytorch::copy(*this, result);
+    return result;
+}
+void Tensor::copy_(Tensor a)
+{
+    tinytorch::copy(a, *this);
+}
+Tensor Tensor::min() const
+{
+    return tinytorch::min(*this);
+}
+Tensor Tensor::max() const
+{
+    return tinytorch::max(*this);
 }
 
 }  // namespace tinytorch

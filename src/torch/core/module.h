@@ -75,8 +75,8 @@ class ModuleHolder : ModuleHolderIndicator
     }
 
     template <typename Head, typename... Tail,
-            typename = typename std::enable_if<!(is_module_holder_of<Head, ContainedType>::value &&
-                                                (sizeof...(Tail) == 0))>::type>
+              typename = typename std::enable_if<!(is_module_holder_of<Head, ContainedType>::value &&
+                                                   (sizeof...(Tail) == 0))>::type>
     explicit ModuleHolder(Head&& head, Tail&&... tail)
         : impl_(new Contained(std::forward<Head>(head), std::forward<Tail>(tail)...))
     {
@@ -124,8 +124,32 @@ struct Module
         return {};
     }
 
-    void to(Device d) { throw std::runtime_error("not implemented"); }
-    void zero_grad() { throw std::runtime_error("not implemented"); }
+    void to(Device d)
+    {
+        for (auto& b : buffers_)
+        {
+            b.second = b.second.to(d);
+        }
+        for (auto& b : parameters_)
+        {
+            b.second = b.second.to(d);
+        }
+        for (auto& b : modules_)
+        {
+            b.second->to(d);
+        }
+    }
+    void zero_grad()
+    {
+        for (auto& b : parameters_)
+        {
+            b.second.mutable_grad().zero_();
+        }
+        for (auto& b : modules_)
+        {
+            b.second->zero_grad();
+        }
+    }
     void train(bool on = true) { throw std::runtime_error("not implemented"); }
 
 
@@ -150,7 +174,7 @@ struct Module
     std::shared_ptr<ModuleType> replace_module(std::string name, ModuleHolder<ModuleType> module_holder)
     {
         modules_[name] = module_holder.ptr();
-        return  module_holder.ptr();
+        return module_holder.ptr();
     }
     std::vector<Tensor> parameters()
     {

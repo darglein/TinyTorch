@@ -40,6 +40,8 @@ Tensor relu_impl_cpu(Tensor a);
 Tensor sigmoid_impl_cpu(Tensor a);
 Tensor softplus_impl_cpu(Tensor a, double beta);
 Tensor prod_impl_cpu(Tensor a, int64_t dim);
+Tensor min_impl_cpu(Tensor a);
+Tensor max_impl_cpu(Tensor a);
 Tensor min_impl_cpu(Tensor a, Tensor b);
 Tensor max_impl_cpu(Tensor a, Tensor b);
 Tensor index_select_impl_cpu(Tensor input, int64_t dim, Tensor index);

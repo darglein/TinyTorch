@@ -11,6 +11,8 @@
 
 #include "torch/core/ops_impl_shared.h"
 #include "torch/core/tensor_info.h"
+#include "torch/core/ops_functions.h"
+
 
 namespace tinytorch
 {
@@ -572,9 +574,26 @@ Tensor min_impl_cpu(Tensor a, Tensor b)
 }
 
 template <typename T>
+static void min_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
+{
+    result[0]  = std::numeric_limits<T>::max();
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[0] = std::min(a[i], result[0]);
+    }
+}
+
+Tensor min_impl_cpu(Tensor a)
+{
+    Tensor result = empty({1},a.options());
+    SWITCH_MACRO_ALL(a.scalar_type(), min_impl_cpu, a, result);
+    return result;
+}
+
+template <typename T>
 static void max_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
-    for (int64_t i = 0; i < a.numel(); ++i)
+        for (int64_t i = 0; i < a.numel(); ++i)
     {
         result[i] = std::max(a[i], b[i]);
     }
@@ -584,6 +603,23 @@ Tensor max_impl_cpu(Tensor a, Tensor b)
 {
     Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), max_impl_cpu, a, b, result);
+    return result;
+}
+
+template <typename T>
+static void max_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
+{
+    result[0]  = std::numeric_limits<T>::min();
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[0] = std::max(a[i], result[0]);
+    }
+}
+
+Tensor max_impl_cpu(Tensor a)
+{
+    Tensor result = empty({1},a.options());
+    SWITCH_MACRO_ALL(a.scalar_type(), max_impl_cpu, a, result);
     return result;
 }
 
@@ -1119,6 +1155,19 @@ Tensor to(Tensor a, ScalarType other_type)
     Tensor result = empty_like(a, TensorOptions().dtype(other_type));
     SWITCH_MACRO_ALL(result.scalar_type(), from_double_cpu, t2, result);
     return result;
+}
+
+template <typename T>
+static void copy_cpu(TensorInfo<T> src, TensorInfo<T> dst)
+{
+    for (int64_t i = 0; i < src.numel(); ++i)
+    {
+        dst[i] = src[i];
+    }
+}
+
+void copy(Tensor src, Tensor target) {
+    SWITCH_MACRO_ALL(src.scalar_type(), copy_cpu, src,target);
 }
 
 }  // namespace tinytorch

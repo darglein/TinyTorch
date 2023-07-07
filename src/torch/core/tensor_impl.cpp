@@ -54,9 +54,5 @@ void TensorImpl::set_requires_grad(bool requires_grad)
         autograd_meta = nullptr;
     }
 }
-Tensor TensorImpl::reshape(const SizeType& size) const
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+
 }  // namespace tinytorch

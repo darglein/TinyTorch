@@ -4,9 +4,8 @@
  * See LICENSE file for more information.
  */
 
-#include "torch/core/ops.h"
-
 #include "graph.h"
+#include "torch/core/ops.h"
 
 #include "torch/cpu/ops_impl_cpu.h"
 
@@ -95,7 +94,7 @@ struct MultTensorScalarNode : public FunctionNode<MultTensorScalarNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        double b = ctx->saved_data["b"].toDouble();
+        double b    = ctx->saved_data["b"].toDouble();
         auto l      = ctx->get_saved_variables();
         auto grad_a = mult_backward_impl_cpu(l[0], b, grad[0]);
         return {grad_a[0], {}};
@@ -115,7 +114,7 @@ struct AddTensorScalarNode : public FunctionNode<MultTensorScalarNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        double b = ctx->saved_data["b"].toDouble();
+        double b    = ctx->saved_data["b"].toDouble();
         auto l      = ctx->get_saved_variables();
         auto grad_a = grad[0].clone();
         return {grad_a, {}};
@@ -164,6 +163,24 @@ Tensor operator*(Tensor a, Tensor b)
 Tensor sum(Tensor a)
 {
     return SumNode::forward_and_build_graph(a)[0];
+}
+
+
+Tensor tinytorch::min(Tensor a)
+{
+    return min_impl_cpu(a);
+}
+Tensor tinytorch::max(Tensor a)
+{
+    return max_impl_cpu(a);
+}
+Tensor min(Tensor a, Tensor b)
+{
+    return min_impl_cpu(a, b);
+}
+Tensor max(Tensor a, Tensor b)
+{
+    return max_impl_cpu(a, b);
 }
 
 

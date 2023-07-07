@@ -177,13 +177,9 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    void copy_(Tensor a) { throw std::runtime_error("not implemented"); }
+    void copy_(Tensor a);
 
-    Tensor clone() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor clone() const;
     Tensor to(ScalarType new_type) const;
     Tensor to(Device new_type) const
     {
@@ -314,11 +310,10 @@ struct TINYTORCH_API Tensor
         CHECK_EQ(numel(), 1);
         fill_(a);
     }
-    Tensor min() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor min() const;
+    Tensor max() const;
+
+
     std::pair<Tensor, Tensor> min(int64_t index) const
     {
         throw std::runtime_error("not implemented");
@@ -334,11 +329,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor max() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+
     Tensor sum() const;
     Tensor sum(int64_t dim, bool squeeze_dim) const
     {
