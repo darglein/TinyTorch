@@ -82,6 +82,16 @@ Tensor max(Tensor a, Tensor b)
     return max_impl_cpu(a, b);
 }
 
+Tensor mean(Tensor a)
+{
+    return sum(a) / (double)a.numel(); // TODO: This is not safe for small datatypes, which might overflow in the sum.
+}
+
+Tensor std(Tensor a)
+{
+    return std_impl_cpu(a);
+}
+
 
 
 

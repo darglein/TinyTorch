@@ -45,6 +45,7 @@ Tensor min_impl_cpu(Tensor a);
 Tensor max_impl_cpu(Tensor a);
 Tensor min_impl_cpu(Tensor a, Tensor b);
 Tensor max_impl_cpu(Tensor a, Tensor b);
+Tensor std_impl_cpu(Tensor a);
 Tensor index_select_impl_cpu(Tensor input, int64_t dim, Tensor index);
 Tensor repeat_interleave_impl_cpu(Tensor input, int64_t count);
 Tensor stack_impl_cpu(const std::vector<Tensor>& tensors);

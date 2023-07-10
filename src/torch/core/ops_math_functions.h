@@ -97,6 +97,8 @@ inline Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
 }
 
 TINYTORCH_API Tensor sum(Tensor a);
+TINYTORCH_API Tensor mean(Tensor a);
+TINYTORCH_API Tensor std(Tensor a);
 
 
 

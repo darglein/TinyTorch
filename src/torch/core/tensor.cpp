@@ -1,3 +1,4 @@
+#include "tensor.h"
 /**
  * Copyright (c) 2022 Darius Rückert
  * Licensed under the MIT License.
@@ -233,6 +234,14 @@ Tensor Tensor::to(ScalarType new_type) const
 Tensor Tensor::sum() const
 {
     return tinytorch::sum(*this);
+}
+Tensor Tensor::mean() const
+{
+    return tinytorch::mean(*this);
+}
+Tensor Tensor::std() const
+{
+    return tinytorch::std(*this);
 }
 void Tensor::fill_(double a)
 {

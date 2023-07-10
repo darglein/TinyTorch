@@ -625,6 +625,26 @@ Tensor max_impl_cpu(Tensor a, Tensor b)
 }
 
 template <typename T>
+static void std_impl_cpu(TensorInfo<T> a, double mean, TensorInfo<T> result)
+{
+    T s = T(0);
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        T v = a[i] - T(mean);
+        s += v * v;
+    }
+    result[0] = std::sqrt(s / a.numel());
+}
+
+Tensor std_impl_cpu(Tensor a)
+{
+    double mean   = (sum_impl_cpu(a) / (double)a.numel()).toDouble();
+    Tensor result = empty({1}, a.options());
+    SWITCH_MACRO_FLOAT(a.scalar_type(), std_impl_cpu, a, mean, result);
+    return result;
+}
+
+template <typename T>
 static void max_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
     result[0] = std::numeric_limits<T>::min();

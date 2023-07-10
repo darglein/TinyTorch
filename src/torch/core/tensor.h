@@ -331,11 +331,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor mean() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor mean() const;
     Tensor mean(int64_t dim, bool squeeze_dim) const
     {
         throw std::runtime_error("not implemented");
@@ -346,6 +342,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
+    Tensor std() const;
     Tensor index_select(int64_t i, Tensor index) const
     {
         throw std::runtime_error("not implemented");
@@ -361,11 +358,6 @@ struct TINYTORCH_API Tensor
     Tensor transpose(int64_t dim0, int64_t dim1);
     void backward() const;
     void backward(Tensor t, bool retain_grad = false) const;
-    Tensor std() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
     Tensor item() const
     {
         CHECK_EQ(numel(), 1);
