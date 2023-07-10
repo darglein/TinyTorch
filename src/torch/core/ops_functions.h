@@ -13,6 +13,8 @@ namespace tinytorch
 {
 
 TINYTORCH_API Tensor repeat(Tensor t, SizeType sizes);
+TINYTORCH_API Tensor repeat_interleave(Tensor t, int64_t count);
+TINYTORCH_API Tensor transpose(Tensor t, int64_t dim0, int64_t dim1);
 
 TINYTORCH_API void copy(Tensor src, Tensor target);
 
@@ -31,11 +33,7 @@ TINYTORCH_API Tensor to(Tensor b, ScalarType other_type);
 
 
 
-inline Tensor stack(const std::vector<Tensor>& a)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+TINYTORCH_API Tensor stack(const std::vector<Tensor>& a);
 inline Tensor cat(const std::vector<Tensor>& a, int64_t dim)
 {
     throw std::runtime_error("not implemented");

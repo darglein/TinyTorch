@@ -698,6 +698,121 @@ Tensor index_select_impl_cpu(Tensor input, int64_t dim, Tensor index)
     return result;
 }
 
+template <typename T>
+static void repeat_interleave_impl_cpu(TensorInfo<T> input, int64_t count, TensorInfo<T> result)
+{
+    int64_t to_copy = input.numel() / input.sizes[0];
+    int64_t input_start = 0;
+    int64_t output_start = 0;
+    for (int64_t i = 0; i < input.sizes[0]; ++i)
+    {
+        for (int64_t c = 0; c < count; ++c)
+        {
+            for (int64_t j = 0; j < to_copy; ++j)
+            {
+                result[output_start + j] = input[input_start + j];
+            }
+
+            output_start += to_copy;
+        }
+
+        input_start += to_copy;
+    }
+
+    CHECK_EQ(input_start, input.numel());
+    CHECK_EQ(output_start, result.numel());
+}
+
+Tensor repeat_interleave_impl_cpu(Tensor input, int64_t count)
+{
+    SizeType new_sizes = input.sizes();
+    new_sizes[0] *= count;
+    Tensor result = empty(new_sizes, input.options());
+    SWITCH_MACRO_ALL(input.scalar_type(), repeat_interleave_impl_cpu, input, count, result);
+    return result;
+}
+
+template <typename T>
+static void stack_impl_cpu(TensorInfo<T> input, int64_t result_offset, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < input.numel(); ++i)
+    {
+        result[result_offset + i] = input[i];
+    }
+}
+
+Tensor stack_impl_cpu(const std::vector<Tensor>& tensors)
+{
+    if (tensors.empty())
+    {
+        return {};
+    }
+
+    for (const auto& t : tensors)
+    {
+        CHECK_EQ(tensors.front().sizes(), t.sizes());
+        CHECK_EQ(tensors.front().device(), t.device());
+        CHECK_EQ(tensors.front().scalar_type(), t.scalar_type());
+    }
+
+    SizeType new_sizes = tensors.front().sizes();
+    new_sizes.vec().insert(new_sizes.vec().begin(), tensors.size());
+
+    int64_t individual_numel = tensors.front().numel();
+
+    Tensor result = empty(new_sizes, tensors.front().options());
+
+    int64_t offset = 0;
+    for (const auto& t : tensors)
+    {
+        SWITCH_MACRO_ALL(t.scalar_type(), stack_impl_cpu, t, offset, result);
+        offset += individual_numel;
+    }
+
+    return result;
+}
+
+template <typename T>
+static void transpose_impl_cpu(TensorInfo<T> input, int64_t dim0, int64_t dim1, TensorInfo<T> result)
+{
+    int64_t dims = input.dims;
+
+    for (int64_t n = 0; n < input.numel(); ++n)
+    {
+        int64_t linearId = n;
+        int64_t input_offset   = 0;
+        int64_t output_offset   = 0;
+
+        for (int64_t i = dims - 1; i > 0; --i)
+        {
+            int64_t curDimIndex = linearId % input.sizes[i];
+            input_offset += curDimIndex * input.strides[i];
+
+            int64_t j = (i == dim0) ? dim1 : (i == dim1) ? dim0 : i;
+            output_offset += curDimIndex * result.strides[j];
+            linearId /= input.sizes[i];
+        }
+
+        input_offset += linearId * input.strides[0];
+
+        int64_t j = (0 == dim0) ? dim1 : (0 == dim1) ? dim0 : 0;
+        output_offset += linearId * result.strides[j];
+
+
+        result.data[output_offset] = input.data[input_offset];
+    }
+}
+
+Tensor transpose_impl_cpu(Tensor input, int64_t dim0, int64_t dim1) 
+{
+    SizeType new_sizes = input.sizes();
+    std::swap(new_sizes[dim0], new_sizes[dim1]);
+
+    Tensor result = empty(new_sizes, input.options());
+    SWITCH_MACRO_ALL(input.scalar_type(), transpose_impl_cpu, input, dim0, dim1, result);
+    return result;
+}
+
 // ================================================================================================================
 
 template <typename T>

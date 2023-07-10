@@ -357,16 +357,8 @@ struct TINYTORCH_API Tensor
         return {};
     }
     void set_data(Tensor t) { this->impl_ = t.impl_; }
-    inline Tensor repeat_interleave(int64_t start)
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    inline Tensor transpose(int64_t start, int64_t end)
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor repeat_interleave(int64_t count);
+    Tensor transpose(int64_t dim0, int64_t dim1);
     void backward() const;
     void backward(Tensor t, bool retain_grad = false) const;
     Tensor std() const

@@ -238,32 +238,23 @@ void Tensor::fill_(double a)
 {
     tinytorch::fill(*this, a);
 }
-
-
 Tensor Tensor::reshape(const SizeType& size) const
 {
-    auto sizes       = size;
-    int negative_dim = -1;
-    for (int i = 0; i < sizes.size(); ++i)
-    {
-        if (sizes[i] < 0)
-        {
-            CHECK_EQ(negative_dim, -1);
-            negative_dim = i;
-        }
-    }
+    SizeType new_sizes = size;
+    fill_neg_one_dim(new_sizes, numel());
 
-    if (negative_dim >= 0)
-    {
-        sizes[negative_dim] = 1;
-        sizes[negative_dim] = numel() / sizes.numel();
-    }
-
-    CHECK_EQ(sizes.numel(), numel());
-
-    Tensor result = empty(sizes, options());
+    Tensor result = empty(new_sizes, options());
     tinytorch::copy(*this, result);
     return result;
+}
+
+Tensor Tensor::repeat_interleave(int64_t count)
+{
+    return tinytorch::repeat_interleave(*this, count);
+}
+Tensor Tensor::transpose(int64_t dim0, int64_t dim1)
+{
+    return tinytorch::transpose(*this, dim0, dim1);
 }
 Tensor Tensor::clone() const
 {

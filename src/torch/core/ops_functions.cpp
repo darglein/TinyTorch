@@ -45,6 +45,16 @@ Tensor repeat(Tensor t, SizeType sizes)
     return result;
 }
 
+Tensor repeat_interleave(Tensor t, int64_t count)
+{
+    return repeat_interleave_impl_cpu(t, count);
+}
+
+Tensor transpose(Tensor t, int64_t dim0, int64_t dim1)
+{
+    return transpose_impl_cpu(t, dim0, dim1);
+}
+
 void fill(Tensor& t, double value)
 {
     fill_impl_cpu(t, value);
@@ -53,6 +63,11 @@ void fill(Tensor& t, double value)
 Tensor index_select(Tensor input, int64_t dim, Tensor index)
 {
     return index_select_impl_cpu(input, dim, index);
+}
+
+Tensor stack(const std::vector<Tensor>& a)
+{
+    return stack_impl_cpu(a);
 }
 
 
