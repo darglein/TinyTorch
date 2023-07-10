@@ -65,12 +65,12 @@ static void range_impl_cpu(TensorInfo<T> a, double start, double end, double ste
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        a[i] = start + i * step;
+        a[i] = T(start) + T(i) * T(step);
     }
 }
 void range_impl_cpu(Tensor a, double start, double end, double step)
 {
-    SWITCH_MACRO_FLOAT(a.scalar_type(), range_impl_cpu, a, start, end, step);
+    SWITCH_MACRO_ALL(a.scalar_type(), range_impl_cpu, a, start, end, step);
 }
 
 
@@ -1070,7 +1070,7 @@ void print_impl_cpu(std::ostream& strm, TensorInfo<T> a)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        std::cout << a[i] << " ";
+        strm << a[i] << " ";
     }
 }
 
@@ -1150,7 +1150,7 @@ static void to_double_cpu(TensorInfo<T> a, TensorInfo<double> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[i] = a[i];
+        result[i] = double(a[i]);
     }
 }
 
@@ -1159,7 +1159,7 @@ static void from_double_cpu(TensorInfo<double> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[i] = a[i];
+        result[i] = T(a[i]);
     }
 }
 

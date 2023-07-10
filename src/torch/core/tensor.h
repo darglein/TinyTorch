@@ -83,7 +83,7 @@ inline SizeType CompactStrideForSize(SizeType size)
 {
     std::vector<int64_t> result(size.size());
     result.back() = 1;
-    for (int i = size.size() - 2; i >= 0; i--)
+    for (int64_t i = size.size() - 2; i >= 0; i--)
     {
         result[i] = result[i + 1] * size[i + 1];
     }
