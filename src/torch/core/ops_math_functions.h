@@ -84,6 +84,8 @@ TINYTORCH_API Tensor min(Tensor a, Tensor b);
 TINYTORCH_API Tensor max(Tensor a, Tensor b);
 TINYTORCH_API Tensor min(Tensor a);
 TINYTORCH_API Tensor max(Tensor a);
+TINYTORCH_API std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim = false);
+TINYTORCH_API std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim = false);
 
 inline Tensor sum(Tensor a, SizeType s)
 {

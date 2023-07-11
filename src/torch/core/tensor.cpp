@@ -127,6 +127,23 @@ Tensor Tensor::view(const SizeType& sizes) const
     SizeType new_sizes = sizes;
     fill_neg_one_dim(new_sizes, numel());
 
+    if (is_contiguous())
+    {
+        SizeType new_strides;
+        new_strides.resize(new_sizes.vec().size());
+        int64_t stride = 1;
+        for (int64_t i = new_strides.vec().size() - 1; i >= 0; --i)
+        {
+            new_strides[i] = stride;
+            stride *= new_sizes[i];
+        }
+
+        std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
+            impl_->storage_, impl_->storage_offset_, std::move(new_sizes), std::move(new_strides), options());
+
+        return Tensor(new_impl);
+    }
+
     throw std::runtime_error("not implemented");
 
     return {};
@@ -183,6 +200,10 @@ Tensor Tensor::squeeze(int64_t dim) const
 {
     CHECK_LT(dim, this->dim());
     CHECK_EQ(size(dim), 1);
+    if (this->dim() == 1)
+    {
+        return *this;
+    }
 
     std::vector<int64_t> new_sizes = sizes();
     new_sizes.erase(std::next(new_sizes.begin(), dim));
@@ -198,6 +219,11 @@ Tensor Tensor::squeeze(int64_t dim) const
 
 Tensor Tensor::squeeze() const
 {
+    if (this->dim() == 1)
+    {
+        return *this;
+    }
+
     std::vector<int64_t> new_sizes = sizes();
     new_sizes.erase(std::remove(new_sizes.begin(), new_sizes.end(), 1), new_sizes.end());
 
@@ -282,6 +308,14 @@ Tensor Tensor::min() const
 Tensor Tensor::max() const
 {
     return tinytorch::max(*this);
+}
+std::pair<Tensor, Tensor> Tensor::min(int64_t dim, bool keepdim) const
+{
+    return tinytorch::min(*this, dim, keepdim);
+}
+std::pair<Tensor, Tensor> Tensor::max(int64_t dim, bool keepdim = false) const 
+{
+    return tinytorch::max(*this, dim, keepdim);
 }
 Tensor Tensor::repeat(const SizeType& size) const
 {

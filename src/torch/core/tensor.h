@@ -309,16 +309,8 @@ struct TINYTORCH_API Tensor
     Tensor max() const;
 
 
-    std::pair<Tensor, Tensor> min(int64_t index) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    std::pair<Tensor, Tensor> max(int64_t index) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    std::pair<Tensor, Tensor> min(int64_t dim, bool keepdim = false) const;
+    std::pair<Tensor, Tensor> max(int64_t dim, bool keepdim = false) const;
     Tensor std(int64_t index) const
     {
         throw std::runtime_error("not implemented");

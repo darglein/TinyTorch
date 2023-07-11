@@ -563,7 +563,7 @@ Tensor prod_impl_cpu(Tensor input, int64_t dim)
 {
     CHECK_LT(dim, input.dim());
 
-    auto result_size = input.sizes().vec();
+    auto result_size = input.sizes();
     result_size[dim] = 1;
 
     Tensor result = empty(result_size, input.options());
@@ -622,6 +622,91 @@ Tensor max_impl_cpu(Tensor a, Tensor b)
     Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), max_impl_cpu, a, b, result);
     return result;
+}
+
+template <typename T>
+static void minmax_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> indices, TensorInfo<T> result, bool calc_min)
+{
+    int64_t dims = input.dims;
+
+    int64_t size_along_dim = input.sizes[dim];
+    int64_t stride_along_dim = input.strides[dim];
+
+    for (int64_t i = 0; i < result.numel(); ++i)
+    {
+        int64_t linearId = i;
+        int64_t offset   = 0;
+        for (int64_t i = dims - 1; i > 0; --i)
+        {
+            if (i != dim)
+            {
+                int64_t curDimIndex  = linearId % input.sizes[i];
+                int64_t curDimOffset = curDimIndex * input.strides[i];
+                offset += curDimOffset;
+                linearId /= input.sizes[i];
+            }
+        }
+        if (0 != dim)
+        {
+            offset += linearId * input.strides[0];
+        }
+
+        int64_t minmax_index = 0;
+        T minmax_value       = calc_min ? std::numeric_limits<T>::max() : std::numeric_limits<T>::lowest();
+        for (int64_t d = 0; d < size_along_dim; ++d)
+        {
+            T value = input.data[offset];
+            bool cmp = calc_min ? (value < minmax_value) : (value > minmax_value);
+            if (cmp)
+            {
+                minmax_value = value;
+                minmax_index = d;
+            }
+            
+            offset += stride_along_dim;
+        }
+
+        indices[i] = minmax_index;
+        result[i]  = minmax_value;
+    }
+}
+
+std::pair<Tensor, Tensor> min_impl_cpu(Tensor input, int64_t dim, bool keepdim)
+{
+    auto result_size = input.sizes();
+    result_size[dim] = 1;
+
+    Tensor result  = empty(result_size, input.options());
+    Tensor indices = empty(result_size, input.options().dtype(kLong));
+
+    SWITCH_MACRO_ALL(input.scalar_type(), minmax_impl_cpu, input, dim, indices, result, true);
+
+    if (!keepdim)
+    {
+        result = result.squeeze(dim);
+        indices = indices.squeeze(dim);
+    }
+
+    return {result, indices};
+}
+
+std::pair<Tensor, Tensor> max_impl_cpu(Tensor input, int64_t dim, bool keepdim)
+{
+    auto result_size = input.sizes();
+    result_size[dim] = 1;
+
+    Tensor result  = empty(result_size, input.options());
+    Tensor indices = empty(result_size, input.options().dtype(kLong));
+
+    SWITCH_MACRO_ALL(input.scalar_type(), minmax_impl_cpu, input, dim, indices, result, false);
+
+    if (!keepdim)
+    {
+        result  = result.squeeze(dim);
+        indices = indices.squeeze(dim);
+    }
+
+    return {result, indices};
 }
 
 template <typename T>

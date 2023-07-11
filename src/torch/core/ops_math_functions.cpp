@@ -73,6 +73,14 @@ Tensor max(Tensor a)
 {
     return max_impl_cpu(a);
 }
+std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
+{
+    return min_impl_cpu(a, dim, keepdim);
+}
+std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
+{
+    return max_impl_cpu(a, dim, keepdim);
+}
 Tensor min(Tensor a, Tensor b)
 {
     return min_impl_cpu(a, b);
