@@ -209,11 +209,7 @@ struct TINYTORCH_API Tensor
         return *this;
     }
     Tensor cpu() const { return to(kCPU); }
-    Tensor index_add(int64_t dim, Tensor index, Tensor data) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor index_add(int64_t dim, Tensor index, Tensor data) const;
     Tensor square() const
     {
         throw std::runtime_error("not implemented");

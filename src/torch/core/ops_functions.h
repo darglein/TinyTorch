@@ -40,6 +40,7 @@ inline Tensor cat(const std::vector<Tensor>& a, int64_t dim)
     return {};
 }
 TINYTORCH_API Tensor index_select(Tensor input, int64_t dim, Tensor index);
+TINYTORCH_API Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data);
 
 inline void load(Tensor&, std::string)
 {

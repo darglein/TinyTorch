@@ -797,9 +797,58 @@ Tensor index_select_impl_cpu(Tensor input, int64_t dim, Tensor index)
     result_size[dim] = numel;
 
     Tensor result = empty(result_size, input.options());
-
     SWITCH_MACRO_ALL(input.scalar_type(), index_select_impl_cpu, input, dim, index, result);
+    return result;
+}
 
+template <typename T>
+static void index_add_impl_cpu(int64_t dim, TensorInfo<int64_t> index, TensorInfo<T> data, TensorInfo<T> result)
+{
+    int64_t dims = result.dims;
+
+    int64_t to_add = data.numel() / data.sizes[0];
+
+    for (int64_t index_index = 0; index_index < index.numel(); ++index_index)
+    {
+        int64_t slice        = index[index_index];
+        int64_t data_start   = index_index * data.strides[dim];
+        int64_t result_start = slice * result.strides[dim];
+
+        for (int64_t c = 0; c < to_add; ++c)
+        {
+            int64_t linearId = c;
+
+            int64_t result_offset = result_start;
+            for (int64_t i = dims - 1; i > 0; --i)
+            {
+                if (i != dim)
+                {
+                    int64_t curDimIndex = linearId % result.sizes[i];
+                    result_offset += curDimIndex * result.strides[i];
+                    linearId /= result.sizes[i];
+                }
+            }
+
+            if (dim != 0)
+            {
+                result_offset += linearId * result.strides[0];
+            }
+
+            result.data[result_offset] += data[data_start + c];
+        }
+    }
+}
+
+Tensor index_add_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor data)
+{
+    CHECK_LT(dim, input.dim());
+    CHECK_EQ(index.dtype(), kLong);
+    CHECK_EQ(input.dim(), data.dim());
+    CHECK_EQ(index.dim(), 1);
+    CHECK_EQ(index.numel(), data.size(0));
+
+    Tensor result = input.clone();
+    SWITCH_MACRO_ALL(input.scalar_type(), index_add_impl_cpu, dim, index, data, result);
     return result;
 }
 

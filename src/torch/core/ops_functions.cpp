@@ -65,6 +65,11 @@ Tensor index_select(Tensor input, int64_t dim, Tensor index)
     return index_select_impl_cpu(input, dim, index);
 }
 
+Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data)
+{
+    return index_add_impl_cpu(input, dim, index, data);
+}
+
 Tensor stack(const std::vector<Tensor>& a)
 {
     return stack_impl_cpu(a);

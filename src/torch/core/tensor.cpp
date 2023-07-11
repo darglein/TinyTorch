@@ -313,13 +313,17 @@ std::pair<Tensor, Tensor> Tensor::min(int64_t dim, bool keepdim) const
 {
     return tinytorch::min(*this, dim, keepdim);
 }
-std::pair<Tensor, Tensor> Tensor::max(int64_t dim, bool keepdim = false) const 
+std::pair<Tensor, Tensor> Tensor::max(int64_t dim, bool keepdim) const 
 {
     return tinytorch::max(*this, dim, keepdim);
 }
 Tensor Tensor::repeat(const SizeType& size) const
 {
     return tinytorch::repeat(*this, size);
+}
+Tensor Tensor::index_add(int64_t dim, Tensor index, Tensor data) const
+{
+    return tinytorch::index_add(*this, dim, index, data);
 }
 void Tensor::backward() const
 {
