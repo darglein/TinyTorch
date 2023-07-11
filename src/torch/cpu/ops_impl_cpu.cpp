@@ -44,6 +44,23 @@ namespace tinytorch
             CHECK(false) << "invalid input type " << real_scalar_type; \
     }
 
+
+
+static SizeType max_size(Tensor a, Tensor b)
+{
+    CHECK_EQ(a.dim(), b.dim());
+    SizeType new_sizes;
+    new_sizes.resize(a.dim());
+    for (int64_t i = 0; i < a.dim(); ++i)
+    {
+        int64_t as = a.size(i);
+        int64_t bs = b.size(i);
+        CHECK(as == bs || as == 1 || bs == 1);
+        new_sizes[i] = std::max(as, bs);
+    }
+    return new_sizes;
+}
+
 template <typename T>
 static void fill_impl_cpu(TensorInfo<T> a, double value)
 {
@@ -220,15 +237,38 @@ Tensor sub_impl_cpu(double a, Tensor b)
 template <typename T>
 static void mult_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
-    for (int64_t i = 0; i < a.numel(); ++i)
+    // This handles the case that if one tensor has size 1 along a dimension, the respective value is duplicated along
+    // this dimension.
+
+    int64_t dims = result.dims;
+
+    for (int64_t i = 0; i < result.numel(); ++i)
     {
-        result[i] = a[i] * b[i];
+        int64_t linearId = i;
+        int64_t offset_a = 0;
+        int64_t offset_b = 0;
+
+        for (int64_t i = dims - 1; i > 0; --i)
+        {
+            int64_t sa = a.sizes[i];
+            int64_t sb = b.sizes[i];
+            int64_t max_s = std::max(sa, sb);
+
+            offset_a += (sa == 0) ? 0 : ((linearId % sa) * a.strides[i]);
+            offset_b += (sb == 0) ? 0 : ((linearId % sb) * b.strides[i]);
+            linearId /= max_s;
+        }
+
+        offset_a += linearId * a.strides[0];
+        offset_b += linearId * b.strides[0];
+
+        result[i] = a.data[offset_a] * b[offset_b];
     }
 }
 
 Tensor mult_impl_cpu(Tensor a, Tensor b)
 {
-    Tensor result = empty_like(a);
+    Tensor result = empty(max_size(a, b), a.options());
     SWITCH_MACRO_ALL(a.scalar_type(), mult_impl_cpu, a, b, result);
     return result;
 }
