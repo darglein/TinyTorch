@@ -100,6 +100,11 @@ Tensor std(Tensor a)
     return std_impl_cpu(a);
 }
 
+Tensor abs(Tensor a) 
+{
+    return abs_impl_cpu(a);
+}
+
 
 
 

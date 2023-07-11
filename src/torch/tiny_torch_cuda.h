@@ -9,6 +9,7 @@
 #include "tiny_torch.h"
 
 #if __has_include("cuda_runtime.h")
+
 #    include "cuda_runtime.h"
 
 #    ifdef __CUDACC__
@@ -27,8 +28,7 @@ namespace cuda
 {
 inline cudaStream_t getCurrentCUDAStream()
 {
-    throw std::runtime_error("not implemented");
-    return {};
+    return 0;
 }
 
 struct CUDACachingAllocator

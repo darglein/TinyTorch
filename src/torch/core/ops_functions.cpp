@@ -9,6 +9,7 @@
 #include "graph.h"
 
 #include "torch/cpu/ops_impl_cpu.h"
+#include "torch/cuda/ops_impl_cuda.h"
 
 
 namespace tinytorch
@@ -57,7 +58,14 @@ Tensor transpose(Tensor t, int64_t dim0, int64_t dim1)
 
 void fill(Tensor& t, double value)
 {
-    fill_impl_cpu(t, value);
+    if (t.is_cpu())
+    {
+        fill_impl_cpu(t, value);
+    }
+    else
+    {
+        fill_impl_cuda(t, value);
+    }
 }
 
 Tensor index_select(Tensor input, int64_t dim, Tensor index)

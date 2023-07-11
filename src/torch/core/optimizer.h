@@ -66,28 +66,29 @@ void adam_step(TensorInfo<T> param, TensorInfo<T> param_grad, TensorInfo<T> m1s,
 {
     for (int i = 0; i < param.numel(); ++i)
     {
-        auto& w = param[i];
+        T& w = param[i];
         // assert(param.grad().size() == param.size());
 
-        auto gradient    = param_grad[i];
-        auto m1          = m1s[i];
-        auto m2          = m2s[i];
-        auto beta1       = std::get<0>(options.betas_);
-        auto beta2       = std::get<1>(options.betas_);
-        m1               = beta1 * m1 + (1 - beta1) * gradient;
-        m2               = beta2 * m2 + (1 - beta2) * (gradient * gradient);
-        m1s[i]           = m1;
-        m2s[i]           = m2;
+        T gradient = param_grad[i];
+        T m1       = m1s[i];
+        T m2       = m2s[i];
+        T beta1    = T(std::get<0>(options.betas_));
+        T beta2    = T(std::get<1>(options.betas_));
+        m1         = beta1 * m1 + (1 - beta1) * gradient;
+        m2         = beta2 * m2 + (1 - beta2) * (gradient * gradient);
+        m1s[i]     = m1;
+        m2s[i]     = m2;
 
-        auto learning_rate = options.lr();
-        learning_rate *= sqrtf(1 - powf(beta2, current_step)) / (1 - powf(beta1, current_step));
+        double learning_rate = options.lr();
+        learning_rate *=
+            std::sqrt(1.0 - std::pow(beta2, double(current_step))) / (1.0 - std::pow(beta1, double(current_step)));
 
-        auto effective_learning_rate = fminf(fmaxf(learning_rate / (sqrtf(m2) + options.eps()), 0), 1e36);
+        double effective_learning_rate = std::min(std::max(learning_rate / (std::sqrt(m2) + options.eps()), 0.0), 1e36);
 
-        auto weight_change = effective_learning_rate * m1;
-        auto new_weight    = w - weight_change;
+        double weight_change = effective_learning_rate * m1;
+        double new_weight    = w - weight_change;
 
-        w = new_weight;
+        w = T(new_weight);
     }
 }
 

@@ -16,7 +16,6 @@
 
 namespace tinytorch
 {
-
 #define CASE_MACRO(func, type, scalar_type, ...) \
     case scalar_type:                            \
         func<type>(__VA_ARGS__);                 \
@@ -726,6 +725,22 @@ Tensor std_impl_cpu(Tensor a)
     double mean   = (sum_impl_cpu(a) / (double)a.numel()).toDouble();
     Tensor result = empty({1}, a.options());
     SWITCH_MACRO_FLOAT(a.scalar_type(), std_impl_cpu, a, mean, result);
+    return result;
+}
+
+template <typename T>
+static void abs_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = std::abs(a[i]);
+    }
+}
+
+Tensor abs_impl_cpu(Tensor a)
+{
+    Tensor result = empty_like(a);
+    SWITCH_MACRO_ALL(a.scalar_type(), abs_impl_cpu, a, result);
     return result;
 }
 

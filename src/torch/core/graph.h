@@ -46,16 +46,13 @@ struct IValue
 {
     IValue() {}
 
-    IValue(bool b) {}
-    IValue(double d) { v_double = d; }
-    IValue(int32_t i) {}
-    IValue(int64_t i) {}
+    IValue(bool b) : v_bool(b) {}
+    IValue(double d) :v_double(d) {}
+    IValue(int32_t i) : v_int64(i) {}
+    IValue(int64_t i) : v_int64(i) {}
 
     template <typename T>
-    IValue(std::shared_ptr<T> i)
-    {
-        custom_class = i;
-    }
+    IValue(std::shared_ptr<T> i) : custom_class(i) {}
 
     template <typename T>
     std::shared_ptr<T> toCustomClass()
@@ -65,19 +62,13 @@ struct IValue
         return result;
     }
 
+    bool toBool() { return v_bool; }
     double toDouble() { return v_double; }
-    bool toBool()
-    {
-        throw std::runtime_error("not implemented");
-        return false;
-    }
-    int64_t toInt()
-    {
-        throw std::runtime_error("not implemented");
-        return false;
-    }
+    int64_t toInt() { return v_int64; }
 
+    bool v_bool;
     double v_double;
+    int64_t v_int64;
     std::shared_ptr<CustomClassHolder> custom_class;
 };
 

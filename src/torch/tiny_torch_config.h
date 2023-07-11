@@ -36,3 +36,10 @@
 #ifndef TINY_TORCH_NAMESPACE
 #define TINY_TORCH_NAMESPACE tinytorch
 #endif
+
+#ifdef TT_HAS_CUDA
+#    include <cuda_runtime_api.h>
+#    define TT_HD __host__ __device__
+#else
+#    define TT_HD
+#endif

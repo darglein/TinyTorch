@@ -48,6 +48,7 @@ Tensor max_impl_cpu(Tensor a, Tensor b);
 std::pair<Tensor, Tensor> min_impl_cpu(Tensor a, int64_t dim, bool keepdim);
 std::pair<Tensor, Tensor> max_impl_cpu(Tensor a, int64_t dim, bool keepdim);
 Tensor std_impl_cpu(Tensor a);
+Tensor abs_impl_cpu(Tensor a);
 Tensor index_select_impl_cpu(Tensor input, int64_t dim, Tensor index);
 Tensor index_add_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor data);
 Tensor repeat_interleave_impl_cpu(Tensor input, int64_t count);

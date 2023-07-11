@@ -4,14 +4,6 @@
 
 namespace tinytorch
 {
-#ifdef TT_HAS_CUDA
-#    include <cuda_runtime_api.h>
-#    define TT_HD __host__ __device__
-#else
-#    define TT_HD
-#endif
-
-
 template <typename T>
 inline TT_HD T relu(T x)
 {

@@ -150,11 +150,7 @@ struct TINYTORCH_API Tensor
     int64_t element_size() const;
 
     Tensor view(const SizeType& sizes) const;
-    Tensor operator[](int64_t index) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor operator[](int64_t index) const { return slice(0, index, index + 1).squeeze(0); }
     Tensor slice(int64_t dim, int64_t start, int64_t end, int64_t step = 1) const;
     Tensor select(int64_t dim, int64_t index) const
     {
@@ -180,15 +176,7 @@ struct TINYTORCH_API Tensor
 
     Tensor clone() const;
     Tensor to(ScalarType new_type) const;
-    Tensor to(Device new_type) const
-    {
-        if (device() == new_type)
-        {
-            return *this;
-        }
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor to(Device new_device) const;
     Tensor flip(const SizeType& size) const { throw std::runtime_error("not implemented"); }
     void resize_(const SizeType& size) { throw std::runtime_error("not implemented"); }
     Tensor permute(const SizeType& size) const
@@ -224,11 +212,7 @@ struct TINYTORCH_API Tensor
     {
         return to(kCUDA);
     }
-    bool allclose(Tensor value) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    bool allclose(Tensor other, double atol = 1e-07) const;
 
     Tensor clamp(double mi, double ma) const
     {
@@ -336,11 +320,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor abs() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor abs() const;
     void set_data(Tensor t) { this->impl_ = t.impl_; }
     Tensor repeat_interleave(int64_t count);
     Tensor transpose(int64_t dim0, int64_t dim1);
@@ -369,11 +349,7 @@ struct TINYTORCH_API Tensor
     inline bool is_cuda() const { return device() == kCUDA; }
     bool is_cpu() const { return device() == kCPU; }
 
-    Tensor contiguous() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor contiguous() const;
 
    private:
     std::shared_ptr<TensorImpl> impl_;

@@ -48,7 +48,7 @@ struct TensorInfo
         contiguous = t.is_contiguous();
     }
 
-    int64_t numel()
+    TT_HD int64_t numel()
     {
         int64_t result = 1;
         for (int64_t i = 0; i < dims; ++i)
@@ -58,12 +58,12 @@ struct TensorInfo
         return result;
     }
 
-    T& GetLinear(int64_t linearId) { return data[IndexToOffset(linearId)]; }
+    TT_HD T& GetLinear(int64_t linearId) { return data[IndexToOffset(linearId)]; }
 
-    T& operator[](int64_t linearId) { return data[IndexToOffset(linearId)]; }
+    TT_HD T& operator[](int64_t linearId) { return data[IndexToOffset(linearId)]; }
 
 
-    int64_t IndexToOffset(int64_t linearId)
+    TT_HD int64_t IndexToOffset(int64_t linearId)
     {
         if (contiguous)
         {

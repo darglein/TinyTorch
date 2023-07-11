@@ -29,7 +29,7 @@ inline std::pair<Tensor,Tensor> sort(Tensor t, int64_t a)
 }
 
 
-TINYTORCH_API Tensor to(Tensor b, ScalarType other_type);
+TINYTORCH_API Tensor to(Tensor a, ScalarType other_type);
 
 
 

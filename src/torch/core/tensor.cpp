@@ -5,6 +5,7 @@
  * See LICENSE file for more information.
  */
 #include "torch/core/tensor.h"
+#include "../tiny_torch_cuda.h"
 
 #include "torch/core/backward.h"
 #include "torch/core/ops.h"
@@ -249,6 +250,17 @@ bool Tensor::is_contiguous() const
     }
     return true;
 }
+Tensor Tensor::contiguous() const
+{
+    if (is_contiguous())
+    {
+        return *this;
+    }
+
+    Tensor result = empty_like(*this);
+    tinytorch::copy(*this, result);
+    return result;
+}
 Tensor Tensor::to(ScalarType new_type) const
 {
     if (dtype() == new_type)
@@ -256,6 +268,35 @@ Tensor Tensor::to(ScalarType new_type) const
         return *this;
     }
     return tinytorch::to(*this, new_type);
+}
+Tensor Tensor::to(Device new_device) const
+{
+    if (!impl_)
+    {
+        return *this;
+    }
+
+#ifdef TT_HAS_CUDA
+    if (device() == new_device)
+    {
+        return *this;
+    }
+
+    Tensor contig = contiguous();
+
+    int64_t bytes = element_size() * numel();
+
+    auto new_storage = std::make_shared<StorageImpl>(bytes, new_device);
+    auto new_impl =
+        std::make_shared<TensorImpl>(new_storage, 0, contig.sizes(), contig.strides(), options().device(new_device));
+
+    auto type = (new_device == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
+    cudaMemcpy(new_impl->data_ptr(), contig.data_ptr(), bytes, type);
+
+    return Tensor(new_impl);
+#else
+    CHECK(false);
+#endif
 }
 Tensor Tensor::sum() const
 {
@@ -268,6 +309,10 @@ Tensor Tensor::mean() const
 Tensor Tensor::std() const
 {
     return tinytorch::std(*this);
+}
+Tensor Tensor::abs() const 
+{
+    return tinytorch::abs(*this);
 }
 void Tensor::fill_(double a)
 {
@@ -324,6 +369,23 @@ Tensor Tensor::repeat(const SizeType& size) const
 Tensor Tensor::index_add(int64_t dim, Tensor index, Tensor data) const
 {
     return tinytorch::index_add(*this, dim, index, data);
+}
+bool Tensor::allclose(Tensor other, double atol) const
+{
+    Tensor diff = (*this - other).abs().max();
+    double v    = 0.f;
+    switch (diff.dtype())
+    {
+        case kFloat:
+            v = diff.toFloat();
+            break;
+        case kDouble:
+            v = diff.toDouble();
+            break;
+        default:
+            CHECK(false);
+    }
+    return v < atol;
 }
 void Tensor::backward() const
 {

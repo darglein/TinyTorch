@@ -28,7 +28,7 @@ target_include_directories(torch PUBLIC ${MY_BUILDCONFIG_DIR})
 
 #############  source #############
 
-FILE(GLOB_RECURSE ALL_SRC *.cpp)
+FILE(GLOB_RECURSE ALL_SRC *.cpp *.cu)
 FILE(GLOB_RECURSE ALL_HEADER *.h)
 
 target_sources(torch PRIVATE ${ALL_SRC} PUBLIC ${ALL_HEADER})

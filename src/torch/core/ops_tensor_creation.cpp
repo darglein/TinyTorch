@@ -10,6 +10,7 @@
 #include "torch/core/ops.h"
 
 #include "torch/cpu/ops_impl_cpu.h"
+#include "torch/cuda/ops_impl_cuda.h"
 
 
 
@@ -165,7 +166,14 @@ Tensor range(double start, double end, TensorOptions options, double step)
 {
     int64_t count = int64_t((end - start) / step) + 1;
     Tensor t      = empty({count}, options);
-    range_impl_cpu(t, start, end, step);
+    if (t.is_cpu())
+    {
+        range_impl_cpu(t, start, end, step);
+    }
+    else
+    {
+        range_impl_cuda(t, start, end, step);
+    }
     return t;
 }
 Tensor range(double start, double end, double step)
