@@ -274,11 +274,4 @@ struct AccumulateGrad : public Node
 };
 }  // namespace autograd
 
-inline void MakeParameter(Tensor t)
-{
-    t.set_requires_grad(true);
-}
-
-
-
 }  // namespace tinytorch

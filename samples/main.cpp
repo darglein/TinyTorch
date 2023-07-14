@@ -18,8 +18,7 @@ int main()
     std::vector<tinytorch::Tensor> params;
     for (int i = 0; i < 4; ++i)
     {
-        params.push_back(tinytorch::rand({3, 5}, options));
-        MakeParameter(params.back());
+        params.push_back(tinytorch::rand({3, 5}, options.requires_grad(true)));
     }
 
     // The model itself

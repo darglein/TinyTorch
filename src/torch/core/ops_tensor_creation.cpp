@@ -51,6 +51,7 @@ Tensor empty_like(Tensor t, TensorOptions options)
 Tensor full(const SizeType& sizes, float value, TensorOptions options)
 {
     Tensor t = empty(sizes, options);
+    NoGradGuard ngg;
     fill(t, value);
     return t;
 }
@@ -123,6 +124,7 @@ int64_t get_seed()
 Tensor rand(const SizeType& sizes, TensorOptions options)
 {
     Tensor t = empty(sizes, options);
+    NoGradGuard ngg;
     uniform(t);
     return t;
 }
