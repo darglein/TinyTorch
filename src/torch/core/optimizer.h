@@ -79,15 +79,23 @@ void adam_step(TensorInfo<T> param, TensorInfo<T> param_grad, TensorInfo<T> m1s,
         m1s[i]     = m1;
         m2s[i]     = m2;
 
+        CHECK(std::isfinite(gradient));
+        CHECK(std::isfinite(m1));;
+        CHECK(std::isfinite(m2));
+        CHECK(std::isfinite(w));
+
         double learning_rate = options.lr();
         learning_rate *=
             std::sqrt(1.0 - std::pow(beta2, double(current_step))) / (1.0 - std::pow(beta1, double(current_step)));
+        CHECK(std::isfinite(learning_rate));
 
-        double effective_learning_rate = std::min(std::max(learning_rate / (std::sqrt(m2) + options.eps()), 0.0), 1e36);
+        double effective_learning_rate = std::min(std::max(learning_rate / (std::sqrt(m2+1e-10) + options.eps()), 0.0), 1e36);
+        CHECK(std::isfinite(effective_learning_rate));
 
         double weight_change = effective_learning_rate * m1;
         double new_weight    = w - weight_change;
 
+        CHECK(std::isfinite(new_weight));
         w = T(new_weight);
     }
 }
@@ -164,6 +172,7 @@ struct Adam : public OptimizerBase
 
     void step()
     {
+        current_step++;
         for (int p = 0; p < params.size(); ++p)
         {
             auto& param = params[p];
@@ -173,7 +182,6 @@ struct Adam : public OptimizerBase
             }
             adam_step<float>(param, param.mutable_grad(), m1[p], m2[p], options[p], current_step);
         }
-        current_step++;
     }
 
     std::vector<AdamOptions> options;

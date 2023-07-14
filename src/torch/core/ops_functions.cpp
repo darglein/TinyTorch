@@ -68,7 +68,9 @@ void fill(Tensor& t, double value)
     }
     else
     {
+#if TT_HAS_CUDA
         fill_impl_cuda(t, value);
+#endif
     }
 }
 
@@ -205,7 +207,9 @@ struct CloneNode : public FunctionNode<CloneNode>
         }
         else
         {
+#if TT_HAS_CUDA
             copy_impl_cuda(a, result);
+#endif
         }
         return {result};
     }
@@ -220,7 +224,9 @@ struct CloneNode : public FunctionNode<CloneNode>
         }
         else
         {
+#if TT_HAS_CUDA
             copy_impl_cuda(grad[0], grad_a);
+#endif
         }
         return {grad_a[0]};
     }

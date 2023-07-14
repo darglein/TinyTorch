@@ -4,6 +4,9 @@
 
 #include "torch/core/tensor_options.h"
 #include "torch/tiny_torch_config.h"
+
+
+#if TT_HAS_CUDA
 namespace tinytorch
 {
 // Internal implementation of forward/backward
@@ -14,3 +17,6 @@ void fill_impl_cuda(Tensor a, double value);
 void copy_impl_cuda(Tensor src, Tensor target);
 
 }
+
+
+#endif

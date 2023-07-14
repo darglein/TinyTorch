@@ -19,11 +19,15 @@ namespace tinytorch
 
 void to_impl_cpu_cuda(Tensor a, Tensor b)
 {
+#ifdef TT_HAS_CUDA
     CHECK(a.is_contiguous());
     CHECK(b.is_contiguous());
     int64_t bytes = a.element_size() * a.numel();
     auto type     = (b.device() == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
     cudaMemcpy(b.data_ptr(), a.data_ptr(), bytes, type);
+#else
+    CHECK(false);
+#endif
 }
 
 

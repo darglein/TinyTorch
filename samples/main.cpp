@@ -8,7 +8,7 @@
 
 int main()
 {
-    auto options = tinytorch::TensorOptions().device(tinytorch::kCUDA).dtype(tinytorch::kFloat);
+    auto options = tinytorch::TensorOptions().device(tinytorch::kCPU).dtype(tinytorch::kFloat);
 
     // The data tensors
     tinytorch::Tensor observation = tinytorch::rand({3, 5}, options);
@@ -26,7 +26,7 @@ int main()
     auto model = [&](tinytorch::Tensor x) -> tinytorch::Tensor
     {
         x = x + params[0] + 5;
-         x = x * -params[0];
+        x = x * -params[0];
         x = x + params[1] + 5;
         x = x * params[2] * -1.;
         x = x + 2 * params[3];
@@ -34,7 +34,7 @@ int main()
     };
 
     // Create a simple optimizer
-    tinytorch::optim::Adam optim(params, 0.01f);
+    tinytorch::optim::Adam optim(params, 0.1f);
 
     // Optimize the model for 50 iterations
     for (int i = 0; i < 50; ++i)
@@ -45,13 +45,14 @@ int main()
 
         auto loss = sum(square(prediction - target));
 
-        // std::cout << params[0].grad() << std::endl;
+//        std::cout << "grad   " << params[0].grad() << std::endl;
         backward(loss);
-        // std::cout << "params " << params[0]<< std::endl;
-        // std::cout << "grad   " << params[0].grad() << std::endl;
+//        std::cout << "params " << params[0] << std::endl;
+//        std::cout << "grad   " << params[0].grad() << std::endl;
         optim.step();
+//        std::cout << "params " << params[0] << std::endl;
 
-        std::cout << "Step " << i << " Loss: " << loss << std::endl<< std::endl;
+        std::cout << "Step " << i << " Loss: " << loss << std::endl << std::endl;
     }
     return 0;
 }

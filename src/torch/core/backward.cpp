@@ -29,7 +29,6 @@ void backward(Tensor loss, Tensor grad)
     }
     else
     {
-        CHECK(false);
         CHECK_EQ(loss.numel(), 1);
         // The gradient of the final loss is 1
         Tensor one = full({1}, 1);
