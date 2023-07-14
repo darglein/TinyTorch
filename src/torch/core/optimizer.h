@@ -147,7 +147,7 @@ struct OptimizerBase
     {
         for (auto& p : params)
         {
-            p.mutable_grad().zero_();
+            if(p.grad().defined()) p.mutable_grad().zero_();
         }
     }
 };

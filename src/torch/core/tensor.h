@@ -124,6 +124,7 @@ struct TINYTORCH_API Tensor
 
     Tensor grad() const;
     Tensor& mutable_grad();
+    void set_grad(Tensor t);
 
     std::shared_ptr<Edge> getEdge() const;
     void SetEdge(std::shared_ptr<Edge> edge);

@@ -44,7 +44,7 @@ void TensorImpl::set_requires_grad(bool requires_grad)
 
         auto grad_options = options_;
         grad_options.requires_grad(false);
-        autograd_meta->_grad = zeros(sizes_, grad_options);
+        // autograd_meta->_grad = zeros(sizes_, grad_options);
         autograd_meta->edge  = std::make_shared<Edge>(std::make_shared<autograd::AccumulateGrad>(Tensor(getptr())), 0);
     }
     else

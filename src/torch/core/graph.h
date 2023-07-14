@@ -265,8 +265,14 @@ struct AccumulateGrad : public Node
     std::vector<Tensor> node_backward(const std::vector<Tensor>& input_grad) override
     {
         CHECK_EQ(input_grad.size(), 1);
-        // t.AddGradInplace(input_grad[0]);
-        t.mutable_grad() += input_grad[0];
+        if (!t.grad().defined())
+        {
+            t.set_grad(input_grad[0]);
+        }
+        else
+        {
+            t.mutable_grad() += input_grad[0];
+        }
         return {};
     }
 
