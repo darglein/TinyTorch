@@ -117,12 +117,13 @@ struct MultTensorScalarNode : public FunctionNode<MultTensorScalarNode>
 };
 
 
-struct AddTensorScalarNode : public FunctionNode<MultTensorScalarNode>
+struct AddTensorScalarNode : public FunctionNode<AddTensorScalarNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, double b)
     {
         ctx->saved_data["b"] = b;
         ctx->save_for_backward({a});
+
         auto result = add_impl_cpu(a, b);
         return {result};
     }

@@ -181,7 +181,7 @@ Tensor range(double start, double end, TensorOptions options, double step)
     }
     else
     {
-#if TT_HAS_CUDA
+#ifdef  TT_HAS_CUDA
         range_impl_cuda(t, start, end, step);
 #endif
     }
