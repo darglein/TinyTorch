@@ -1,11 +1,10 @@
-#include "torch/cuda/ops_impl_cuda.h"
-
 #include "torch/core/ops.h"
 #include "torch/core/tensor.h"
 
 #include "torch/core/ops_functions.h"
 #include "torch/core/ops_impl_shared.h"
 #include "torch/core/tensor_info.h"
+#include "torch/cuda/ops_impl_cuda.h"
 #include "torch/tiny_torch_cuda.h"
 
 TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
@@ -49,13 +48,13 @@ namespace tinytorch
 template <typename T>
 static __global__ void range_impl_cuda(TensorInfo<T> a, double start, double end, double step)
 {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int64_t i = threadIdx.x + blockIdx.x * blockDim.x;
     if (i >= a.numel()) return;
-    
+
     a[i] = T(start) + T(i) * T(step);
 }
 
-void range_impl_cuda(Tensor a, double start, double end, double step) 
+void range_impl_cuda(Tensor a, double start, double end, double step)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), range_impl_cuda, a, start, end, step);
 }
@@ -63,14 +62,28 @@ void range_impl_cuda(Tensor a, double start, double end, double step)
 template <typename T>
 static __global__ void fill_impl_cuda(TensorInfo<T> a, double value)
 {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int64_t i = threadIdx.x + blockIdx.x * blockDim.x;
     if (i >= a.numel()) return;
-    
+
     a[i] = T(value);
 }
 
-void fill_impl_cuda(Tensor a, double value) 
+void fill_impl_cuda(Tensor a, double value)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), fill_impl_cuda, a, value);
 }
+
+template <typename T>
+static __global__ void copy_impl_cuda(TensorInfo<T> a, TensorInfo<T> b)
+{
+    int64_t i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i >= a.numel()) return;
+    b[i] = a[i];
 }
+void copy_impl_cuda(Tensor src, Tensor target)
+{
+    SWITCH_MACRO_ALL(src.scalar_type(), src.numel(), copy_impl_cuda, src, target);
+}
+
+
+}  // namespace tinytorch

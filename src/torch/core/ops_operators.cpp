@@ -6,8 +6,9 @@
 
 #include "ops_operators.h"
 
-#include "torch/cpu/ops_impl_cpu.h"
 #include "graph.h"
+
+#include "torch/cpu/ops_impl_cpu.h"
 
 namespace tinytorch
 {
@@ -44,6 +45,21 @@ struct SubNode : public FunctionNode<SubNode>
     }
 };
 
+struct DivNode : public FunctionNode<DivNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
+    {
+        ctx->save_for_backward({a, b});
+        auto result = div_impl_cpu(a, b);
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        auto l = ctx->get_saved_variables();
+        return div_backward_impl_cpu(l[0], l[1], grad[0]);
+    }
+};
 
 struct MultNode : public FunctionNode<MultNode>
 {
@@ -62,6 +78,24 @@ struct MultNode : public FunctionNode<MultNode>
     }
 };
 
+struct DivScalarTensorNode : public FunctionNode<DivScalarTensorNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, double a, Tensor b)
+    {
+        ctx->saved_data["a"] = a;
+        ctx->save_for_backward({b});
+        auto result = div_impl_cpu(a, b);
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        double a    = ctx->saved_data["a"].toDouble();
+        auto l      = ctx->get_saved_variables();
+        auto grad_a = div_backward_impl_cpu(a, l[0], grad[0]);
+        return {{}, grad_a[0]};
+    }
+};
 
 struct MultTensorScalarNode : public FunctionNode<MultTensorScalarNode>
 {
@@ -101,22 +135,23 @@ struct AddTensorScalarNode : public FunctionNode<MultTensorScalarNode>
         return {grad_a, {}};
     }
 };
-}
+}  // namespace autograd
 
 using namespace autograd;
 
 Tensor operator/(Tensor a, Tensor b)
 {
-    return div_impl_cpu(a, b);
+    return DivNode::apply(a, b)[0];
 }
 
 Tensor operator/(Tensor a, double b)
 {
-    return div_impl_cpu(a, b);
+    return a * (1.0 / b);
 }
+
 Tensor operator/(double a, Tensor b)
 {
-    return div_impl_cpu(a, b);
+    return DivScalarTensorNode::apply(a,b)[0];
 }
 
 
@@ -158,7 +193,6 @@ Tensor operator*(Tensor a, double b)
 {
     return b * a;
 }
-
 
 Tensor operator+(Tensor a, double b)
 {

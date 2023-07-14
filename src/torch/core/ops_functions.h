@@ -18,6 +18,7 @@ TINYTORCH_API Tensor transpose(Tensor t, int64_t dim0, int64_t dim1);
 
 TINYTORCH_API void copy(Tensor src, Tensor target);
 
+
 TINYTORCH_API void fill(Tensor& t, double value);
 TINYTORCH_API void uniform(Tensor& t);
 TINYTORCH_API void uniform_int(Tensor& t, int low, int high);
@@ -28,8 +29,10 @@ inline std::pair<Tensor,Tensor> sort(Tensor t, int64_t a)
     return {};
 }
 
+TINYTORCH_API Tensor clone(Tensor a);
 
 TINYTORCH_API Tensor to(Tensor a, ScalarType other_type);
+TINYTORCH_API Tensor to(Tensor a, Device other_type);
 
 
 

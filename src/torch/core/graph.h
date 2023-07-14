@@ -15,6 +15,28 @@
 namespace tinytorch
 {
 
+
+struct TINYTORCH_API GradMode
+{
+    static bool is_enabled();
+    static void set_enabled(bool enabled);
+};
+
+// A RAII, thread local (!) guard that enables or disables grad mode upon
+// construction, and sets it back to the original value upon destruction.
+struct TINYTORCH_API AutoGradMode
+{
+    AutoGradMode(bool enabled) : prev_mode(GradMode::is_enabled()) { GradMode::set_enabled(enabled); }
+    ~AutoGradMode() { GradMode::set_enabled(prev_mode); }
+    bool prev_mode;
+};
+
+struct NoGradGuard : public AutoGradMode
+{
+    NoGradGuard() : AutoGradMode(/*enabled=*/false) {}
+};
+
+
 template <typename _Tp, typename... _Args>
 std::shared_ptr<_Tp> make_intrusive(_Args&&... __args)
 {
@@ -47,12 +69,15 @@ struct IValue
     IValue() {}
 
     IValue(bool b) : v_bool(b) {}
-    IValue(double d) :v_double(d) {}
+    IValue(double d) : v_double(d) {}
     IValue(int32_t i) : v_int64(i) {}
     IValue(int64_t i) : v_int64(i) {}
+    IValue(Tensor t) : v_tensor(t) {}
 
     template <typename T>
-    IValue(std::shared_ptr<T> i) : custom_class(i) {}
+    IValue(std::shared_ptr<T> i) : custom_class(i)
+    {
+    }
 
     template <typename T>
     std::shared_ptr<T> toCustomClass()
@@ -65,10 +90,12 @@ struct IValue
     bool toBool() { return v_bool; }
     double toDouble() { return v_double; }
     int64_t toInt() { return v_int64; }
+    Tensor toTensor() { return v_tensor; }
 
     bool v_bool;
     double v_double;
     int64_t v_int64;
+    Tensor v_tensor;
     std::shared_ptr<CustomClassHolder> custom_class;
 };
 
@@ -98,24 +125,39 @@ using variable_list   = std::vector<Tensor>;
 using Variable        = Tensor;
 
 
+template <typename TargetT>
 struct ExtractVariables
 {
     template <typename T, typename... Args>
-    static void apply(std::vector<Tensor>& output, T&& arg, Args&&... args)
+    static void apply(std::vector<TargetT>& output, T&& arg, Args&&... args)
     {
         check_tensor(output, arg);
         apply(output, args...);
     }
 
-    static void apply(std::vector<Tensor>& output) {}
+    static void apply(std::vector<TargetT>& output) {}
 
     template <typename T>
-    static void check_tensor(std::vector<Tensor>& output, const T& arg)
+    static void check_tensor(std::vector<TargetT>& output, const T& arg)
     {
     }
 
-    static void check_tensor(std::vector<Tensor>& output, const Tensor& arg) { output.push_back(arg); }
+    static void check_tensor(std::vector<TargetT>& output, const TargetT& arg) { output.push_back(arg); }
 };
+
+
+struct ToIValueList
+{
+    template <typename T, typename... Args>
+    static void apply(std::vector<IValue>& output, T&& arg, Args&&... args)
+    {
+        output.push_back(arg);
+        apply(output, args...);
+    }
+
+    static void apply(std::vector<IValue>& output) {}
+};
+
 
 
 struct Node
@@ -150,6 +192,7 @@ struct FunctionNode : public Node
 
     std::vector<Tensor> node_backward(const std::vector<Tensor>& fwd_output_grad) override
     {
+        NoGradGuard ngg;
         CHECK_EQ(fwd_output_grad.size(), num_input_gradients_of_backward);
 
         // backward
@@ -161,23 +204,32 @@ struct FunctionNode : public Node
     template <typename... Args>
     static std::vector<Tensor> forward_and_build_graph(Args&&... args)
     {
+        NoGradGuard ngg;
         // Create node and set next edge
         bool need_grad              = false;
         auto node                   = std::make_shared<FunctionNode<T>>();
         node->num_inputs_of_forward = sizeof...(Args);
 
-        std::vector<Tensor> t;
-        ExtractVariables::apply(t, args...);
-        // CHECK_EQ(t.size() , num_inputs);
-        for (int i = 0; i < t.size(); ++i)
+        std::vector<IValue> input_ivalues;
+        ToIValueList::apply(input_ivalues, args...);
+        CHECK_EQ(input_ivalues.size(), node->num_inputs_of_forward);
+        for (int i = 0; i < input_ivalues.size(); ++i)
         {
-            node->next.push_back(t[i].getEdge());
-            // if(node->next.)
-            if (t[i].requires_grad())
+            if (input_ivalues[i].v_tensor.defined())
             {
-                need_grad = true;
+                auto t = input_ivalues[i].toTensor();
+                node->next.push_back(t.getEdge());
+                if (t.requires_grad())
+                {
+                    need_grad = true;
+                }
+            }
+            else
+            {
+                node->next.push_back({});
             }
         }
+        CHECK_EQ(node->next.size(), node->num_inputs_of_forward);
 
         // Forward
         auto result                           = T::forward(&node->context, std::forward<Args>(args)...);
@@ -225,16 +277,8 @@ struct AccumulateGrad : public Node
 inline void MakeParameter(Tensor t)
 {
     t.set_requires_grad(true);
-    t.SetEdge(std::make_shared<Edge>(std::make_shared<autograd::AccumulateGrad>(t), 0));
 }
 
-struct NoGradGuard
-{
-    NoGradGuard() { throw std::runtime_error("not implemented"); }
-};
-struct AutoGradMode
-{
-    AutoGradMode(bool b) { throw std::runtime_error("not implemented"); }
-};
+
 
 }  // namespace tinytorch

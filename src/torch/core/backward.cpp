@@ -14,6 +14,7 @@ void backward(Tensor loss, Tensor grad)
     std::map<std::shared_ptr<autograd::Node>, std::vector<Tensor>> grad_map;
 
 
+    CHECK(loss.requires_grad());
     CHECK(loss.getEdge());
 
     // Start traversal at the root node
@@ -28,6 +29,7 @@ void backward(Tensor loss, Tensor grad)
     }
     else
     {
+        CHECK(false);
         CHECK_EQ(loss.numel(), 1);
         // The gradient of the final loss is 1
         Tensor one = full({1}, 1);
@@ -47,6 +49,9 @@ void backward(Tensor loss, Tensor grad)
         // backpropagate gradients
         auto next_gradients = current_node->node_backward(grad_map[current_node]);
 
+        CHECK_EQ(next_gradients.size(), current_node->num_inputs_of_forward);
+        CHECK_EQ(current_node->next.size(), current_node->num_inputs_of_forward);
+
         // Traverse to next nodes
         for (int i = 0; i < current_node->next.size(); ++i)
         {
@@ -54,15 +59,20 @@ void backward(Tensor loss, Tensor grad)
             if (next)
             {
                 auto next_node = next->function;
+                auto g = next_gradients[i];
+                CHECK(g.defined());
 
                 // Accumulate gradient
                 grad_map[next_node].resize(next_node->num_input_gradients_of_backward);
 
                 if (!grad_map[next_node][next->input_nr].defined())
                 {
-                    grad_map[next_node][next->input_nr] = zeros_like(next_gradients[next->input_nr]);
+                    // grad_map[next_node][next->input_nr] = zeros_like(next_gradients[next->input_nr]);
+                    grad_map[next_node][next->input_nr] = g.clone();
+                }else
+                {
+                    grad_map[next_node][next->input_nr] += g;
                 }
-                grad_map[next_node][next->input_nr] += next_gradients[next->input_nr];
 
                 // Add next node to the stack
                 node_stack.push_back(next->function);

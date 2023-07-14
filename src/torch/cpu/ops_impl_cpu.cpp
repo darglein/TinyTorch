@@ -16,6 +16,18 @@
 
 namespace tinytorch
 {
+
+void to_impl_cpu_cuda(Tensor a, Tensor b)
+{
+    CHECK(a.is_contiguous());
+    CHECK(b.is_contiguous());
+    int64_t bytes = a.element_size() * a.numel();
+    auto type     = (b.device() == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
+    cudaMemcpy(b.data_ptr(), a.data_ptr(), bytes, type);
+}
+
+
+
 #define CASE_MACRO(func, type, scalar_type, ...) \
     case scalar_type:                            \
         func<type>(__VA_ARGS__);                 \
@@ -250,8 +262,8 @@ static void mult_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result
 
         for (int64_t i = dims - 1; i > 0; --i)
         {
-            int64_t sa = a.sizes[i];
-            int64_t sb = b.sizes[i];
+            int64_t sa    = a.sizes[i];
+            int64_t sb    = b.sizes[i];
             int64_t max_s = std::max(sa, sb);
 
             offset_a += (sa == 0) ? 0 : ((linearId % sa) * a.strides[i]);
@@ -391,7 +403,7 @@ static void sum_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 
 Tensor sum_impl_cpu(Tensor a)
 {
-    Tensor result = zeros({1}, a.options());
+    Tensor result = zeros({1}, a.options().requires_grad(false));
     SWITCH_MACRO_ALL(a.scalar_type(), sum_impl_cpu, a, result);
     return result;
 }
@@ -633,7 +645,7 @@ Tensor min_impl_cpu(Tensor a, Tensor b)
 template <typename T>
 static void min_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
-    result[0] = std::numeric_limits<T>::max();
+    result[0] = std::numeric_limits<T>::infinity();
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         result[0] = std::min(a[i], result[0]);
@@ -664,11 +676,12 @@ Tensor max_impl_cpu(Tensor a, Tensor b)
 }
 
 template <typename T>
-static void minmax_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> indices, TensorInfo<T> result, bool calc_min)
+static void minmax_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> indices, TensorInfo<T> result,
+                            bool calc_min)
 {
     int64_t dims = input.dims;
 
-    int64_t size_along_dim = input.sizes[dim];
+    int64_t size_along_dim   = input.sizes[dim];
     int64_t stride_along_dim = input.strides[dim];
 
     for (int64_t i = 0; i < result.numel(); ++i)
@@ -694,14 +707,14 @@ static void minmax_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t
         T minmax_value       = calc_min ? std::numeric_limits<T>::max() : std::numeric_limits<T>::lowest();
         for (int64_t d = 0; d < size_along_dim; ++d)
         {
-            T value = input.data[offset];
+            T value  = input.data[offset];
             bool cmp = calc_min ? (value < minmax_value) : (value > minmax_value);
             if (cmp)
             {
                 minmax_value = value;
                 minmax_index = d;
             }
-            
+
             offset += stride_along_dim;
         }
 
@@ -722,7 +735,7 @@ std::pair<Tensor, Tensor> min_impl_cpu(Tensor input, int64_t dim, bool keepdim)
 
     if (!keepdim)
     {
-        result = result.squeeze(dim);
+        result  = result.squeeze(dim);
         indices = indices.squeeze(dim);
     }
 
@@ -787,7 +800,7 @@ Tensor abs_impl_cpu(Tensor a)
 template <typename T>
 static void max_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
-    result[0] = std::numeric_limits<T>::min();
+    result[0] = -std::numeric_limits<T>::infinity();
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         result[0] = std::max(a[i], result[0]);
@@ -910,8 +923,8 @@ Tensor index_add_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor data)
 template <typename T>
 static void repeat_interleave_impl_cpu(TensorInfo<T> input, int64_t count, TensorInfo<T> result)
 {
-    int64_t to_copy = input.numel() / input.sizes[0];
-    int64_t input_start = 0;
+    int64_t to_copy      = input.numel() / input.sizes[0];
+    int64_t input_start  = 0;
     int64_t output_start = 0;
     for (int64_t i = 0; i < input.sizes[0]; ++i)
     {
@@ -988,9 +1001,9 @@ static void transpose_impl_cpu(TensorInfo<T> input, int64_t dim0, int64_t dim1, 
 
     for (int64_t n = 0; n < input.numel(); ++n)
     {
-        int64_t linearId = n;
-        int64_t input_offset   = 0;
-        int64_t output_offset   = 0;
+        int64_t linearId      = n;
+        int64_t input_offset  = 0;
+        int64_t output_offset = 0;
 
         for (int64_t i = dims - 1; i > 0; --i)
         {
@@ -1012,7 +1025,7 @@ static void transpose_impl_cpu(TensorInfo<T> input, int64_t dim0, int64_t dim1, 
     }
 }
 
-Tensor transpose_impl_cpu(Tensor input, int64_t dim0, int64_t dim1) 
+Tensor transpose_impl_cpu(Tensor input, int64_t dim0, int64_t dim1)
 {
     SizeType new_sizes = input.sizes();
     std::swap(new_sizes[dim0], new_sizes[dim1]);
@@ -1406,7 +1419,10 @@ std::ostream& operator<<(std::ostream& strm, Tensor t)
 
 Tensor operator+=(Tensor a, Tensor b)
 {
+    CHECK(a.is_cpu());
+    CHECK(b.is_cpu());
     CHECK(!a.requires_grad());
+    CHECK_EQ(a.sizes() , b.sizes());
     SWITCH_MACRO_ALL(a.scalar_type(), add_impl_cpu, a, b, a);
     return a;
 }
@@ -1487,7 +1503,7 @@ static void from_double_cpu(TensorInfo<double> a, TensorInfo<T> result)
     }
 }
 
-Tensor to(Tensor a, ScalarType other_type)
+Tensor to_impl_cpu(Tensor a, ScalarType other_type)
 {
     Tensor t2 = empty_like(a, TensorOptions().dtype(kDouble));
     SWITCH_MACRO_ALL(a.scalar_type(), to_double_cpu, a, t2);
@@ -1506,11 +1522,12 @@ static void copy_cpu(TensorInfo<T> src, TensorInfo<T> dst)
     }
 }
 
-void copy(Tensor src, Tensor target)
+void copy_impl_cpu(Tensor src, Tensor target)
 {
     CHECK_EQ(src.numel(), target.numel());
     SWITCH_MACRO_ALL(src.scalar_type(), copy_cpu, src, target);
 }
+
 
 
 }  // namespace tinytorch

@@ -4,12 +4,11 @@
  * Licensed under the MIT License.
  * See LICENSE file for more information.
  */
-#include "torch/core/tensor.h"
-#include "../tiny_torch_cuda.h"
-
 #include "torch/core/backward.h"
 #include "torch/core/ops.h"
+#include "torch/core/tensor.h"
 
+#include "../tiny_torch_cuda.h"
 #include "torch/core/tensor_impl.h"
 
 namespace tinytorch
@@ -77,6 +76,7 @@ int64_t Tensor::dim() const
 }
 int64_t Tensor::size(int64_t index) const
 {
+    CHECK_LT(index, dim());
     return impl_->sizes_[index];
 }
 int64_t Tensor::stride(int64_t index) const
@@ -139,7 +139,7 @@ Tensor Tensor::view(const SizeType& sizes) const
             stride *= new_sizes[i];
         }
 
-        std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
+        std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(
             impl_->storage_, impl_->storage_offset_, std::move(new_sizes), std::move(new_strides), options());
 
         return Tensor(new_impl);
@@ -168,8 +168,8 @@ Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) cons
     auto new_strides = strides();
     new_strides[dim] *= step;
 
-    std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
-        impl_->storage_, impl_->storage_offset_ + offset, std::move(new_sizes), std::move(new_strides), options());
+    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_ + offset,
+                                                              std::move(new_sizes), std::move(new_strides), options());
 
     return Tensor(new_impl);
 }
@@ -191,8 +191,8 @@ Tensor Tensor::unsqueeze(int64_t dim) const
     std::vector<int64_t> new_strides = strides();
     new_strides.insert(std::next(new_strides.begin(), dim), stride_to_insert);
 
-    std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
-        impl_->storage_, impl_->storage_offset_, std::move(new_sizes), std::move(new_strides), options());
+    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_,
+                                                              std::move(new_sizes), std::move(new_strides), options());
 
     return Tensor(new_impl);
 }
@@ -212,8 +212,8 @@ Tensor Tensor::squeeze(int64_t dim) const
     std::vector<int64_t> new_strides = strides();
     new_strides.erase(std::next(new_strides.begin(), dim));
 
-    std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
-        impl_->storage_, impl_->storage_offset_, std::move(new_sizes), std::move(new_strides), options());
+    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_,
+                                                              std::move(new_sizes), std::move(new_strides), options());
 
     return Tensor(new_impl);
 }
@@ -231,8 +231,8 @@ Tensor Tensor::squeeze() const
     std::vector<int64_t> new_strides = strides();
     new_strides.erase(std::remove(new_strides.begin(), new_strides.end(), 1), new_strides.end());
 
-    std::shared_ptr<TensorImpl> new_impl = std::make_shared<TensorImpl>(
-        impl_->storage_, impl_->storage_offset_, std::move(new_sizes), std::move(new_strides), options());
+    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_,
+                                                              std::move(new_sizes), std::move(new_strides), options());
 
     return Tensor(new_impl);
 }
@@ -257,9 +257,7 @@ Tensor Tensor::contiguous() const
         return *this;
     }
 
-    Tensor result = empty_like(*this);
-    tinytorch::copy(*this, result);
-    return result;
+    return clone();
 }
 Tensor Tensor::to(ScalarType new_type) const
 {
@@ -276,27 +274,7 @@ Tensor Tensor::to(Device new_device) const
         return *this;
     }
 
-#ifdef TT_HAS_CUDA
-    if (device() == new_device)
-    {
-        return *this;
-    }
-
-    Tensor contig = contiguous();
-
-    int64_t bytes = element_size() * numel();
-
-    auto new_storage = std::make_shared<StorageImpl>(bytes, new_device);
-    auto new_impl =
-        std::make_shared<TensorImpl>(new_storage, 0, contig.sizes(), contig.strides(), options().device(new_device));
-
-    auto type = (new_device == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
-    cudaMemcpy(new_impl->data_ptr(), contig.data_ptr(), bytes, type);
-
-    return Tensor(new_impl);
-#else
-    CHECK(false);
-#endif
+    return tinytorch::to(*this, new_device);
 }
 Tensor Tensor::sum() const
 {
@@ -310,7 +288,7 @@ Tensor Tensor::std() const
 {
     return tinytorch::std(*this);
 }
-Tensor Tensor::abs() const 
+Tensor Tensor::abs() const
 {
     return tinytorch::abs(*this);
 }
@@ -338,9 +316,7 @@ Tensor Tensor::transpose(int64_t dim0, int64_t dim1)
 }
 Tensor Tensor::clone() const
 {
-    Tensor result = empty_like(*this);
-    tinytorch::copy(*this, result);
-    return result;
+    return tinytorch::clone(*this);
 }
 void Tensor::copy_(Tensor a)
 {
@@ -358,7 +334,7 @@ std::pair<Tensor, Tensor> Tensor::min(int64_t dim, bool keepdim) const
 {
     return tinytorch::min(*this, dim, keepdim);
 }
-std::pair<Tensor, Tensor> Tensor::max(int64_t dim, bool keepdim) const 
+std::pair<Tensor, Tensor> Tensor::max(int64_t dim, bool keepdim) const
 {
     return tinytorch::max(*this, dim, keepdim);
 }

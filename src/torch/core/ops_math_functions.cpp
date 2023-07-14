@@ -67,41 +67,50 @@ Tensor sum(Tensor a)
 
 Tensor min(Tensor a)
 {
+    CHECK(!a.requires_grad());
     return min_impl_cpu(a);
 }
 Tensor max(Tensor a)
 {
+    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
     return max_impl_cpu(a);
 }
 std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
 {
+    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
     return min_impl_cpu(a, dim, keepdim);
 }
 std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
 {
+    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
     return max_impl_cpu(a, dim, keepdim);
 }
 Tensor min(Tensor a, Tensor b)
 {
+    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
     return min_impl_cpu(a, b);
 }
 Tensor max(Tensor a, Tensor b)
 {
+    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
     return max_impl_cpu(a, b);
 }
 
 Tensor mean(Tensor a)
 {
+    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
     return sum(a) / (double)a.numel(); // TODO: This is not safe for small datatypes, which might overflow in the sum.
 }
 
 Tensor std(Tensor a)
 {
+    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
     return std_impl_cpu(a);
 }
 
 Tensor abs(Tensor a) 
 {
+    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
     return abs_impl_cpu(a);
 }
 

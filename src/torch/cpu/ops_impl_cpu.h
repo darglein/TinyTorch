@@ -11,6 +11,9 @@
 #include "torch/tiny_torch_config.h"
 namespace tinytorch
 {
+
+void to_impl_cpu_cuda(Tensor a, Tensor b);
+
 // Internal implementation of forward/backward
 // Should NOT be called by the user
 void range_impl_cpu(Tensor a, double start, double end, double step);
@@ -54,6 +57,9 @@ Tensor index_add_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor data);
 Tensor repeat_interleave_impl_cpu(Tensor input, int64_t count);
 Tensor stack_impl_cpu(const std::vector<Tensor>& tensors);
 Tensor transpose_impl_cpu(Tensor input, int64_t dim0, int64_t dim1);
+Tensor to_impl_cpu(Tensor a, ScalarType other_type);
+void copy_impl_cpu(Tensor src, Tensor target);
+
 std::vector<Tensor> square_backward_impl_cpu(Tensor a, Tensor grad_output);
 std::vector<Tensor> add_backward_impl_cpu(Tensor grad_output);
 std::vector<Tensor> sub_backward_impl_cpu(Tensor grad_output);

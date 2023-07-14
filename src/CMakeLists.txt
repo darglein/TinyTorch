@@ -1,6 +1,5 @@
 
 
-
 add_library(torch SHARED "")
 target_include_directories(torch PUBLIC ".")
 
@@ -14,6 +13,7 @@ target_link_libraries(torch PUBLIC glog::glog)
 
 if (TT_HAS_CUDA)
     target_link_libraries(torch PUBLIC CUDA::cudart)
+    set_target_properties(torch PROPERTIES CUDA_ARCHITECTURES "72;72-virtual")
 endif ()
 
 

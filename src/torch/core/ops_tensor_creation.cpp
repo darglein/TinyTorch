@@ -25,7 +25,12 @@ namespace tinytorch
 
 Tensor empty(const SizeType& sizes, TensorOptions options)
 {
-    Tensor t(std::make_shared<TensorImpl>(sizes, options));
+    if (!GradMode::is_enabled())
+    {
+        options.requires_grad_ = false;
+    }
+    Tensor t(TensorImpl::create(sizes, options));
+    t.set_requires_grad(options.requires_grad_);
     return t;
 }
 
@@ -143,14 +148,16 @@ Tensor rand_like(Tensor t)
 }
 Tensor from_blob(void* data, const SizeType& sizes, const SizeType& stride, TensorOptions options)
 {
+    CHECK(options.requires_grad_ == false);
     int64_t size = sizes.numel() * elementSize(options.dtype_);
     auto storage = std::make_shared<StorageImpl>(data, size, options.device_);
 
-    Tensor t(std::make_shared<TensorImpl>(storage, 0, sizes, stride, options));
+    Tensor t(TensorImpl::create(storage, 0, sizes, stride, options));
     return t;
 }
 Tensor from_blob(void* data, const SizeType& sizes, TensorOptions options)
 {
+    CHECK(options.requires_grad_ == false);
     return from_blob(data, sizes, CompactStrideForSize(sizes), options);
 }
 Tensor from_blob(void* data, const SizeType& sizes, ScalarType type)
