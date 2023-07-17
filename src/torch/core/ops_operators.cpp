@@ -77,9 +77,18 @@ struct DivNode : public FunctionNode<DivNode>
     {
         auto l = ctx->get_saved_variables();
 
+#if 0
         auto grad_a = empty_like(l[0]);
         auto grad_b = empty_like(l[1]);
         div_backward_impl_cpu(l[0], l[1], grad[0], grad_a, grad_b);
+#else
+        auto a = l[0];
+        auto b = l[1];
+        auto g = grad[0];
+        auto grad_a = 1.0 / b * g;
+        auto grad_b = -a / (b * b) * g;
+
+#endif
         return {grad_a, grad_b};
     }
 };
@@ -102,17 +111,12 @@ struct MultNode : public FunctionNode<MultNode>
         auto b = l[1];
         auto g = grad[0];
         CHECK(!g.requires_grad());
-#if 0
-        auto grad_a = empty_like(a);
-        auto grad_b = empty_like(b);
-        mult_backward_impl_cpu(a,b, grad[0], grad_a, grad_b);
-#else
+
         CHECK(!GradMode::is_enabled());
         auto grad_a = g * b;
         auto grad_b = g * a;
         CHECK(!grad_a.requires_grad());
         CHECK(!grad_b.requires_grad());
-#endif
         return {grad_a, grad_b};
     }
 };
@@ -132,8 +136,12 @@ struct DivScalarTensorNode : public FunctionNode<DivScalarTensorNode>
     {
         double a    = ctx->saved_data["a"].toDouble();
         auto l      = ctx->get_saved_variables();
-        auto grad_b = empty_like(l[0]);
-        div_backward_impl_cpu(a, l[0], grad[0], grad_b);
+        auto b = l[0];
+        auto g = grad[0];
+
+        auto grad_b = -a / (b * b) * g;
+        // auto grad_b = empty_like(l[0]);
+        // div_backward_impl_cpu(a, l[0], grad[0], grad_b);
         return {{}, grad_b};
     }
 };
@@ -153,8 +161,7 @@ struct MultTensorScalarNode : public FunctionNode<MultTensorScalarNode>
     {
         double b    = ctx->saved_data["b"].toDouble();
         auto l      = ctx->get_saved_variables();
-        auto grad_a = empty_like(l[0]);
-        mult_backward_impl_cpu(l[0], b, grad[0], grad_a);
+        auto grad_a = b * grad[0];
         return {grad_a, {}};
     }
 };

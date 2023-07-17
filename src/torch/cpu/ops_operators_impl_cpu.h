@@ -27,10 +27,4 @@ void equal_impl_cpu(Tensor a, double b, Tensor& result);
 void less_impl_cpu(Tensor a, double b, Tensor& result);
 void greater_impl_cpu(Tensor a, double b, Tensor& result);
 
-// basic operators
-void mult_backward_impl_cpu(Tensor a, Tensor b, Tensor grad_output, Tensor& grad_a, Tensor& grad_b);
-void mult_backward_impl_cpu(Tensor a, double b, Tensor grad_output, Tensor& grad_a); // Returns only one gradient, the one for the tensor.
-void div_backward_impl_cpu(Tensor a, Tensor b, Tensor grad_output, Tensor& grad_a, Tensor& grad_b);
-void div_backward_impl_cpu(double a, Tensor b, Tensor grad_output, Tensor& grad_a); // Returns only one gradient, the one for the tensor.
-
 }  // namespace tinytorch
