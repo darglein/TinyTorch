@@ -97,10 +97,22 @@ struct MultNode : public FunctionNode<MultNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto l      = ctx->get_saved_variables();
-        auto grad_a = empty_like(l[0]);
-        auto grad_b = empty_like(l[1]);
-        mult_backward_impl_cpu(l[0], l[1], grad[0], grad_a, grad_b);
+        auto l = ctx->get_saved_variables();
+        auto a = l[0];
+        auto b = l[1];
+        auto g = grad[0];
+        CHECK(!g.requires_grad());
+#if 0
+        auto grad_a = empty_like(a);
+        auto grad_b = empty_like(b);
+        mult_backward_impl_cpu(a,b, grad[0], grad_a, grad_b);
+#else
+        CHECK(!GradMode::is_enabled());
+        auto grad_a = g * b;
+        auto grad_b = g * a;
+        CHECK(!grad_a.requires_grad());
+        CHECK(!grad_b.requires_grad());
+#endif
         return {grad_a, grad_b};
     }
 };

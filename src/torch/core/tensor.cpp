@@ -417,6 +417,7 @@ Tensor Tensor::detach() const
 Tensor& Tensor::uniform_(double mi, double ma)
 {
     tinytorch::uniform(*this, mi, ma);
+    return *this;
 }
 Tensor Tensor::square() const
 {
