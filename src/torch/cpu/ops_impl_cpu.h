@@ -15,26 +15,9 @@ namespace tinytorch
 void print_impl_cpu(std::ostream& strm, Tensor t);
 void to_impl_cpu_cuda(Tensor a, Tensor b);
 
-// Internal implementation of forward/backward
-// Should NOT be called by the user
 void range_impl_cpu(Tensor a, double start, double end, double step);
 void fill_impl_cpu(Tensor a, double value);
 Tensor square_impl_cpu(Tensor a);
-
-// basic operators
-void add_impl_cpu(Tensor a, Tensor b, Tensor& result);
-void add_impl_cpu(Tensor a, double b, Tensor& result);
-void sub_impl_cpu(Tensor a, Tensor b, Tensor& result);
-void mult_impl_cpu(Tensor a, Tensor b, Tensor& result);
-void mult_impl_cpu(Tensor a, double b, Tensor& result);
-void div_impl_cpu(Tensor a, Tensor b, Tensor& result);
-void div_impl_cpu(double a, Tensor b, Tensor& result);
-
-// comparison operators (no grad needed)
-void equal_impl_cpu(Tensor a, double b, Tensor& result);
-void less_impl_cpu(Tensor a, double b, Tensor& result);
-void greater_impl_cpu(Tensor a, double b, Tensor& result);
-
 Tensor sum_impl_cpu(Tensor a);
 Tensor log_impl_cpu(Tensor a);
 Tensor log1p_impl_cpu(Tensor a);
@@ -65,14 +48,6 @@ void copy_impl_cpu(Tensor src, Tensor target);
 void clamp_impl_cpu_(Tensor& a, double low, double high);
 
 std::vector<Tensor> square_backward_impl_cpu(Tensor a, Tensor grad_output);
-
-// basic operators
-std::vector<Tensor> add_backward_impl_cpu(Tensor grad_output);
-std::vector<Tensor> sub_backward_impl_cpu(Tensor grad_output);
-std::vector<Tensor> mult_backward_impl_cpu(Tensor a, Tensor b, Tensor grad_output);
-std::vector<Tensor> mult_backward_impl_cpu(Tensor a, double b, Tensor grad_output); // Returns only one gradient, the one for the tensor.
-std::vector<Tensor> div_backward_impl_cpu(Tensor a, Tensor b, Tensor grad_output);
-std::vector<Tensor> div_backward_impl_cpu(double a, Tensor b, Tensor grad_output); // Returns only one gradient, the one for the tensor.
 
 
 std::vector<Tensor> sum_backward_impl_cpu(const SizeType& input_sizes, Tensor grad_output);

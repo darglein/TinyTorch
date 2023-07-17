@@ -13,8 +13,6 @@ namespace tinytorch
 {
 TINYTORCH_API std::ostream& operator<<(std::ostream& strm, Tensor t);
 
-// Basic Tensor Math operators
-// These operators should be called by the user and support Auto-Diff
 TINYTORCH_API Tensor operator+(Tensor a, Tensor b);
 TINYTORCH_API Tensor operator+(Tensor a, double b);
 TINYTORCH_API Tensor operator+(double a, Tensor b);
@@ -44,7 +42,4 @@ TINYTORCH_API Tensor operator*=(Tensor a, Tensor b);
 TINYTORCH_API Tensor operator*=(Tensor a, double b);
 TINYTORCH_API Tensor operator/=(Tensor a, Tensor b);
 TINYTORCH_API Tensor operator/=(Tensor a, double b);
-
-
-
 }  // namespace tinytorch

@@ -9,6 +9,7 @@
 #include "graph.h"
 
 #include "torch/cpu/ops_impl_cpu.h"
+#include "torch/cpu/ops_operators_impl_cpu.h"
 
 namespace tinytorch
 {
@@ -37,8 +38,9 @@ struct AddNode : public FunctionNode<AddNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto grad_a = add_backward_impl_cpu(grad[0]);
-        return grad_a;
+        auto grad_a = grad[0].clone();
+        auto grad_b = grad[0].clone();
+        return {grad_a, grad_b};
     }
 };
 
@@ -54,8 +56,9 @@ struct SubNode : public FunctionNode<SubNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto grad_a = sub_backward_impl_cpu(grad[0]);
-        return grad_a;
+        auto grad_a = grad[0].clone();
+        auto grad_b = -grad[0].clone();
+        return {grad_a, grad_b};
     }
 };
 
@@ -73,7 +76,11 @@ struct DivNode : public FunctionNode<DivNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         auto l = ctx->get_saved_variables();
-        return div_backward_impl_cpu(l[0], l[1], grad[0]);
+
+        auto grad_a = empty_like(l[0]);
+        auto grad_b = empty_like(l[1]);
+        div_backward_impl_cpu(l[0], l[1], grad[0], grad_a, grad_b);
+        return {grad_a, grad_b};
     }
 };
 
@@ -91,8 +98,10 @@ struct MultNode : public FunctionNode<MultNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         auto l      = ctx->get_saved_variables();
-        auto grad_a = mult_backward_impl_cpu(l[0], l[1], grad[0]);
-        return grad_a;
+        auto grad_a = empty_like(l[0]);
+        auto grad_b = empty_like(l[1]);
+        mult_backward_impl_cpu(l[0], l[1], grad[0], grad_a, grad_b);
+        return {grad_a, grad_b};
     }
 };
 
@@ -111,8 +120,9 @@ struct DivScalarTensorNode : public FunctionNode<DivScalarTensorNode>
     {
         double a    = ctx->saved_data["a"].toDouble();
         auto l      = ctx->get_saved_variables();
-        auto grad_a = div_backward_impl_cpu(a, l[0], grad[0]);
-        return {{}, grad_a[0]};
+        auto grad_b = empty_like(l[0]);
+        div_backward_impl_cpu(a, l[0], grad[0], grad_b);
+        return {{}, grad_b};
     }
 };
 
@@ -131,8 +141,9 @@ struct MultTensorScalarNode : public FunctionNode<MultTensorScalarNode>
     {
         double b    = ctx->saved_data["b"].toDouble();
         auto l      = ctx->get_saved_variables();
-        auto grad_a = mult_backward_impl_cpu(l[0], b, grad[0]);
-        return {grad_a[0], {}};
+        auto grad_a = empty_like(l[0]);
+        mult_backward_impl_cpu(l[0], b, grad[0], grad_a);
+        return {grad_a, {}};
     }
 };
 
