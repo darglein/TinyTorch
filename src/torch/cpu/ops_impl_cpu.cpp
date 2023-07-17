@@ -11,7 +11,9 @@
 
 #include "torch/core/ops_functions.h"
 #include "torch/core/ops_impl_shared.h"
+#include "torch/core/ops_operators.h"
 #include "torch/core/tensor_info.h"
+
 
 
 namespace tinytorch
@@ -163,11 +165,9 @@ static void add_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
     }
 }
 
-Tensor add_impl_cpu(Tensor a, Tensor b)
+void add_impl_cpu(Tensor a, Tensor b, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), add_impl_cpu, a, b, result);
-    return result;
 }
 
 template <typename T>
@@ -179,27 +179,9 @@ static void add_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
     }
 }
 
-Tensor add_impl_cpu(Tensor a, double b)
+void add_impl_cpu(Tensor a, double b, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), add_impl_cpu, a, b, result);
-    return result;
-}
-
-template <typename T>
-static void add_impl_cpu(double a, TensorInfo<T> b, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < b.numel(); ++i)
-    {
-        result[i] = T(a + b[i]);
-    }
-}
-
-Tensor add_impl_cpu(double a, Tensor b)
-{
-    Tensor result = empty_like(b);
-    SWITCH_MACRO_ALL(b.scalar_type(), add_impl_cpu, a, b, result);
-    return result;
 }
 
 template <typename T>
@@ -211,44 +193,11 @@ static void sub_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
     }
 }
 
-Tensor sub_impl_cpu(Tensor a, Tensor b)
+void sub_impl_cpu(Tensor a, Tensor b, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), sub_impl_cpu, a, b, result);
-    return result;
 }
 
-template <typename T>
-static void sub_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[i] = T(a[i] - b);
-    }
-}
-
-Tensor sub_impl_cpu(Tensor a, double b)
-{
-    Tensor result = empty_like(a);
-    SWITCH_MACRO_ALL(a.scalar_type(), sub_impl_cpu, a, b, result);
-    return result;
-}
-
-template <typename T>
-static void sub_impl_cpu(double a, TensorInfo<T> b, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < b.numel(); ++i)
-    {
-        result[i] = T(a - b[i]);
-    }
-}
-
-Tensor sub_impl_cpu(double a, Tensor b)
-{
-    Tensor result = empty_like(b);
-    SWITCH_MACRO_ALL(b.scalar_type(), sub_impl_cpu, a, b, result);
-    return result;
-}
 
 template <typename T>
 static void mult_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
@@ -282,11 +231,11 @@ static void mult_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result
     }
 }
 
-Tensor mult_impl_cpu(Tensor a, Tensor b)
+void mult_impl_cpu(Tensor a, Tensor b, Tensor& result)
 {
-    Tensor result = empty(max_size(a, b), a.options());
+    // Tensor result = empty(max_size(a, b), a.options());
     SWITCH_MACRO_ALL(a.scalar_type(), mult_impl_cpu, a, b, result);
-    return result;
+    // return result;
 }
 
 template <typename T>
@@ -298,28 +247,11 @@ static void mult_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
     }
 }
 
-Tensor mult_impl_cpu(Tensor a, double b)
+void mult_impl_cpu(Tensor a, double b, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), mult_impl_cpu, a, b, result);
-    return result;
 }
 
-template <typename T>
-static void mult_impl_cpu(double a, TensorInfo<T> b, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < b.numel(); ++i)
-    {
-        result[i] = T(a * b[i]);
-    }
-}
-
-Tensor mult_impl_cpu(double a, Tensor b)
-{
-    Tensor result = empty_like(b);
-    SWITCH_MACRO_ALL(b.scalar_type(), mult_impl_cpu, a, b, result);
-    return result;
-}
 
 template <typename T>
 static void div_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
@@ -330,11 +262,9 @@ static void div_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
     }
 }
 
-Tensor div_impl_cpu(Tensor a, Tensor b)
+void div_impl_cpu(Tensor a, Tensor b, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), div_impl_cpu, a, b, result);
-    return result;
 }
 
 template <typename T>
@@ -355,46 +285,12 @@ static void div_impl_cpu(double a, TensorInfo<T> b, TensorInfo<T> result)
         result[i] = T(a / b[i]);
     }
 }
-Tensor div_impl_cpu(double a, Tensor b)
+void div_impl_cpu(double a, Tensor b, Tensor& result)
 {
-    Tensor result = empty_like(b);
     SWITCH_MACRO_ALL(b.scalar_type(), div_impl_cpu, a, b, result);
-    return result;
-}
-
-Tensor div_impl_cpu(Tensor a, double b)
-{
-    Tensor result = empty_like(a);
-    SWITCH_MACRO_ALL(a.scalar_type(), div_impl_cpu, a, b, result);
-    return result;
 }
 
 
-template <typename T>
-static void equals_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[i] = T(a[i] == b);
-    }
-}
-
-
-template <typename T>
-static void neg_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[0] = -a[i];
-    }
-}
-
-Tensor neg_impl_cpu(Tensor a)
-{
-    Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), neg_impl_cpu, a, result);
-    return result;
-}
 
 template <typename T>
 static void sum_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
@@ -1406,6 +1302,7 @@ std::vector<Tensor> max_backward_impl_cpu(Tensor grad_output)
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), one_backward_impl_cpu, grad_output, grad_a, grad_b);
     return {grad_a, grad_b};
 }
+
 template <typename T>
 void print_impl_cpu(std::ostream& strm, TensorInfo<T> a)
 {
@@ -1414,79 +1311,49 @@ void print_impl_cpu(std::ostream& strm, TensorInfo<T> a)
         strm << a[i] << " ";
     }
 }
-
-std::ostream& operator<<(std::ostream& strm, Tensor t)
+void print_impl_cpu(std::ostream& strm, Tensor t)
 {
     print_impl_cpu<float>(strm, t);
-    return strm;
 }
 
-Tensor operator+=(Tensor a, Tensor b)
+template <typename T>
+static void equals_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
 {
-    CHECK(a.is_cpu());
-    CHECK(b.is_cpu());
-    CHECK(!a.requires_grad());
-    CHECK_EQ(a.sizes(), b.sizes());
-    SWITCH_MACRO_ALL(a.scalar_type(), add_impl_cpu, a, b, a);
-    return a;
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(a[i] == b);
+    }
+}
+template <typename T>
+static void less_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(a[i] < b);
+    }
+}
+template <typename T>
+static void greater_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(a[i] > b);
+    }
 }
 
-Tensor operator+=(Tensor a, double b)
+void equal_impl_cpu(Tensor a, double b, Tensor& result)
 {
-    CHECK(!a.requires_grad());
-    SWITCH_MACRO_ALL(a.scalar_type(), add_impl_cpu, a, b, a);
-    return a;
+    SWITCH_MACRO_ALL(a.scalar_type(), equals_impl_cpu, a, b, result);
+}
+void less_impl_cpu(Tensor a, double b, Tensor& result)
+{
+    SWITCH_MACRO_ALL(a.scalar_type(), less_impl_cpu, a, b, result);
+}
+void greater_impl_cpu(Tensor a, double b, Tensor& result)
+{
+    SWITCH_MACRO_ALL(a.scalar_type(), greater_impl_cpu, a, b, result);
 }
 
-Tensor operator-=(Tensor a, Tensor b)
-{
-    CHECK(!a.requires_grad());
-    SWITCH_MACRO_ALL(a.scalar_type(), sub_impl_cpu, a, b, a);
-    return a;
-}
-
-Tensor operator-=(Tensor a, double b)
-{
-    CHECK(!a.requires_grad());
-    SWITCH_MACRO_ALL(a.scalar_type(), sub_impl_cpu, a, b, a);
-    return a;
-}
-
-Tensor operator*=(Tensor a, Tensor b)
-{
-    CHECK(!a.requires_grad());
-    SWITCH_MACRO_ALL(a.scalar_type(), mult_impl_cpu, a, b, a);
-    return a;
-}
-
-Tensor operator*=(Tensor a, double b)
-{
-    CHECK(!a.requires_grad());
-    SWITCH_MACRO_ALL(a.scalar_type(), mult_impl_cpu, a, b, a);
-    return a;
-}
-
-Tensor operator/=(Tensor a, Tensor b)
-{
-    CHECK(!a.requires_grad());
-    SWITCH_MACRO_ALL(a.scalar_type(), div_impl_cpu, a, b, a);
-    return a;
-}
-
-Tensor operator/=(Tensor a, double b)
-{
-    CHECK(!a.requires_grad());
-    SWITCH_MACRO_ALL(a.scalar_type(), div_impl_cpu, a, b, a);
-    return a;
-}
-
-Tensor operator==(Tensor a, double b)
-{
-    CHECK(!a.requires_grad());
-    Tensor t2 = empty_like(a);
-    SWITCH_MACRO_ALL(a.scalar_type(), equals_impl_cpu, a, b, t2);
-    return t2;
-}
 
 
 template <typename T>
@@ -1535,7 +1402,7 @@ void copy_impl_cpu(Tensor src, Tensor target)
 template <typename T>
 static void clamp_impl_cpu_(TensorInfo<T> src, double low, double high)
 {
-    T low_t = std::isfinite(low) ? low : std::numeric_limits<T>::lowest();
+    T low_t  = std::isfinite(low) ? low : std::numeric_limits<T>::lowest();
     T high_t = std::isfinite(high) ? high : std::numeric_limits<T>::max();
 
     for (int64_t i = 0; i < src.numel(); ++i)

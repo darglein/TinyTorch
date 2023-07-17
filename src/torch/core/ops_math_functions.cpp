@@ -60,20 +60,6 @@ Tensor square(Tensor a)
     return SquareNode::forward_and_build_graph(a)[0];
 }
 
-Tensor sum(Tensor a)
-{
-    return SumNode::forward_and_build_graph(a)[0];
-}
-
-Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-Tensor sum(Tensor a, SizeType s)
-{
-    throw std::runtime_error("not implemented");
-}
 
 
 Tensor min(Tensor a)
@@ -106,6 +92,22 @@ Tensor max(Tensor a, Tensor b)
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     return max_impl_cpu(a, b);
 }
+
+Tensor sum(Tensor a)
+{
+    return SumNode::forward_and_build_graph(a)[0];
+}
+
+Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
+Tensor sum(Tensor a, SizeType s)
+{
+    throw std::runtime_error("not implemented");
+}
+
 
 Tensor mean(Tensor a)
 {

@@ -12,6 +12,16 @@
 
 namespace tinytorch
 {
+
+
+std::ostream& operator<<(std::ostream& strm, Tensor t)
+{
+    print_impl_cpu(strm, t);
+    return strm;
+}
+
+
+
 namespace autograd
 {
 
@@ -19,7 +29,9 @@ struct AddNode : public FunctionNode<AddNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
-        auto result = add_impl_cpu(a, b);
+        CHECK_EQ(a.sizes(), b.sizes());
+        auto result = empty_like(a);
+        add_impl_cpu(a, b, result);
         return {result};
     }
 
@@ -34,7 +46,9 @@ struct SubNode : public FunctionNode<SubNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
-        auto result = sub_impl_cpu(a, b);
+        CHECK_EQ(a.sizes(), b.sizes());
+        auto result = empty_like(a);
+        sub_impl_cpu(a, b, result);
         return {result};
     }
 
@@ -49,8 +63,10 @@ struct DivNode : public FunctionNode<DivNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
+        CHECK_EQ(a.sizes(), b.sizes());
+        auto result = empty_like(a);
         ctx->save_for_backward({a, b});
-        auto result = div_impl_cpu(a, b);
+        div_impl_cpu(a, b, result);
         return {result};
     }
 
@@ -65,8 +81,10 @@ struct MultNode : public FunctionNode<MultNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
+        CHECK_EQ(a.sizes(), b.sizes());
+        auto result = empty_like(a);
         ctx->save_for_backward({a, b});
-        auto result = mult_impl_cpu(a, b);
+        mult_impl_cpu(a, b, result);
         return {result};
     }
 
@@ -82,9 +100,10 @@ struct DivScalarTensorNode : public FunctionNode<DivScalarTensorNode>
 {
     static std::vector<Tensor> forward(Context* ctx, double a, Tensor b)
     {
+        auto result          = empty_like(b);
         ctx->saved_data["a"] = a;
         ctx->save_for_backward({b});
-        auto result = div_impl_cpu(a, b);
+        div_impl_cpu(a, b, result);
         return {result};
     }
 
@@ -101,9 +120,10 @@ struct MultTensorScalarNode : public FunctionNode<MultTensorScalarNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, double b)
     {
+        auto result          = empty_like(a);
         ctx->saved_data["b"] = b;
         ctx->save_for_backward({a});
-        auto result = mult_impl_cpu(a, b);
+        mult_impl_cpu(a, b, result);
         return {result};
     }
 
@@ -121,10 +141,11 @@ struct AddTensorScalarNode : public FunctionNode<AddTensorScalarNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, double b)
     {
+        auto result          = empty_like(a);
         ctx->saved_data["b"] = b;
         ctx->save_for_backward({a});
 
-        auto result = add_impl_cpu(a, b);
+        add_impl_cpu(a, b, result);
         return {result};
     }
 
@@ -152,7 +173,7 @@ Tensor operator/(Tensor a, double b)
 
 Tensor operator/(double a, Tensor b)
 {
-    return DivScalarTensorNode::apply(a,b)[0];
+    return DivScalarTensorNode::apply(a, b)[0];
 }
 
 
@@ -199,4 +220,71 @@ Tensor operator+(Tensor a, double b)
 {
     return AddTensorScalarNode::forward_and_build_graph(a, b)[0];
 }
+Tensor operator+(double a, Tensor b)
+{
+    return b + a;
+}
+
+
+// ============================================================================
+
+Tensor operator==(Tensor a, double b)
+{
+    auto result = empty_like(a);
+    equal_impl_cpu(a, b, result);
+    return result;
+}
+
+Tensor operator<(Tensor a, double b)
+{
+    auto result = empty_like(a);
+    less_impl_cpu(a, b, result);
+    return result;
+}
+Tensor operator>(Tensor a, double b)
+{
+    auto result = empty_like(a);
+    greater_impl_cpu(a, b, result);
+    return result;
+}
+
+
+Tensor operator+=(Tensor a, Tensor b)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    add_impl_cpu(a, b, a);
+    return a;
+}
+Tensor operator+=(Tensor a, double b)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    add_impl_cpu(a, b, a);
+    return a;
+}
+Tensor operator-=(Tensor a, Tensor b)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    sub_impl_cpu(a, b, a);
+    return a;
+}
+Tensor operator*=(Tensor a, Tensor b)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    mult_impl_cpu(a, b, a);
+    return a;
+}
+Tensor operator*=(Tensor a, double b)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    mult_impl_cpu(a, b, a);
+    return a;
+}
+Tensor operator/=(Tensor a, Tensor b)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    div_impl_cpu(a, b, a);
+    return a;
+}
+
+
 }  // namespace tinytorch
