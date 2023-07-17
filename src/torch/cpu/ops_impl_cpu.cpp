@@ -130,7 +130,7 @@ static void rand_int_impl_cpu(TensorInfo<T> t, std::mt19937& mersenne_engine, in
 void uniform(Tensor& t, double mi, double ma)
 {
     static std::mt19937 mersenne_engine{572547235};
-    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl_cpu, t, mersenne_engine, mi, ma);
+    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl_cpu, t, mersenne_engine, (float)mi, (float)ma);
 }
 void uniform_int(Tensor& t, int low, int high)
 {
@@ -1085,8 +1085,8 @@ void copy_impl_cpu(Tensor src, Tensor target)
 template <typename T>
 static void clamp_impl_cpu_(TensorInfo<T> src, double low, double high)
 {
-    T low_t  = std::isfinite(low) ? low : std::numeric_limits<T>::lowest();
-    T high_t = std::isfinite(high) ? high : std::numeric_limits<T>::max();
+    T low_t  = std::isfinite(low) ? T(low) : std::numeric_limits<T>::lowest();
+    T high_t = std::isfinite(high) ? T(high) : std::numeric_limits<T>::max();
 
     for (int64_t i = 0; i < src.numel(); ++i)
     {
