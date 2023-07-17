@@ -204,34 +204,38 @@ struct FunctionNode : public Node
     template <typename... Args>
     static std::vector<Tensor> forward_and_build_graph(Args&&... args)
     {
-        NoGradGuard ngg;
         // Create node and set next edge
         bool need_grad              = false;
         auto node                   = std::make_shared<FunctionNode<T>>();
         node->num_inputs_of_forward = sizeof...(Args);
 
-        std::vector<IValue> input_ivalues;
-        ToIValueList::apply(input_ivalues, args...);
-        CHECK_EQ(input_ivalues.size(), node->num_inputs_of_forward);
-        for (int i = 0; i < input_ivalues.size(); ++i)
+        if (GradMode::is_enabled())
         {
-            if (input_ivalues[i].v_tensor.defined())
+            std::vector<IValue> input_ivalues;
+            ToIValueList::apply(input_ivalues, args...);
+            CHECK_EQ(input_ivalues.size(), node->num_inputs_of_forward);
+            for (int i = 0; i < input_ivalues.size(); ++i)
             {
-                auto t = input_ivalues[i].toTensor();
-                node->next.push_back(t.getEdge());
-                if (t.requires_grad())
+                if (input_ivalues[i].v_tensor.defined())
                 {
-                    need_grad = true;
+                    auto t = input_ivalues[i].toTensor();
+                    node->next.push_back(t.getEdge());
+                    if (t.requires_grad())
+                    {
+                        need_grad = true;
+                    }
+                }
+                else
+                {
+                    node->next.push_back({});
                 }
             }
-            else
-            {
-                node->next.push_back({});
-            }
+            CHECK_EQ(node->next.size(), node->num_inputs_of_forward);
         }
-        CHECK_EQ(node->next.size(), node->num_inputs_of_forward);
 
         // Forward
+
+        NoGradGuard ngg;
         auto result                           = T::forward(&node->context, std::forward<Args>(args)...);
         node->num_input_gradients_of_backward = result.size();
 

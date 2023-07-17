@@ -25,6 +25,7 @@ int main()
     auto model = [&](tinytorch::Tensor x) -> tinytorch::Tensor
     {
         x = x + params[0] + 5;
+        x = x / params[0] ;
         x = x * -params[0];
         x = x + params[1] + 5;
         x = x * params[2] * -1.;
