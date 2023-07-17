@@ -380,5 +380,98 @@ void Tensor::backward(Tensor t, bool retain_grad) const
 {
     tinytorch::backward(*this, t);
 }
+Tensor Tensor::std(int64_t index) const
+{
+    return tinytorch::std(*this, index);
+}
+Tensor Tensor::sum(int64_t dim, bool squeeze_dim) const
+{
+    return tinytorch::sum(*this, dim, squeeze_dim);
+}
+Tensor Tensor::mean(int64_t dim, bool squeeze_dim) const
+{
+    return tinytorch::mean(*this, dim, squeeze_dim);
+}
+Tensor Tensor::mean(const SizeType& sizes) const
+{
+    return tinytorch::mean(*this, sizes);
+}
+Tensor Tensor::index_select(int64_t i, Tensor index) const
+{
+    return tinytorch::index_select(*this, i, index);
+}
+Tensor Tensor::pow(Tensor a) const
+{
+    return tinytorch::pow(*this, a);
+}
+Tensor Tensor::permute(const SizeType& size) const
+{
+    return tinytorch::permute(*this, size);
+}
+Tensor Tensor::detach() const
+{
+    auto result = clone();
+    result.set_requires_grad(false);
+    return result;
+}
+Tensor& Tensor::uniform_(double mi, double ma)
+{
+    tinytorch::uniform(*this, mi, ma);
+}
+Tensor Tensor::square() const
+{
+    return tinytorch::square(*this);
+}
+Tensor Tensor::sqrt() const
+{
+    return tinytorch::sqrt(*this);
+}
+Tensor Tensor::clamp(double mi, double ma) const
+{
+    return tinytorch::clamp(*this, mi, ma);
+}
+void Tensor::clamp_(double mi, double ma)
+{
+    tinytorch::clamp(*this, mi, ma);
+}
+Tensor Tensor::clamp_min(double m) const
+{
+    return clamp(m, std::numeric_limits<double>::infinity());
+}
+void Tensor::clamp_min_(double m)
+{
+    clamp_(m, std::numeric_limits<double>::infinity());
+}
+Tensor Tensor::clamp_max(double m) const
+{
+    return clamp(-std::numeric_limits<double>::infinity(), m);
+}
+void Tensor::clamp_max_(double m)
+{
+    clamp_(-std::numeric_limits<double>::infinity(), m);
+}
+Tensor Tensor::norm(int64_t norm, int64_t dim, bool keepdim) const
+{
+    return tinytorch::norm(*this, norm, dim, keepdim);
+}
+Tensor Tensor::cumprod(int64_t dim) const
+{
+    return tinytorch::cumprod(*this, dim);
+}
+Tensor Tensor::cumsum(int64_t dim) const
+{
+    return tinytorch::cumsum(*this, dim);
+}
+bool Tensor::is_leaf() const
+{
+    if (!requires_grad()) return false;
+
+    if (!impl_->autograd_meta->edge) return false;
+
+    std::shared_ptr<autograd::AccumulateGrad> node =
+        std::dynamic_pointer_cast<autograd::AccumulateGrad>(impl_->autograd_meta->edge->function);
+
+    return node != nullptr;
+}
 
 }  // namespace tinytorch

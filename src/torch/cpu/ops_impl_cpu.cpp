@@ -107,9 +107,9 @@ void range_impl_cpu(Tensor a, double start, double end, double step)
 
 
 template <typename T>
-static void rand_float_impl_cpu(TensorInfo<T> t, std::mt19937& mersenne_engine)
+static void rand_float_impl_cpu(TensorInfo<T> t, std::mt19937& mersenne_engine, float low, float high)
 {
-    std::uniform_real_distribution<float> dist{0.f, 1.f};
+    std::uniform_real_distribution<float> dist{low, high};
     for (int64_t i = 0; i < t.numel(); ++i)
     {
         t[i] = T(dist(mersenne_engine));
@@ -125,10 +125,10 @@ static void rand_int_impl_cpu(TensorInfo<T> t, std::mt19937& mersenne_engine, in
     }
 }
 
-void uniform(Tensor& t)
+void uniform(Tensor& t, double mi, double ma)
 {
     static std::mt19937 mersenne_engine{572547235};
-    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl_cpu, t, mersenne_engine);
+    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl_cpu, t, mersenne_engine, mi, ma);
 }
 void uniform_int(Tensor& t, int low, int high)
 {
@@ -1426,7 +1426,7 @@ Tensor operator+=(Tensor a, Tensor b)
     CHECK(a.is_cpu());
     CHECK(b.is_cpu());
     CHECK(!a.requires_grad());
-    CHECK_EQ(a.sizes() , b.sizes());
+    CHECK_EQ(a.sizes(), b.sizes());
     SWITCH_MACRO_ALL(a.scalar_type(), add_impl_cpu, a, b, a);
     return a;
 }
@@ -1530,6 +1530,22 @@ void copy_impl_cpu(Tensor src, Tensor target)
 {
     CHECK_EQ(src.numel(), target.numel());
     SWITCH_MACRO_ALL(src.scalar_type(), copy_cpu, src, target);
+}
+
+template <typename T>
+static void clamp_impl_cpu_(TensorInfo<T> src, double low, double high)
+{
+    T low_t = std::isfinite(low) ? low : std::numeric_limits<T>::lowest();
+    T high_t = std::isfinite(high) ? high : std::numeric_limits<T>::max();
+
+    for (int64_t i = 0; i < src.numel(); ++i)
+    {
+        src[i] = std::min<T>(high_t, std::max<T>(src[i], low_t));
+    }
+}
+void clamp_impl_cpu_(Tensor& a, double low, double high)
+{
+    SWITCH_MACRO_ALL(a.scalar_type(), clamp_impl_cpu_, a, low, high);
 }
 
 

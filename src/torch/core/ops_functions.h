@@ -16,11 +16,13 @@ TINYTORCH_API Tensor repeat(Tensor t, SizeType sizes);
 TINYTORCH_API Tensor repeat_interleave(Tensor t, int64_t count);
 TINYTORCH_API Tensor transpose(Tensor t, int64_t dim0, int64_t dim1);
 
+TINYTORCH_API Tensor permute(Tensor t, const SizeType& size);
+
 TINYTORCH_API void copy(Tensor src, Tensor target);
 
 
 TINYTORCH_API void fill(Tensor& t, double value);
-TINYTORCH_API void uniform(Tensor& t);
+TINYTORCH_API void uniform(Tensor& t, double mi = 0, double ma = 1);
 TINYTORCH_API void uniform_int(Tensor& t, int low, int high);
 
 inline std::pair<Tensor,Tensor> sort(Tensor t, int64_t a)

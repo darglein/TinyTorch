@@ -59,6 +59,7 @@ Tensor stack_impl_cpu(const std::vector<Tensor>& tensors);
 Tensor transpose_impl_cpu(Tensor input, int64_t dim0, int64_t dim1);
 Tensor to_impl_cpu(Tensor a, ScalarType other_type);
 void copy_impl_cpu(Tensor src, Tensor target);
+void clamp_impl_cpu_(Tensor& a, double low, double high);
 
 std::vector<Tensor> square_backward_impl_cpu(Tensor a, Tensor grad_output);
 std::vector<Tensor> add_backward_impl_cpu(Tensor grad_output);

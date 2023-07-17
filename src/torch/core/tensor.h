@@ -153,11 +153,7 @@ struct TINYTORCH_API Tensor
     Tensor view(const SizeType& sizes) const;
     Tensor operator[](int64_t index) const { return slice(0, index, index + 1).squeeze(0); }
     Tensor slice(int64_t dim, int64_t start, int64_t end, int64_t step = 1) const;
-    Tensor select(int64_t dim, int64_t index) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+
     Tensor scatter_add(int64_t dim, Tensor ids, Tensor value) const
     {
         throw std::runtime_error("not implemented");
@@ -168,11 +164,7 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return *this;
     }
-    Tensor pow(Tensor a) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor pow(Tensor a) const;
     void copy_(Tensor a);
 
     Tensor clone() const;
@@ -180,86 +172,43 @@ struct TINYTORCH_API Tensor
     Tensor to(Device new_device) const;
     Tensor flip(const SizeType& size) const { throw std::runtime_error("not implemented"); }
     void resize_(const SizeType& size) { throw std::runtime_error("not implemented"); }
-    Tensor permute(const SizeType& size) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor permute(const SizeType& size) const;
     Tensor reshape(const SizeType& size) const;
     Tensor repeat(const SizeType& size) const;
-    Tensor detach() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor& uniform_(double mi, double ma)
-    {
-        throw std::runtime_error("not implemented");
-        return *this;
-    }
+    Tensor detach() const;
+
+    Tensor& uniform_(double mi = 0, double ma = 1);
+
     Tensor cpu() const { return to(kCPU); }
     Tensor index_add(int64_t dim, Tensor index, Tensor data) const;
-    Tensor square() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor sqrt() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor square() const;
+    Tensor sqrt() const;
     Tensor cuda() const
     {
         return to(kCUDA);
     }
     bool allclose(Tensor other, double atol = 1e-07) const;
 
-    Tensor clamp(double mi, double ma) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+
     Tensor round() const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor clamp_min(double m) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor clamp_min_(double m) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor clamp_max_(double m) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor clamp_max(double m) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor clamp_(double mi, double ma) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+
+    Tensor clamp(double mi, double ma) const;
+    void clamp_(double mi, double ma);
+    Tensor clamp_min(double m) const;
+    void clamp_min_(double m);
+    Tensor clamp_max(double m) const;
+    void clamp_max_(double m);
+
     Tensor gather(int64_t dim, Tensor index) const
     {
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor norm(int64_t norm, int64_t dim, bool keepdim = false) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor norm(int64_t norm, int64_t dim, bool keepdim = false) const;
     Tensor unsqueeze(int64_t dim) const;
     Tensor squeeze(int64_t dim) const;
     Tensor squeeze() const;
@@ -268,18 +217,9 @@ struct TINYTORCH_API Tensor
         throw std::runtime_error("not implemented");
         return {};
     }
-    Tensor cumprod(int64_t dim) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor cumsum(int64_t dim) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor cumprod(int64_t dim) const;
+    Tensor cumsum(int64_t dim) const;
     void fill_(double a);
-    void uniform_() { throw std::runtime_error("not implemented"); }
     void operator=(double a)
     {
         CHECK_EQ(dim(), 1);
@@ -292,35 +232,15 @@ struct TINYTORCH_API Tensor
 
     std::pair<Tensor, Tensor> min(int64_t dim, bool keepdim = false) const;
     std::pair<Tensor, Tensor> max(int64_t dim, bool keepdim = false) const;
-    Tensor std(int64_t index) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor std(int64_t index) const;
 
     Tensor sum() const;
-    Tensor sum(int64_t dim, bool squeeze_dim) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor sum(int64_t dim, bool squeeze_dim) const;
     Tensor mean() const;
-    Tensor mean(int64_t dim, bool squeeze_dim) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor mean(const SizeType& sizes) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor mean(int64_t dim, bool squeeze_dim) const;
+    Tensor mean(const SizeType& sizes) const;
     Tensor std() const;
-    Tensor index_select(int64_t i, Tensor index) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor index_select(int64_t i, Tensor index) const;
     Tensor abs() const;
     void set_data(Tensor t) { this->impl_ = t.impl_; }
     Tensor repeat_interleave(int64_t count);
@@ -342,11 +262,7 @@ struct TINYTORCH_API Tensor
     double toFloat() const { return item<float>(); }
     int toInt() const { return item<int>(); }
     bool is_contiguous() const;
-    bool is_leaf() const
-    {
-        throw std::runtime_error("not implemented");
-        return true;
-    }
+    bool is_leaf() const;
     inline bool is_cuda() const { return device() == kCUDA; }
     bool is_cpu() const { return device() == kCPU; }
 

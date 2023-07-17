@@ -237,5 +237,10 @@ Tensor clone(Tensor a)
 {
     return autograd::CloneNode::apply(a)[0];
 }
+Tensor permute(Tensor t, const SizeType& size)
+{
+    throw std::runtime_error("not implemented");
+    return Tensor();
+}
 
 }  // namespace tinytorch

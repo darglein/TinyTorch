@@ -4,8 +4,9 @@
  * See LICENSE file for more information.
  */
 
-#include "graph.h"
 #include "torch/core/ops_math_functions.h"
+
+#include "graph.h"
 
 #include "torch/cpu/ops_impl_cpu.h"
 
@@ -64,6 +65,16 @@ Tensor sum(Tensor a)
     return SumNode::forward_and_build_graph(a)[0];
 }
 
+Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
+{
+    throw std::runtime_error("not implemented");
+    return {};
+}
+Tensor sum(Tensor a, SizeType s)
+{
+    throw std::runtime_error("not implemented");
+}
+
 
 Tensor min(Tensor a)
 {
@@ -72,49 +83,76 @@ Tensor min(Tensor a)
 }
 Tensor max(Tensor a)
 {
-    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
     return max_impl_cpu(a);
 }
 std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
 {
-    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
     return min_impl_cpu(a, dim, keepdim);
 }
 std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
 {
-    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
     return max_impl_cpu(a, dim, keepdim);
 }
 Tensor min(Tensor a, Tensor b)
 {
-    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
     return min_impl_cpu(a, b);
 }
 Tensor max(Tensor a, Tensor b)
 {
-    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
     return max_impl_cpu(a, b);
 }
 
 Tensor mean(Tensor a)
 {
-    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
-    return sum(a) / (double)a.numel(); // TODO: This is not safe for small datatypes, which might overflow in the sum.
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    return sum(a) / (double)a.numel();  // TODO: This is not safe for small datatypes, which might overflow in the sum.
+}
+
+Tensor mean(Tensor a, int64_t dim, bool squeeze_dim)
+{
+    throw std::runtime_error("not implemented");
+}
+Tensor mean(Tensor a, SizeType s)
+{
+    throw std::runtime_error("not implemented");
 }
 
 Tensor std(Tensor a)
 {
-    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
     return std_impl_cpu(a);
 }
 
-Tensor abs(Tensor a) 
+
+Tensor std(Tensor a, int64_t dim)
 {
-    CHECK(!a.requires_grad()|| !GradMode::is_enabled());
-    return abs_impl_cpu(a);
+    return Tensor();
 }
 
 
+Tensor abs(Tensor a)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    return abs_impl_cpu(a);
+}
+Tensor clamp(Tensor a, double low, double high)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    auto t = a.clone();
+    clamp_(t, low, high);
+    return t;
+}
+void clamp_(Tensor& a, double low, double high)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    CHECK(a.is_cpu());
+    clamp_impl_cpu_(a, low, high);
+}
 
 
 }  // namespace tinytorch
