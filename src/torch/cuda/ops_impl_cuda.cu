@@ -8,6 +8,7 @@
 #include "torch/tiny_torch_cuda.h"
 
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
 
 TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 {
@@ -16,6 +17,10 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#ifndef __launch_bounds__
+#    define __launch_bounds__(...)
+#endif
 
 namespace tinytorch
 {
@@ -52,6 +57,7 @@ namespace tinytorch
 
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void range_impl_cuda(TensorInfo<T> a, double start, double end, double step)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -66,6 +72,7 @@ void range_impl_cuda(Tensor a, double start, double end, double step)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void fill_impl_cuda(TensorInfo<T> a, double value)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -80,6 +87,7 @@ void fill_impl_cuda(Tensor a, double value)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void copy_impl_cuda(TensorInfo<T> a, TensorInfo<T> b)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -87,6 +95,7 @@ static __global__ void copy_impl_cuda(TensorInfo<T> a, TensorInfo<T> b)
 
     b[i] = a[i];
 }
+
 void copy_impl_cuda(Tensor src, Tensor target)
 {
     SWITCH_MACRO_ALL(src.scalar_type(), src.numel(), copy_impl_cuda, src, target);
@@ -94,6 +103,43 @@ void copy_impl_cuda(Tensor src, Tensor target)
 
 
 template <typename T>
+__launch_bounds__(128) 
+static __global__ void rand_float_impl_cuda(TensorInfo<T> a, float low, float high, uint64_t seed)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= a.numel()) return;
+
+    curandState state;
+    curand_init(seed, i, 0, &state);
+    a[i] = T(curand_uniform(&state) * (high - low) + low);
+}
+
+void uniform_impl_cuda(Tensor& a, double mi, double ma)
+{
+    uint64_t seed = ::rand();
+    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), rand_float_impl_cuda, a, (float)mi, (float)ma, seed);
+}
+
+template <typename T>
+__launch_bounds__(128) 
+static __global__ void rand_int_impl_cuda(TensorInfo<T> a, int low, int high, uint64_t seed)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= a.numel()) return;
+
+    curandState state;
+    curand_init(seed, i, 0, &state);
+    a[i] = T(curand(&state) % (high - low) + low);
+}
+
+void uniform_int_impl_cuda(Tensor& a, int low, int high)
+{
+    uint64_t seed = ::rand();
+    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), rand_int_impl_cuda, a, low, high, seed);
+}
+
+template <typename T>
+__launch_bounds__(128)
 static __global__ void square_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -112,6 +158,7 @@ Tensor square_impl_cuda(Tensor a)
 
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void sum_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -139,6 +186,7 @@ Tensor sum_impl_cuda(Tensor a)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void log_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -155,6 +203,7 @@ Tensor log_impl_cuda(Tensor a)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void log1p_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -171,6 +220,7 @@ Tensor log1p_impl_cuda(Tensor a)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void exp_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -187,6 +237,7 @@ Tensor exp_impl_cuda(Tensor a)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void sign_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -204,6 +255,7 @@ Tensor sign_impl_cuda(Tensor a)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void pow_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -220,6 +272,7 @@ Tensor pow_impl_cuda(Tensor a, double b)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void sin_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -236,6 +289,7 @@ Tensor sin_impl_cuda(Tensor a)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void cos_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -252,6 +306,7 @@ Tensor cos_impl_cuda(Tensor a)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void relu_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -268,6 +323,7 @@ Tensor relu_impl_cuda(Tensor a)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void sigmoid_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -284,6 +340,7 @@ Tensor sigmoid_impl_cuda(Tensor a)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void softplus_impl_cuda(TensorInfo<T> a, double beta, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -300,6 +357,7 @@ Tensor softplus_impl_cuda(Tensor a, double beta)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void min_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
@@ -316,6 +374,7 @@ Tensor min_impl_cuda(Tensor a, Tensor b)
 }
 
 template <typename T>
+__launch_bounds__(128)
 static __global__ void max_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;

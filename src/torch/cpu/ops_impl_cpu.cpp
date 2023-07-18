@@ -117,6 +117,13 @@ static void rand_float_impl_cpu(TensorInfo<T> t, std::mt19937& mersenne_engine, 
         t[i] = T(dist(mersenne_engine));
     }
 }
+
+void uniform_impl_cpu(Tensor& t, double mi, double ma)
+{
+    static std::mt19937 mersenne_engine{572547235};
+    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl_cpu, t, mersenne_engine, (float)mi, (float)ma);
+}
+
 template <typename T>
 static void rand_int_impl_cpu(TensorInfo<T> t, std::mt19937& mersenne_engine, int low, int high)
 {
@@ -127,12 +134,7 @@ static void rand_int_impl_cpu(TensorInfo<T> t, std::mt19937& mersenne_engine, in
     }
 }
 
-void uniform(Tensor& t, double mi, double ma)
-{
-    static std::mt19937 mersenne_engine{572547235};
-    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl_cpu, t, mersenne_engine, (float)mi, (float)ma);
-}
-void uniform_int(Tensor& t, int low, int high)
+void uniform_int_impl_cpu(Tensor& t, int low, int high)
 {
     static std::mt19937 mersenne_engine{572547235};
     SWITCH_MACRO_ALL(t.scalar_type(), rand_int_impl_cpu, t, mersenne_engine, low, high);

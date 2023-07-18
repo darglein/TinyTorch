@@ -17,6 +17,8 @@ void to_impl_cpu_cuda(Tensor a, Tensor b);
 
 void range_impl_cpu(Tensor a, double start, double end, double step);
 void fill_impl_cpu(Tensor a, double value);
+void uniform_impl_cpu(Tensor& t, double mi, double ma);
+void uniform_int_impl_cpu(Tensor& t, int low, int high);
 Tensor square_impl_cpu(Tensor a);
 Tensor sum_impl_cpu(Tensor a);
 Tensor log_impl_cpu(Tensor a);

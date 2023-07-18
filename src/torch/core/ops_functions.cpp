@@ -74,6 +74,36 @@ void fill(Tensor& t, double value)
     }
 }
 
+void uniform(Tensor& t, double mi, double ma) 
+{
+    CHECK(!t.requires_grad() || !GradMode::is_enabled());
+    if (t.is_cpu())
+    {
+        uniform_impl_cpu(t, mi, ma);
+    }
+    else
+    {
+#ifdef TT_HAS_CUDA
+        uniform_impl_cuda(t, mi, ma);
+#endif
+    }
+}
+
+void uniform_int(Tensor& t, int low, int high) 
+{
+    CHECK(!t.requires_grad() || !GradMode::is_enabled());
+    if (t.is_cpu())
+    {
+        uniform_int_impl_cpu(t, low, high);
+    }
+    else
+    {
+#ifdef TT_HAS_CUDA
+        uniform_int_impl_cuda(t, low, high);
+#endif
+    }
+}
+
 void copy(Tensor src, Tensor target)
 {
     CHECK(!src.requires_grad() || !GradMode::is_enabled());
