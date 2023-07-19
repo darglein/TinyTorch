@@ -128,11 +128,11 @@ struct Module
     {
         for (auto& b : buffers_)
         {
-            b.second = b.second.to(d);
+            b.second.to_(d);
         }
         for (auto& b : parameters_)
         {
-            b.second = b.second.to(d);
+            b.second.to_(d);
         }
         for (auto& b : modules_)
         {

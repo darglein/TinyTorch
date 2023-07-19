@@ -285,6 +285,18 @@ Tensor Tensor::to(Device new_device) const
 
     return tinytorch::to(*this, new_device);
 }
+
+void Tensor::to_(ScalarType new_type)
+{
+    auto result = to(new_type);
+    impl_->set_data(*result.impl_);
+}
+void Tensor::to_(Device new_device)
+{
+    auto result = to(new_device);
+    impl_->set_data(*result.impl_);
+}
+
 Tensor Tensor::sum() const
 {
     return tinytorch::sum(*this);

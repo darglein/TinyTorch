@@ -75,31 +75,37 @@ Tensor sqrt(Tensor a)
 Tensor min(Tensor a)
 {
     CHECK(!a.requires_grad());
+    CHECK(a.is_cpu());
     return min_impl_cpu(a);
 }
 Tensor max(Tensor a)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    CHECK(a.is_cpu());
     return max_impl_cpu(a);
 }
 std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    CHECK(a.is_cpu());
     return min_impl_cpu(a, dim, keepdim);
 }
 std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    CHECK(a.is_cpu());
     return max_impl_cpu(a, dim, keepdim);
 }
 Tensor min(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    CHECK(a.is_cpu());
     return min_impl_cpu(a, b);
 }
 Tensor max(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    CHECK(a.is_cpu());
     return max_impl_cpu(a, b);
 }
 
@@ -111,6 +117,7 @@ Tensor sum(Tensor a)
 Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    CHECK(a.is_cpu());
 
     auto out_size = a.sizes();
     out_size[dim] = 1;

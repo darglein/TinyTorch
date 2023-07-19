@@ -54,6 +54,10 @@ struct TensorImpl : public std::enable_shared_from_this<TensorImpl>
     Tensor reshape(const SizeType& size) const;
 
 
+    // overwrite the current data (storage, sizes,...)
+    // Note: this changes the data for all "Tensor" objects that point to this impl
+    void set_data(TensorImpl& other);
+
 
 
     template <typename T>

@@ -14,8 +14,6 @@ TensorImpl::TensorImpl(const SizeType& sizes, TensorOptions options) : sizes_(si
 {
     recompute_strides();
     storage_ = std::make_shared<StorageImpl>(elementSize(options.dtype_) * numel(), options.device_);
-
-
 }
 
 TensorImpl::TensorImpl(std::shared_ptr<StorageImpl> storage, int64_t storage_offset, const SizeType& sizes,
@@ -40,12 +38,12 @@ void TensorImpl::set_requires_grad(bool requires_grad)
 {
     if (requires_grad)
     {
-        autograd_meta        = std::make_unique<AutogradMeta>();
+        autograd_meta = std::make_unique<AutogradMeta>();
 
         auto grad_options = options_;
         grad_options.requires_grad(false);
         // autograd_meta->_grad = zeros(sizes_, grad_options);
-        autograd_meta->edge  = std::make_shared<Edge>(std::make_shared<autograd::AccumulateGrad>(Tensor(getptr())), 0);
+        autograd_meta->edge = std::make_shared<Edge>(std::make_shared<autograd::AccumulateGrad>(Tensor(getptr())), 0);
     }
     else
     {
@@ -59,6 +57,17 @@ bool TensorImpl::requires_grad() const
     if (!autograd_meta->edge) return false;
 
     return true;
+}
+void TensorImpl::set_data(TensorImpl& other)
+{
+    storage_        = other.storage_;
+    storage_offset_ = other.storage_offset_;
+    sizes_          = other.sizes_;
+    strides_        = other.strides_;
+    options_        = other.options_;
+    {
+        set_requires_grad(other.requires_grad());
+    }
 }
 
 }  // namespace tinytorch

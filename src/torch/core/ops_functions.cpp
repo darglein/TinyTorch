@@ -110,11 +110,6 @@ void copy(Tensor src, Tensor target)
     copy_impl_cpu(src, target);
 }
 
-Tensor to(Tensor a, ScalarType other_type)
-{
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    return to_impl_cpu(a, other_type);
-}
 
 
 namespace autograd
@@ -124,22 +119,13 @@ struct ToNode : public FunctionNode<ToNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue new_device_)
     {
         NoGradGuard ngg;
-        // ctx->save_for_backward({a});
-        // Tensor result = empty_like(a);
-        // copy_impl_cpu(a, result);
-        // return {result};
-
         ctx->saved_data["old_device"] = (int)a.device();
-
-        Device new_device = (Device)new_device_.toInt();
+        Device new_device             = (Device)new_device_.toInt();
 
 #ifdef TT_HAS_CUDA
-
         Tensor contig = a.contiguous();
         Tensor result = empty(contig.sizes(), a.options().device(new_device));
-
         to_impl_cpu_cuda(a, result);
-
         return {result};
 #else
         CHECK(false);
@@ -149,11 +135,38 @@ struct ToNode : public FunctionNode<ToNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         Device old_device = (Device)ctx->saved_data["old_device"].toInt();
-
-
-        // auto l        = ctx->get_saved_variables();
-        Tensor grad_a = empty_like(grad[0], grad[0].options().device(old_device));
+        Tensor grad_a     = empty_like(grad[0], grad[0].options().device(old_device));
         to_impl_cpu_cuda(grad[0], grad_a);
+        return {grad_a, {}};
+    }
+};
+
+struct ToScalarTypeNode : public FunctionNode<ToScalarTypeNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue new_dtype_)
+    {
+        NoGradGuard ngg;
+        ctx->saved_data["old_dtype"] = (int)a.dtype();
+        Dtype new_dtype              = (Dtype)new_dtype_.toInt();
+
+        Tensor result;
+        if (a.is_cpu())
+        {
+            result = to_impl_cpu(a, new_dtype);
+        }
+        else
+        {
+            CHECK(false);
+        }
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        Dtype old_dtype = (Dtype)ctx->saved_data["old_dtype"].toInt();
+        auto g = grad[0];
+        Tensor grad_a   = empty_like(grad[0], grad[0].options().dtype(old_dtype));
+        grad_a = to_impl_cpu(g, old_dtype);
         return {grad_a, {}};
     }
 };
@@ -168,6 +181,15 @@ Tensor to(Tensor a, Device new_device)
     }
 
     return autograd::ToNode::apply(a, (int)new_device)[0];
+}
+
+Tensor to(Tensor a, ScalarType other_type)
+{
+    if (a.dtype() == other_type)
+    {
+        return a;
+    }
+    return autograd::ToScalarTypeNode::apply(a, (int)other_type)[0];
 }
 
 
@@ -289,7 +311,7 @@ Tensor cat(const std::vector<Tensor>& list, int64_t dim)
     int64_t current_offset = 0;
     for (auto a : list)
     {
-        result.slice(dim,current_offset,current_offset+a.size(dim)).copy_(a);
+        result.slice(dim, current_offset, current_offset + a.size(dim)).copy_(a);
     }
 
     return result;

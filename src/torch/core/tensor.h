@@ -168,8 +168,12 @@ struct TINYTORCH_API Tensor
     void copy_(Tensor a);
 
     Tensor clone() const;
+
     Tensor to(ScalarType new_type) const;
     Tensor to(Device new_device) const;
+    void to_(ScalarType new_type);
+    void to_(Device new_device);
+
     Tensor flip(const SizeType& size) const { throw std::runtime_error("not implemented"); }
     void resize_(const SizeType& size) { throw std::runtime_error("not implemented"); }
     Tensor permute(const SizeType& size) const;
@@ -256,7 +260,7 @@ struct TINYTORCH_API Tensor
     T item() const
     {
         CHECK_EQ(numel(), 1);
-        return *cpu().data_ptr<T>();
+        return *cpu().to(CppTypeToScalarType<T>::value).template data_ptr<T>();
     }
     double toDouble() const { return item<double>(); }
     double toFloat() const { return item<float>(); }
