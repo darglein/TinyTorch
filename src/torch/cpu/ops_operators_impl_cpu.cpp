@@ -156,20 +156,21 @@ void div_impl_cpu(double a, Tensor b, Tensor& result)
 
 
 template <typename T>
-void print_impl_cpu(std::ostream& strm, TensorInfo<T> a)
+static void print_impl_cpu(std::ostream& strm, TensorInfo<T> a)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         strm << a[i] << " ";
     }
 }
+
 void print_impl_cpu(std::ostream& strm, Tensor t)
 {
     print_impl_cpu<float>(strm, t);
 }
 
 template <typename T>
-static void equals_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
+static void equal_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
@@ -195,7 +196,7 @@ static void greater_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
 
 void equal_impl_cpu(Tensor a, double b, Tensor& result)
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), equals_impl_cpu, a, b, result);
+    SWITCH_MACRO_ALL(a.scalar_type(), equal_impl_cpu, a, b, result);
 }
 void less_impl_cpu(Tensor a, double b, Tensor& result)
 {
