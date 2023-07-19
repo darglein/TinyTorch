@@ -17,20 +17,24 @@ namespace tinytorch
 
 namespace autograd
 {
-struct SquareNode : public FunctionNode<SquareNode>
+
+struct SqrtNode : public FunctionNode<SqrtNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
         ctx->save_for_backward({a});
-        auto result = square_impl_cpu(a);
+        auto result = empty_like(a);
+        sqrt_impl_cpu(a, result);
         return {result};
     }
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         auto l      = ctx->get_saved_variables();
-        auto grad_a = square_backward_impl_cpu(l[0], grad[0]);
-        return grad_a;
+        auto a      = l[0];
+        auto g      = grad[0];
+        auto grad_a = 1 / (2*a.sqrt()) * g;
+        return {grad_a};
     }
 };
 
@@ -57,7 +61,13 @@ using namespace autograd;
 
 Tensor square(Tensor a)
 {
-    return SquareNode::forward_and_build_graph(a)[0];
+    return a * a;
+}
+
+
+Tensor sqrt(Tensor a)
+{
+    return SqrtNode::forward_and_build_graph(a)[0];
 }
 
 
@@ -100,14 +110,28 @@ Tensor sum(Tensor a)
 
 Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
 {
-    throw std::runtime_error("not implemented");
-    return {};
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+
+    auto out_size = a.sizes();
+    out_size[dim] = 1;
+    auto result   = empty(out_size, a.options());
+    sum_impl_cpu(a, dim, result);
+    if (squeeze_dim)
+    {
+        auto dims_before = result.dim();
+        result           = result.squeeze(dim);
+        CHECK_EQ(result.dim(), dims_before - 1);
+    }
+    return result;
 }
 Tensor sum(Tensor a, SizeType s)
 {
-    throw std::runtime_error("not implemented");
+    for (auto dim : s.vec())
+    {
+        a = sum(a, dim, false);
+    }
+    return a;
 }
-
 
 Tensor mean(Tensor a)
 {
@@ -117,11 +141,17 @@ Tensor mean(Tensor a)
 
 Tensor mean(Tensor a, int64_t dim, bool squeeze_dim)
 {
-    throw std::runtime_error("not implemented");
+    auto count  = a.size(dim);
+    auto result = sum(a, dim, squeeze_dim);
+    return result / count;
 }
 Tensor mean(Tensor a, SizeType s)
 {
-    throw std::runtime_error("not implemented");
+    for (auto dim : s.vec())
+    {
+        a = mean(a, dim, false);
+    }
+    return a;
 }
 
 Tensor std(Tensor a)
@@ -154,6 +184,15 @@ void clamp_(Tensor& a, double low, double high)
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     CHECK(a.is_cpu());
     clamp_impl_cpu_(a, low, high);
+}
+
+Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
+{
+    CHECK_EQ(norm, 2);
+    a = a.square();
+    a = a.sum(dim, !keep);
+    a = a.sqrt();
+    return a;
 }
 
 

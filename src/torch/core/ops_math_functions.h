@@ -14,6 +14,7 @@ namespace tinytorch
 
 // These operators should be called by the user and support Auto-Diff
 TINYTORCH_API Tensor square(Tensor a);
+TINYTORCH_API Tensor sqrt(Tensor a);
 
 inline Tensor log(Tensor b)
 {
@@ -31,11 +32,6 @@ inline Tensor exp(Tensor b)
     return {};
 }
 inline Tensor sign(Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor sqrt(Tensor a)
 {
     throw std::runtime_error("not implemented");
     return {};
@@ -101,11 +97,7 @@ TINYTORCH_API std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim 
 TINYTORCH_API Tensor clamp(Tensor a, double low, double high);
 TINYTORCH_API void clamp_(Tensor& a, double low, double high);
 
-inline Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+TINYTORCH_API Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep);
 TINYTORCH_API Tensor abs(Tensor a);
 
 

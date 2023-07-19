@@ -142,20 +142,17 @@ void uniform_int_impl_cpu(Tensor& t, int low, int high)
 
 
 template <typename T>
-static void square_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
+static void sqrt_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        auto v    = a[i];
-        result[i] = v * v;
+        result[i]= std::sqrt(a[i]);
     }
 }
 
-Tensor square_impl_cpu(Tensor a)
-{
-    Tensor result = empty_like(a);
-    SWITCH_MACRO_ALL(a.scalar_type(), square_impl_cpu, a, result);
-    return result;
+void sqrt_impl_cpu(Tensor a, Tensor& result) {
+
+    SWITCH_MACRO_ALL(a.scalar_type(), sqrt_impl_cpu, a, result);
 }
 
 
@@ -175,6 +172,51 @@ Tensor sum_impl_cpu(Tensor a)
     return result;
 }
 
+
+template <typename T>
+static void sum_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
+{
+    int64_t dims = input.dims;
+
+    int64_t to_prod = input.sizes[dim];
+    int64_t count   = input.numel() / input.sizes[dim];
+    CHECK_EQ(count, result.numel());
+
+    for (int64_t c = 0; c < count; ++c)
+    {
+        int64_t linearId = c;
+
+        int64_t input_offset = 0;
+        for (int64_t i = dims - 1; i > 0; --i)
+        {
+            if (i != dim)
+            {
+                int64_t curDimIndex = linearId % input.sizes[i];
+                input_offset += curDimIndex * input.strides[i];
+                linearId /= input.sizes[i];
+            }
+        }
+
+        if (dim != 0)
+        {
+            input_offset += linearId * input.strides[0];
+        }
+
+        T sum = T(0);
+
+        for (int64_t p = 0; p < to_prod; ++p)
+        {
+            sum += input[input_offset];
+            input_offset += input.strides[dim];
+        }
+
+        result[c] = sum;
+    }
+}
+void sum_impl_cpu(Tensor a, int64_t dim, Tensor& result)
+{
+    SWITCH_MACRO_FLOAT(a.scalar_type(), sum_impl_cpu, a, dim, result);
+}
 template <typename T>
 static void log_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
@@ -803,23 +845,6 @@ Tensor transpose_impl_cpu(Tensor input, int64_t dim0, int64_t dim1)
 }
 
 // ================================================================================================================
-
-template <typename T>
-static void square_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, TensorInfo<T> grad_a)
-{
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        grad_a[i] = 2 * a[i] * grad_output[i];
-    }
-}
-
-std::vector<Tensor> square_backward_impl_cpu(Tensor a, Tensor grad_output)
-{
-    Tensor grad_a = empty_like(a);
-    SWITCH_MACRO_ALL(a.scalar_type(), square_backward_impl_cpu, a, grad_output, grad_a);
-    return {grad_a};
-}
-
 
 
 template <typename T>
