@@ -50,13 +50,25 @@ Tensor repeat(Tensor t, SizeType sizes)
 Tensor repeat_interleave(Tensor t, int64_t count)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
-    return repeat_interleave_impl_cpu(t, count);
+
+    SizeType new_sizes = t.sizes();
+    new_sizes[0] *= count;
+    Tensor result = empty(new_sizes, t.options());
+    repeat_interleave_impl_cpu(t, count, result);
+    return result;
 }
 
 Tensor transpose(Tensor t, int64_t dim0, int64_t dim1)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
-    return transpose_impl_cpu(t, dim0, dim1);
+
+    SizeType new_sizes = t.sizes();
+    std::swap(new_sizes[dim0], new_sizes[dim1]);
+
+    Tensor result = empty(new_sizes, t.options());
+
+    transpose_impl_cpu(t, dim0, dim1, result);
+    return result;
 }
 
 void fill(Tensor& t, double value)
@@ -196,7 +208,19 @@ Tensor to(Tensor a, ScalarType other_type)
 Tensor index_select(Tensor input, int64_t dim, Tensor index)
 {
     CHECK(!input.requires_grad() || !GradMode::is_enabled());
-    return index_select_impl_cpu(input, dim, index);
+
+    
+    CHECK_LT(dim, input.dim());
+    CHECK_EQ(index.dtype(), kLong);
+
+    auto numel = index.numel();
+
+    auto result_size = input.sizes().vec();
+    result_size[dim] = numel;
+
+    Tensor result = empty(result_size, input.options());
+    index_select_impl_cpu(input, dim, index, result);
+    return result;
 }
 
 namespace autograd
@@ -207,7 +231,16 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
     {
         ctx->saved_data["dim"] = dim;
         ctx->save_for_backward({index});
-        auto result = index_add_impl_cpu(input, dim.toInt(), index, data);
+
+
+        CHECK_LT(dim.toInt(), input.dim());
+        CHECK_EQ(index.dtype(), kLong);
+        CHECK_EQ(input.dim(), data.dim());
+        CHECK_EQ(index.dim(), 1);
+        CHECK_EQ(index.numel(), data.size(0));
+
+        Tensor result = input.clone();
+        index_add_impl_cpu(input, dim.toInt(), index, data, result);
         return {result};
     }
 
@@ -216,7 +249,7 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
         auto l     = ctx->get_saved_variables();
         auto index = l[0];
 
-        auto grad_data  = index_select_impl_cpu(grad[0], ctx->saved_data["dim"].toInt(), index);
+        auto grad_data  = index_select(grad[0], ctx->saved_data["dim"].toInt(), index);
         auto grad_input = grad[0];
 
         // Tensor grad_a = empty_like(grad[0]);
@@ -234,13 +267,33 @@ Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data)
     return autograd::IndexAddNode::apply(input, dim, index, data)[0];
 }
 
-Tensor stack(const std::vector<Tensor>& a)
+Tensor stack(const std::vector<Tensor>& tensors)
 {
-    for (auto b : a)
+    for (auto b : tensors)
     {
         CHECK(!b.requires_grad() || !GradMode::is_enabled());
     }
-    return stack_impl_cpu(a);
+
+    
+    if (tensors.empty())
+    {
+        return {};
+    }
+
+    for (const auto& t : tensors)
+    {
+        CHECK_EQ(tensors.front().sizes(), t.sizes());
+        CHECK_EQ(tensors.front().device(), t.device());
+        CHECK_EQ(tensors.front().scalar_type(), t.scalar_type());
+    }
+
+    SizeType new_sizes = tensors.front().sizes();
+    new_sizes.vec().insert(new_sizes.vec().begin(), tensors.size());
+
+    Tensor result = empty(new_sizes, tensors.front().options());
+
+    stack_impl_cpu(tensors, result);
+    return result;
 }
 
 
