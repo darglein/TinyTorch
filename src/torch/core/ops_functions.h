@@ -39,11 +39,7 @@ TINYTORCH_API Tensor to(Tensor a, Device other_type);
 
 
 TINYTORCH_API Tensor stack(const std::vector<Tensor>& a);
-inline Tensor cat(const std::vector<Tensor>& a, int64_t dim)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+TINYTORCH_API Tensor cat(const std::vector<Tensor>& a, int64_t dim);
 TINYTORCH_API Tensor index_select(Tensor input, int64_t dim, Tensor index);
 TINYTORCH_API Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data);
 

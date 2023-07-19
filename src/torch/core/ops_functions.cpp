@@ -74,7 +74,7 @@ void fill(Tensor& t, double value)
     }
 }
 
-void uniform(Tensor& t, double mi, double ma) 
+void uniform(Tensor& t, double mi, double ma)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
     if (t.is_cpu())
@@ -89,7 +89,7 @@ void uniform(Tensor& t, double mi, double ma)
     }
 }
 
-void uniform_int(Tensor& t, int low, int high) 
+void uniform_int(Tensor& t, int low, int high)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
     if (t.is_cpu())
@@ -271,6 +271,28 @@ Tensor permute(Tensor t, const SizeType& size)
 {
     throw std::runtime_error("not implemented");
     return Tensor();
+}
+
+Tensor cat(const std::vector<Tensor>& list, int64_t dim)
+{
+    CHECK_GT(list.size(), 0);
+    auto output_size        = list.front().sizes();
+    int64_t target_dim_size = 0;
+    for (auto a : list)
+    {
+        target_dim_size += a.size(dim);
+    }
+    output_size[dim] = target_dim_size;
+
+    auto result = empty(output_size, list.front().options());
+
+    int64_t current_offset = 0;
+    for (auto a : list)
+    {
+        result.slice(dim,current_offset,current_offset+a.size(dim)).copy_(a);
+    }
+
+    return result;
 }
 
 }  // namespace tinytorch

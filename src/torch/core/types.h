@@ -33,6 +33,7 @@ enum Device
     kCPU,
     kCUDA
 };
+TINYTORCH_API std::ostream& operator<<(std::ostream& strm, Device type);
 
 enum ScalarType
 {
@@ -53,6 +54,8 @@ enum ScalarType
     kFloat64 = 6,
     kDouble  = kFloat64,
 };
+
+TINYTORCH_API std::ostream& operator<<(std::ostream& strm, ScalarType type);
 
 inline int64_t elementSize(ScalarType type)
 {
@@ -110,40 +113,3 @@ ScalarType dtype()
 }
 
 }  // namespace tinytorch
-
-inline std::ostream& operator<<(std::ostream& strm, tinytorch::Device d)
-{
-    strm << ((d == tinytorch::kCPU) ? "kCPU" : "kCUDA");
-    return strm;
-}
-
-inline std::ostream& operator<<(std::ostream& strm, tinytorch::ScalarType type)
-{
-    switch (type)
-    {
-        case tinytorch::kUInt8:
-            strm << "kUint8";
-            break;
-        case tinytorch::kInt16:
-            strm << "kInt16";
-            break;
-        case tinytorch::kInt32:
-            strm << "kInt32";
-            break;
-        case tinytorch::kLong:
-            strm << "kLong";
-            break;
-        case tinytorch::kFloat32:
-            strm << "kFloat32";
-            break;
-        case tinytorch::kFloat64:
-            strm << "kFloat64";
-            break;
-        case tinytorch::kHalf:
-            strm << "kHalf";
-            break;
-        default:
-            CHECK(false);
-    }
-    return strm;
-}
