@@ -124,6 +124,27 @@ void sum_impl_cpu(Tensor a, Tensor& result)
     SWITCH_MACRO_ALL(a.scalar_type(), sum_impl_cpu, a, result);
 }
 
+static int64_t index_along_dim(int64_t linearId, int64_t dims, int64_t dim, int64_t* input_sizes,
+                               int64_t* input_strides)
+{
+    int64_t input_offset = 0;
+    for (int64_t i = dims - 1; i > 0; --i)
+    {
+        if (i != dim)
+        {
+            int64_t curDimIndex = linearId % input_sizes[i];
+            input_offset += curDimIndex * input_strides[i];
+            linearId /= input_sizes[i];
+        }
+    }
+
+    if (dim != 0)
+    {
+        input_offset += linearId * input_strides[0];
+    }
+
+    return input_offset;
+}
 
 template <typename T>
 static void sum_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
@@ -136,23 +157,7 @@ static void sum_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 
     for (int64_t c = 0; c < count; ++c)
     {
-        int64_t linearId = c;
-
-        int64_t input_offset = 0;
-        for (int64_t i = dims - 1; i > 0; --i)
-        {
-            if (i != dim)
-            {
-                int64_t curDimIndex = linearId % input.sizes[i];
-                input_offset += curDimIndex * input.strides[i];
-                linearId /= input.sizes[i];
-            }
-        }
-
-        if (dim != 0)
-        {
-            input_offset += linearId * input.strides[0];
-        }
+        int64_t input_offset = index_along_dim(c, dims, dim, input.sizes, input.strides);
 
         T sum = T(0);
 
@@ -321,23 +326,7 @@ static void prod_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result
 
     for (int64_t c = 0; c < count; ++c)
     {
-        int64_t linearId = c;
-
-        int64_t input_offset = 0;
-        for (int64_t i = dims - 1; i > 0; --i)
-        {
-            if (i != dim)
-            {
-                int64_t curDimIndex = linearId % input.sizes[i];
-                input_offset += curDimIndex * input.strides[i];
-                linearId /= input.sizes[i];
-            }
-        }
-
-        if (dim != 0)
-        {
-            input_offset += linearId * input.strides[0];
-        }
+        int64_t input_offset = index_along_dim(c, dims, dim, input.sizes, input.strides);
 
         T prod = T(1);
 
