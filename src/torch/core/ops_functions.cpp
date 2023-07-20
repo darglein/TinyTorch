@@ -218,7 +218,7 @@ Tensor index_select(Tensor input, int64_t dim, Tensor index)
 
     
     CHECK_LT(dim, input.dim());
-    CHECK_EQ(index.dtype(), kInt32);
+    CHECK(index.dtype() == kInt32 || index.dtype() == kInt64);
 
     SizeType result_size = input.sizes();
     result_size[dim]     = index.numel();
@@ -246,7 +246,7 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
 
 
         CHECK_LT(dim.toInt(), input.dim());
-        CHECK_EQ(index.dtype(), kInt32);
+        CHECK(index.dtype() == kInt32 || index.dtype() == kInt64);
         CHECK_EQ(input.dim(), data.dim());
         CHECK_EQ(index.dim(), 1);
         CHECK_EQ(index.numel(), data.size(0));

@@ -515,8 +515,8 @@ void abs_impl_cpu(Tensor a, Tensor& result)
     SWITCH_MACRO_ALL(a.scalar_type(), abs_impl_cpu, a, result);
 }
 
-template <typename T>
-static void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<int32_t> index, TensorInfo<T> result)
+template <typename T, typename TIndex>
+static void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<TIndex> index, TensorInfo<T> result)
 {
     int64_t dims = input.dims;
 
@@ -555,13 +555,27 @@ static void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<i
     }
 }
 
-void index_select_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor& result)
+template <typename TIndex>
+static void index_select_helper(Tensor input, int64_t dim, TensorInfo<TIndex> index, Tensor result) 
 {
     SWITCH_MACRO_ALL(input.scalar_type(), index_select_impl_cpu, input, dim, index, result);
 }
 
-template <typename T>
-static void index_add_impl_cpu(int64_t dim, TensorInfo<int64_t> index, TensorInfo<T> data, TensorInfo<T> result)
+void index_select_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor& result)
+{
+    switch (index.scalar_type())
+    {
+        case kInt32:
+            index_select_helper<int32_t>(input, dim, index, result);
+            break;
+        case kLong:
+            index_select_helper<int64_t>(input, dim, index, result);
+            break;
+    }
+}
+
+template <typename T, typename TIndex>
+static void index_add_impl_cpu(int64_t dim, TensorInfo<TIndex> index, TensorInfo<T> data, TensorInfo<T> result)
 {
     int64_t dims = result.dims;
 
@@ -598,9 +612,25 @@ static void index_add_impl_cpu(int64_t dim, TensorInfo<int64_t> index, TensorInf
     }
 }
 
-void index_add_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor data, Tensor& result)
+
+
+template <typename TIndex>
+static void index_add_helper(Tensor input, int64_t dim, TensorInfo<TIndex> index, Tensor data, Tensor result)
 {
     SWITCH_MACRO_ALL(input.scalar_type(), index_add_impl_cpu, dim, index, data, result);
+}
+
+void index_add_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor data, Tensor& result)
+{
+    switch (index.scalar_type())
+    {
+        case kInt32:
+            index_add_helper<int32_t>(input, dim, index, data, result);
+            break;
+        case kLong:
+            index_add_helper<int64_t>(input, dim, index, data, result);
+            break;
+    }
 }
 
 template <typename T>
