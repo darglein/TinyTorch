@@ -363,9 +363,9 @@ void max_impl_cuda(Tensor a, Tensor b, Tensor& result)
     SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), max_impl_cuda, a, b, result);
 }
 
-template <typename T>
+template <typename T, typename TIndex>
 __launch_bounds__(128) 
-static __global__ void index_select_impl_cuda(TensorInfo<T> input, int64_t dim, TensorInfo<int32_t> index, TensorInfo<T> result)
+static __global__ void index_select_impl_cuda(TensorInfo<T> input, int64_t dim, TensorInfo<TIndex> index, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
@@ -406,9 +406,23 @@ static __global__ void index_select_impl_cuda(TensorInfo<T> input, int64_t dim, 
     result.data[result_offset] = input.data[input_offset];
 }
 
-void index_select_impl_cuda(Tensor input, int64_t dim, Tensor index, Tensor& result) 
+template <typename TIndex>
+static void index_select_helper(Tensor input, int64_t dim, TensorInfo<TIndex> index, Tensor result)
 {
     SWITCH_MACRO_ALL(result.scalar_type(), result.numel(), index_select_impl_cuda, input, dim, index, result);
+}
+
+void index_select_impl_cuda(Tensor input, int64_t dim, Tensor index, Tensor& result) 
+{
+    switch (index.scalar_type())
+    {
+        case kInt32:
+            index_select_helper<int32_t>(input, dim, index, result);
+            break;
+        case kLong:
+            index_select_helper<int64_t>(input, dim, index, result);
+            break;
+    }
 }
 
 

@@ -612,8 +612,6 @@ static void index_add_impl_cpu(int64_t dim, TensorInfo<TIndex> index, TensorInfo
     }
 }
 
-
-
 template <typename TIndex>
 static void index_add_helper(Tensor input, int64_t dim, TensorInfo<TIndex> index, Tensor data, Tensor result)
 {
