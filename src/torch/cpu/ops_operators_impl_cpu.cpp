@@ -19,13 +19,45 @@
 namespace tinytorch
 {
 
+static std::pair<int64_t, int64_t> calculate_offsets(int64_t linearId, int64_t dims,
+    int64_t* a_sizes, int64_t* b_sizes, int64_t* a_strides, int64_t* b_strides) 
+{
+    // This handles the case that if one tensor has size 1 along a dimension, the respective value is duplicated along
+    // this dimension.
+
+    int64_t offset_a = 0;
+    int64_t offset_b = 0;
+
+    for (int64_t i = dims - 1; i > 0; --i)
+    {
+        int64_t sa    = a_sizes[i];
+        int64_t sb    = b_sizes[i];
+        int64_t max_s = std::max(sa, sb);
+
+        offset_a += (sa == 1) ? 0 : ((linearId % sa) * a_strides[i]);
+        offset_b += (sb == 1) ? 0 : ((linearId % sb) * b_strides[i]);
+        linearId /= max_s;
+    }
+
+    int64_t sa = a_sizes[0];
+    int64_t sb = b_sizes[0];
+
+    offset_a += (sa == 1) ? 0 : ((linearId % sa) * a_strides[0]);
+    offset_b += (sb == 1) ? 0 : ((linearId % sb) * b_strides[0]);
+
+    return {offset_a, offset_b};
+}
+
 
 template <typename T>
 static void add_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
-    for (int64_t i = 0; i < a.numel(); ++i)
+    int64_t dims = result.dims;
+
+    for (int64_t i = 0; i < result.numel(); ++i)
     {
-        result[i] = a[i] + b[i];
+        auto [offset_a, offset_b] = calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides);
+        result[i]                 = a.data[offset_a] + b.data[offset_b];
     }
 }
 
@@ -51,9 +83,12 @@ void add_impl_cpu(Tensor a, double b, Tensor& result)
 template <typename T>
 static void sub_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
-    for (int64_t i = 0; i < a.numel(); ++i)
+    int64_t dims = result.dims;
+
+    for (int64_t i = 0; i < result.numel(); ++i)
     {
-        result[i] = a[i] - b[i];
+        auto [offset_a, offset_b] = calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides);
+        result[i] = a.data[offset_a] - b.data[offset_b];
     }
 }
 
@@ -62,36 +97,15 @@ void sub_impl_cpu(Tensor a, Tensor b, Tensor& result)
     SWITCH_MACRO_ALL(a.scalar_type(), sub_impl_cpu, a, b, result);
 }
 
-
 template <typename T>
 static void mult_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
-    // This handles the case that if one tensor has size 1 along a dimension, the respective value is duplicated along
-    // this dimension.
-
     int64_t dims = result.dims;
 
     for (int64_t i = 0; i < result.numel(); ++i)
     {
-        int64_t linearId = i;
-        int64_t offset_a = 0;
-        int64_t offset_b = 0;
-
-        for (int64_t i = dims - 1; i > 0; --i)
-        {
-            int64_t sa    = a.sizes[i];
-            int64_t sb    = b.sizes[i];
-            int64_t max_s = std::max(sa, sb);
-
-            offset_a += (sa == 0) ? 0 : ((linearId % sa) * a.strides[i]);
-            offset_b += (sb == 0) ? 0 : ((linearId % sb) * b.strides[i]);
-            linearId /= max_s;
-        }
-
-        offset_a += linearId * a.strides[0];
-        offset_b += linearId * b.strides[0];
-
-        result[i] = a.data[offset_a] * b[offset_b];
+        auto [offset_a, offset_b] = calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides);
+        result[i]                 = a.data[offset_a] * b.data[offset_b];
     }
 }
 
@@ -118,9 +132,12 @@ void mult_impl_cpu(Tensor a, double b, Tensor& result)
 template <typename T>
 static void div_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
-    for (int64_t i = 0; i < a.numel(); ++i)
+    int64_t dims = result.dims;
+
+    for (int64_t i = 0; i < result.numel(); ++i)
     {
-        result[i] = a[i] / b[i];
+        auto [offset_a, offset_b] = calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides);
+        result[i]                 = a.data[offset_a] / b.data[offset_b];
     }
 }
 
