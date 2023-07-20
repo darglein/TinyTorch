@@ -53,7 +53,7 @@ static __global__ void add_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> re
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = T(double(a[i]) + b);
+    result[i] = a[i] + T(b);
 }
 
 void add_impl_cuda(Tensor a, double b, Tensor& result) 
@@ -86,7 +86,7 @@ __launch_bounds__(128) static __global__ void sub_impl_cuda(TensorInfo<T> a, dou
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = T(double(a[i]) - b);
+    result[i] = a[i] - T(b);
 }
 
 void sub_impl_cuda(Tensor a, double b, Tensor& result)
@@ -120,7 +120,7 @@ static __global__ void mult_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> r
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = T(double(a[i]) * b);
+    result[i] = a[i] * T(b);
 }
 
 void mult_impl_cuda(Tensor a, double b, Tensor& result) 
