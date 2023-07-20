@@ -62,8 +62,9 @@ configure_file(
 target_include_directories(torch PUBLIC ${MY_BUILDCONFIG_DIR})
 
 
-#target_sources(torch PRIVATE ${ALL_SRC} PUBLIC ${ALL_HEADER})
-
+if(MSVC)
+    target_sources(torch PRIVATE torch.natvis)
+endif()
 
 
 #############  output dir ############# 
