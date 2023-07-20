@@ -13,6 +13,7 @@
 #include "torch/core/ops_operators.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cpu/ops_impl_cpu.h"
+#include "ops_operators_impl_cpu.h"
 
 
 
@@ -65,6 +66,22 @@ static void sub_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 }
 
 void sub_impl_cpu(Tensor a, Tensor b, Tensor& result)
+{
+    SWITCH_MACRO_ALL(a.scalar_type(), sub_impl_cpu, a, b, result);
+}
+
+template <typename T>
+static void sub_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
+{
+    int64_t dims = result.dims;
+
+    for (int64_t i = 0; i < result.numel(); ++i)
+    {
+        result[i] = T(a[i] - b);
+    }
+}
+
+void sub_impl_cpu(Tensor a, double b, Tensor& result) 
 {
     SWITCH_MACRO_ALL(a.scalar_type(), sub_impl_cpu, a, b, result);
 }

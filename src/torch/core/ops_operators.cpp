@@ -317,20 +317,41 @@ Tensor operator+(double a, Tensor b)
 Tensor operator==(Tensor a, double b)
 {
     auto result = empty_like(a);
-    equal_impl_cpu(a, b, result);
+    if (a.is_cpu())
+    {
+        equal_impl_cpu(a, b, result);
+    }
+    else
+    {
+        equal_impl_cuda(a, b, result);
+    }
     return result;
 }
 
 Tensor operator<(Tensor a, double b)
 {
     auto result = empty_like(a);
-    less_impl_cpu(a, b, result);
+    if (a.is_cpu())
+    {
+        less_impl_cpu(a, b, result);
+    }
+    else
+    {
+        less_impl_cuda(a, b, result);
+    }
     return result;
 }
 Tensor operator>(Tensor a, double b)
 {
     auto result = empty_like(a);
-    greater_impl_cpu(a, b, result);
+    if (a.is_cpu())
+    {
+        greater_impl_cpu(a, b, result);
+    }
+    else
+    {
+        greater_impl_cuda(a, b, result);
+    }
     return result;
 }
 
@@ -338,37 +359,92 @@ Tensor operator>(Tensor a, double b)
 Tensor operator+=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    add_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        add_impl_cpu(a, b, a);
+    }
+    else
+    {
+        add_impl_cuda(a, b, a);
+    }
     return a;
 }
 Tensor operator+=(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    add_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        add_impl_cpu(a, b, a);
+    }
+    else
+    {
+        add_impl_cuda(a, b, a);
+    }
     return a;
 }
 Tensor operator-=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    sub_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        sub_impl_cpu(a, b, a);
+    }
+    else
+    {
+        sub_impl_cuda(a, b, a);
+    }
+    return a;
+}
+Tensor operator-=(Tensor a, double b)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    if (a.is_cpu())
+    {
+        sub_impl_cpu(a, b, a);
+    }
+    else
+    {
+        sub_impl_cuda(a, b, a);
+    }
     return a;
 }
 Tensor operator*=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    mult_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        mult_impl_cpu(a, b, a);
+    }
+    else
+    {
+        mult_impl_cuda(a, b, a);
+    }
     return a;
 }
 Tensor operator*=(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    mult_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        mult_impl_cpu(a, b, a);
+    }
+    else
+    {
+        mult_impl_cuda(a, b, a);
+    }
     return a;
 }
 Tensor operator/=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    div_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        div_impl_cpu(a, b, a);
+    }
+    else
+    {
+        div_impl_cuda(a, b, a);
+    }
     return a;
 }
 

@@ -17,6 +17,7 @@ void print_impl_cuda(std::ostream& strm, Tensor t);
 void add_impl_cuda(Tensor a, Tensor b, Tensor& result);
 void add_impl_cuda(Tensor a, double b, Tensor& result);
 void sub_impl_cuda(Tensor a, Tensor b, Tensor& result);
+void sub_impl_cuda(Tensor a, double b, Tensor& result);
 void mult_impl_cuda(Tensor a, Tensor b, Tensor& result);
 void mult_impl_cuda(Tensor a, double b, Tensor& result);
 void div_impl_cuda(Tensor a, Tensor b, Tensor& result);

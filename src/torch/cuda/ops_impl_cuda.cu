@@ -292,7 +292,7 @@ static __global__ void pow_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> re
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
 
-    result[i] = T(std::pow(a[i], b));
+    result[i] = T(::pow(a[i], b));
 }
 
 void pow_impl_cuda(Tensor a, double b, Tensor& result)
@@ -307,7 +307,7 @@ static __global__ void sin_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
 
-    result[i] = std::sin(a[i]);
+    result[i] = ::sin(a[i]);
 }
 
 void sin_impl_cuda(Tensor a, Tensor& result)
@@ -322,7 +322,7 @@ static __global__ void cos_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
 
-    result[i] = std::cos(a[i]);
+    result[i] = ::cos(a[i]);
 }
 
 void cos_impl_cuda(Tensor a, Tensor& result)

@@ -53,7 +53,7 @@ static __global__ void add_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> re
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = T(a[i] + b);
+    result[i] = T(double(a[i]) + b);
 }
 
 void add_impl_cuda(Tensor a, double b, Tensor& result) 
@@ -76,6 +76,20 @@ static __global__ void sub_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInf
 }
 
 void sub_impl_cuda(Tensor a, Tensor b, Tensor& result) 
+{
+    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), sub_impl_cuda, a, b, result);
+}
+
+template <typename T>
+__launch_bounds__(128) static __global__ void sub_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= result.numel()) return;
+
+    result[i] = T(double(a[i]) - b);
+}
+
+void sub_impl_cuda(Tensor a, double b, Tensor& result)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), sub_impl_cuda, a, b, result);
 }
@@ -106,7 +120,7 @@ static __global__ void mult_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> r
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = T(a[i] * b);
+    result[i] = T(double(a[i]) * b);
 }
 
 void mult_impl_cuda(Tensor a, double b, Tensor& result) 
@@ -140,7 +154,7 @@ static __global__ void div_impl_cuda(double a, TensorInfo<T> b, TensorInfo<T> re
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = T(a / b[i]);
+    result[i] = T(a / double(b[i]));
 }
 
 void div_impl_cuda(double a, Tensor b, Tensor& result) 
@@ -155,7 +169,7 @@ static __global__ void equal_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> 
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = T(a[i] == b);
+    result[i] = T(a[i] == T(b));
 }
 
 void equal_impl_cuda(Tensor a, double b, Tensor& result) 
@@ -170,7 +184,7 @@ static __global__ void less_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> r
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = T(a[i] < b);
+    result[i] = T(a[i] < T(b));
 }
 
 void less_impl_cuda(Tensor a, double b, Tensor& result) 
@@ -185,7 +199,7 @@ static __global__ void greater_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = T(a[i] > b);
+    result[i] = T(a[i] > T(b));
 }
 
 void greater_impl_cuda(Tensor a, double b, Tensor& result) 

@@ -7,19 +7,19 @@ namespace tinytorch
 template <typename T>
 inline TT_HD T relu(T x)
 {
-    return (x > T(0)) ? x : T(0);
+    return (x > T(0.f)) ? x : T(0.f);
 }
 
 template <typename T>
 inline TT_HD T sigmoid(T x)
 {
-    return T(1) / (T(1) + ::exp(-x));
+    return T(1.f) / (T(1.f) + ::exp(-x));
 }
 
 template <typename T>
 inline TT_HD T softplus(T x, T beta)
 {
-    return T(::log(1 + ::exp(beta * x)) / beta);
+    return T(::log(T(1.f) + ::exp(beta * x)) / beta);
 }
 
 
@@ -27,19 +27,19 @@ inline TT_HD T softplus(T x, T beta)
 template <typename T>
 inline TT_HD std::pair<T, T> div_backward(T a, T b)
 {
-    return {T(1) / b, -a / (b * b)};
+    return {T(1.f) / b, -a / (b * b)};
 }
 
 template <typename T>
 inline TT_HD T log_backward(T x)
 {
-    return T(1) / x;
+    return T(1.f) / x;
 }
 
 template <typename T>
 inline TT_HD T log1p_backward(T x)
 {
-    return T(1) / (x + T(1));
+    return T(1.f) / (x + T(1.f));
 }
 
 template <typename T>
@@ -63,21 +63,21 @@ inline TT_HD T cos_backward(T x)
 template <typename T>
 inline TT_HD T relu_backward(T x)
 {
-    return ((x < T(0)) ? T(0) : T(1));
+    return ((x < T(0.f)) ? T(0.f) : T(1.f));
 }
 
 template <typename T>
 inline TT_HD T sigmoid_backward(T x)
 {
     T expnegx = T(::exp(-x));
-    return expnegx / ((T(1) + expnegx) * (T(1) + expnegx));
+    return expnegx / ((T(1.f) + expnegx) * (T(1.f) + expnegx));
 }
 
 template <typename T>
 inline TT_HD T softplus_backward(T x, T beta)
 {
     T e = T(::exp(beta * x));
-    return e / (e + T(1));
+    return e / (e + T(1.f));
 }
 
 inline TT_HD int64_t index_along_dim(int64_t linearId, int64_t dims, int64_t dim, int64_t* input_sizes,
