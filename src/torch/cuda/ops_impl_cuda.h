@@ -19,6 +19,7 @@ void uniform_impl_cuda(Tensor& t, double mi, double ma);
 void uniform_int_impl_cuda(Tensor& t, int low, int high);
 
 void sum_impl_cuda(Tensor a, Tensor& result);
+void sum_impl_cuda(Tensor a, int64_t dim, Tensor& result);
 void log_impl_cuda(Tensor a, Tensor& result);
 void log1p_impl_cuda(Tensor a, Tensor& result);
 void exp_impl_cuda(Tensor a, Tensor& result);
@@ -35,6 +36,7 @@ void softplus_impl_cuda(Tensor a, double beta, Tensor& result);
 void min_impl_cuda(Tensor a, Tensor b, Tensor& result);
 void max_impl_cuda(Tensor a, Tensor b, Tensor& result);
 
+void index_select_impl_cuda(Tensor input, int64_t dim, Tensor index, Tensor& result);
 }
 
 

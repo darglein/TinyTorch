@@ -10,6 +10,7 @@
 
 #include "torch/cpu/ops_impl_cpu.h"
 #include "torch/cpu/ops_operators_impl_cpu.h"
+#include "torch/cuda/ops_operators_impl_cuda.h"
 
 namespace tinytorch
 {
@@ -48,7 +49,14 @@ struct AddNode : public FunctionNode<AddNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
         Tensor result = empty(max_size(a, b), a.options());
-        add_impl_cpu(a, b, result);
+        if (a.is_cpu())
+        {
+            add_impl_cpu(a, b, result);
+        }
+        else
+        {
+            add_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -65,7 +73,14 @@ struct SubNode : public FunctionNode<SubNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
         Tensor result = empty(max_size(a, b), a.options());
-        sub_impl_cpu(a, b, result);
+        if (a.is_cpu())
+        {
+            sub_impl_cpu(a, b, result);
+        }
+        else
+        {
+            sub_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -83,7 +98,14 @@ struct DivNode : public FunctionNode<DivNode>
     {
         Tensor result = empty(max_size(a, b), a.options());
         ctx->save_for_backward({a, b});
-        div_impl_cpu(a, b, result);
+        if (a.is_cpu())
+        {
+            div_impl_cpu(a, b, result);
+        }
+        else
+        {
+            div_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -107,7 +129,14 @@ struct MultNode : public FunctionNode<MultNode>
     {
         Tensor result = empty(max_size(a, b), a.options());
         ctx->save_for_backward({a, b});
-        mult_impl_cpu(a, b, result);
+        if (a.is_cpu())
+        {
+            mult_impl_cpu(a, b, result);
+        }
+        else
+        {
+            mult_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -135,7 +164,14 @@ struct DivScalarTensorNode : public FunctionNode<DivScalarTensorNode>
         auto result          = empty_like(b);
         ctx->saved_data["a"] = a;
         ctx->save_for_backward({b});
-        div_impl_cpu(a, b, result);
+        if (b.is_cpu())
+        {
+            div_impl_cpu(a, b, result);
+        }
+        else
+        {
+            div_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -160,7 +196,14 @@ struct MultTensorScalarNode : public FunctionNode<MultTensorScalarNode>
         auto result          = empty_like(a);
         ctx->saved_data["b"] = b;
         ctx->save_for_backward({a});
-        mult_impl_cpu(a, b, result);
+        if (a.is_cpu())
+        {
+            mult_impl_cpu(a, b, result);
+        }
+        else
+        {
+            mult_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -181,8 +224,14 @@ struct AddTensorScalarNode : public FunctionNode<AddTensorScalarNode>
         auto result          = empty_like(a);
         ctx->saved_data["b"] = b;
         ctx->save_for_backward({a});
-
-        add_impl_cpu(a, b, result);
+        if (a.is_cpu())
+        {
+            add_impl_cpu(a, b, result);
+        }
+        else
+        {
+            add_impl_cuda(a, b, result);
+        }
         return {result};
     }
 

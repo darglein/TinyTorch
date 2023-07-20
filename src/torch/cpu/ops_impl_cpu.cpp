@@ -527,18 +527,18 @@ void abs_impl_cpu(Tensor a, Tensor& result)
 }
 
 template <typename T>
-static void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> index, TensorInfo<T> result)
+static void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<int32_t> index, TensorInfo<T> result)
 {
     int64_t dims = input.dims;
 
-    int64_t to_copy = input.numel() / input.sizes[dim];
+    int64_t slice_size = input.numel() / input.sizes[dim];
     for (int64_t index_index = 0; index_index < index.numel(); ++index_index)
     {
         int64_t slice        = index[index_index];
         int64_t input_start  = slice * input.strides[dim];
         int64_t result_start = index_index * result.strides[dim];
 
-        for (int64_t c = 0; c < to_copy; ++c)
+        for (int64_t c = 0; c < slice_size; ++c)
         {
             int64_t linearId = c;
 

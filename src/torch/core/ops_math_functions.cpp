@@ -9,6 +9,7 @@
 #include "graph.h"
 
 #include "torch/cpu/ops_impl_cpu.h"
+#include "torch/cuda/ops_impl_cuda.h"
 
 
 namespace tinytorch
@@ -146,12 +147,18 @@ Tensor sum(Tensor a)
 Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    CHECK(a.is_cpu());
 
     auto out_size = a.sizes();
     out_size[dim] = 1;
     auto result   = empty(out_size, a.options());
-    sum_impl_cpu(a, dim, result);
+    if (a.is_cpu())
+    {
+        sum_impl_cpu(a, dim, result);
+    }
+    else
+    {
+        sum_impl_cuda(a, dim, result);
+    }
     if (squeeze_dim)
     {
         auto dims_before = result.dim();

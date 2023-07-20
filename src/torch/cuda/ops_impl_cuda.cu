@@ -177,6 +177,11 @@ void sum_impl_cuda(Tensor a, Tensor& result)
     }
 }
 
+void sum_impl_cuda(Tensor a, int64_t dim, Tensor& result) 
+{
+    throw std::runtime_error("not implemented");
+}
+
 template <typename T>
 __launch_bounds__(128)
 static __global__ void log_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
@@ -356,6 +361,54 @@ static __global__ void max_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInf
 void max_impl_cuda(Tensor a, Tensor b, Tensor& result)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), max_impl_cuda, a, b, result);
+}
+
+template <typename T>
+__launch_bounds__(128) 
+static __global__ void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<int32_t> index, TensorInfo<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= result.numel()) return;
+
+    int64_t dims    = input.dims;
+    int64_t slice_size = input.numel() / input.sizes[dim];
+
+    int64_t index_index = i / slice_size;
+    int64_t slice        = index[index_index];
+    int64_t input_start  = slice * input.strides[dim];
+    int64_t result_start = index_index * result.strides[dim];
+
+    int64_t c = i % slice_size;
+
+
+    int64_t linearId = c;
+
+    int64_t input_offset  = input_start;
+    int64_t result_offset = result_start;
+    for (int64_t i = dims - 1; i > 0; --i)
+    {
+        if (i != dim)
+        {
+            int64_t curDimIndex = linearId % input.sizes[i];
+            input_offset += curDimIndex * input.strides[i];
+            result_offset += curDimIndex * result.strides[i];
+            linearId /= input.sizes[i];
+        }
+    }
+
+    if (dim != 0)
+    {
+        input_offset += linearId * input.strides[0];
+        result_offset += linearId * result.strides[0];
+    }
+
+    // result[i] should be the same as result.data[result_offset]
+    result.data[result_offset] = input.data[input_offset];
+}
+
+void index_select_impl_cuda(Tensor input, int64_t dim, Tensor index, Tensor& result) 
+{
+    SWITCH_MACRO_ALL(result.scalar_type(), result.numel(), index_select_impl_cpu, input, dim, index, result);
 }
 
 

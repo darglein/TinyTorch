@@ -119,7 +119,14 @@ void uniform_int(Tensor& t, int low, int high)
 void copy(Tensor src, Tensor target)
 {
     CHECK(!src.requires_grad() || !GradMode::is_enabled());
-    copy_and_convert_impl_cpu(src, target);
+    if (src.is_cpu())
+    {
+        copy_and_convert_impl_cpu(src, target);
+    }
+    else
+    {
+        copy_and_convert_impl_cuda(src, target);
+    }
 }
 
 
@@ -211,15 +218,20 @@ Tensor index_select(Tensor input, int64_t dim, Tensor index)
 
     
     CHECK_LT(dim, input.dim());
-    CHECK_EQ(index.dtype(), kLong);
+    CHECK_EQ(index.dtype(), kInt32);
 
-    auto numel = index.numel();
-
-    auto result_size = input.sizes().vec();
-    result_size[dim] = numel;
+    SizeType result_size = input.sizes();
+    result_size[dim]     = index.numel();
 
     Tensor result = empty(result_size, input.options());
-    index_select_impl_cpu(input, dim, index, result);
+    if (input.is_cpu())
+    {
+        index_select_impl_cpu(input, dim, index, result);
+    }
+    else
+    {
+        index_select_impl_cuda(input, dim, index, result);
+    }
     return result;
 }
 
@@ -234,7 +246,7 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
 
 
         CHECK_LT(dim.toInt(), input.dim());
-        CHECK_EQ(index.dtype(), kLong);
+        CHECK_EQ(index.dtype(), kInt32);
         CHECK_EQ(input.dim(), data.dim());
         CHECK_EQ(index.dim(), 1);
         CHECK_EQ(index.numel(), data.size(0));
