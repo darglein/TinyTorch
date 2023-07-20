@@ -25,7 +25,14 @@ struct SqrtNode : public FunctionNode<SqrtNode>
     {
         ctx->save_for_backward({a});
         auto result = empty_like(a);
-        sqrt_impl_cpu(a, result);
+        if (a.is_cpu())
+        {
+            sqrt_impl_cpu(a, result);
+        }
+        else
+        {
+            sqrt_impl_cuda(a, result);
+        }
         return {result};
     }
 
@@ -150,13 +157,15 @@ Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
 
     auto out_size = a.sizes();
     out_size[dim] = 1;
-    auto result   = empty(out_size, a.options());
+    Tensor result;
     if (a.is_cpu())
     {
+        result = empty(out_size, a.options());
         sum_impl_cpu(a, dim, result);
     }
     else
     {
+        result = zeros(out_size, a.options());
         sum_impl_cuda(a, dim, result);
     }
     if (squeeze_dim)

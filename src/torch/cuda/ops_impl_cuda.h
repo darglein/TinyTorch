@@ -17,7 +17,7 @@ void fill_impl_cuda(Tensor a, double value);
 void copy_and_convert_impl_cuda(Tensor src, Tensor& target);
 void uniform_impl_cuda(Tensor& t, double mi, double ma);
 void uniform_int_impl_cuda(Tensor& t, int low, int high);
-
+void sqrt_impl_cuda(Tensor a, Tensor& result);
 void sum_impl_cuda(Tensor a, Tensor& result);
 void sum_impl_cuda(Tensor a, int64_t dim, Tensor& result);
 void log_impl_cuda(Tensor a, Tensor& result);

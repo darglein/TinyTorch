@@ -80,6 +80,55 @@ inline TT_HD T softplus_backward(T x, T beta)
     return e / (e + T(1));
 }
 
+inline TT_HD int64_t index_along_dim(int64_t linearId, int64_t dims, int64_t dim, int64_t* input_sizes,
+                               int64_t* input_strides)
+{
+    int64_t input_offset = 0;
+    for (int64_t i = dims - 1; i > 0; --i)
+    {
+        if (i != dim)
+        {
+            int64_t curDimIndex = linearId % input_sizes[i];
+            input_offset += curDimIndex * input_strides[i];
+            linearId /= input_sizes[i];
+        }
+    }
+
+    if (dim != 0)
+    {
+        input_offset += linearId * input_strides[0];
+    }
+
+    return input_offset;
+}
+
+inline TT_HD void calculate_offsets(int64_t linearId, int64_t dims, int64_t* a_sizes, int64_t* b_sizes,
+                                    int64_t* a_strides, int64_t* b_strides, int64_t& offset_a, int64_t& offset_b)
+{
+    // This handles the case that if one tensor has size 1 along a dimension, the respective value is duplicated along
+    // this dimension.
+
+    offset_a = 0;
+    offset_b = 0;
+
+    for (int64_t i = dims - 1; i > 0; --i)
+    {
+        int64_t sa    = a_sizes[i];
+        int64_t sb    = b_sizes[i];
+        int64_t max_s = (sa > sb) ? sa : sb;
+
+        offset_a += (sa == 1) ? 0 : ((linearId % sa) * a_strides[i]);
+        offset_b += (sb == 1) ? 0 : ((linearId % sb) * b_strides[i]);
+        linearId /= max_s;
+    }
+
+    int64_t sa = a_sizes[0];
+    int64_t sb = b_sizes[0];
+
+    offset_a += (sa == 1) ? 0 : ((linearId % sa) * a_strides[0]);
+    offset_b += (sb == 1) ? 0 : ((linearId % sb) * b_strides[0]);
+}
+
 
 
 }  // namespace tinytorch

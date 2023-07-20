@@ -154,14 +154,28 @@ void uniform_int_impl_cuda(Tensor& a, int low, int high)
 }
 
 template <typename T>
+__launch_bounds__(128) 
+static __global__ void sqrt_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= a.numel()) return;
+
+    result[i] = ::sqrt(a[i]);
+}
+
+void sqrt_impl_cuda(Tensor a, Tensor& result) 
+{
+    SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), sqrt_impl_cuda, a, result);
+}
+
+template <typename T>
 __launch_bounds__(128)
 static __global__ void sum_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
 
-    T* ptr = &result[0];
-    atomicAdd(ptr, a[i]);
+    atomicAdd(&result[0], a[i]);
 }
 
 void sum_impl_cuda(Tensor a, Tensor& result)
@@ -177,9 +191,37 @@ void sum_impl_cuda(Tensor a, Tensor& result)
     }
 }
 
+template <typename T>
+__launch_bounds__(128)
+static __global__ void sum_impl_cuda(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= input.numel()) return;
+
+    int64_t dims = input.dims;
+
+    int64_t count = result.numel();
+    int64_t c     = i / count;
+
+    int64_t input_offset = index_along_dim(c, dims, dim, input.sizes, input.strides);
+
+    int64_t o = i % count;
+    input_offset += o * input.strides[dim];
+
+    atomicAdd(&result[c], input[input_offset]);
+}
+
 void sum_impl_cuda(Tensor a, int64_t dim, Tensor& result) 
 {
-    throw std::runtime_error("not implemented");
+    auto stream = cuda::getCurrentCUDAStream();
+    switch (a.scalar_type())
+    {
+        CASE_MACRO(sum_impl_cuda, int32_t, kInt32, a.numel(), a, dim, result)
+        CASE_MACRO(sum_impl_cuda, float, kFloat, a.numel(), a, dim, result)
+        CASE_MACRO(sum_impl_cuda, double, kDouble, a.numel(), a, dim, result)
+        default:
+            CHECK(false) << "invalid input type " << a.scalar_type();
+    }
 }
 
 template <typename T>

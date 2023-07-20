@@ -124,34 +124,12 @@ void sum_impl_cpu(Tensor a, Tensor& result)
     SWITCH_MACRO_ALL(a.scalar_type(), sum_impl_cpu, a, result);
 }
 
-static int64_t index_along_dim(int64_t linearId, int64_t dims, int64_t dim, int64_t* input_sizes,
-                               int64_t* input_strides)
-{
-    int64_t input_offset = 0;
-    for (int64_t i = dims - 1; i > 0; --i)
-    {
-        if (i != dim)
-        {
-            int64_t curDimIndex = linearId % input_sizes[i];
-            input_offset += curDimIndex * input_strides[i];
-            linearId /= input_sizes[i];
-        }
-    }
-
-    if (dim != 0)
-    {
-        input_offset += linearId * input_strides[0];
-    }
-
-    return input_offset;
-}
-
 template <typename T>
 static void sum_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
     int64_t dims = input.dims;
 
-    int64_t to_prod = input.sizes[dim];
+    int64_t dim_size = input.sizes[dim];
     int64_t count   = input.numel() / input.sizes[dim];
     CHECK_EQ(count, result.numel());
 
@@ -161,7 +139,7 @@ static void sum_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 
         T sum = T(0);
 
-        for (int64_t p = 0; p < to_prod; ++p)
+        for (int64_t p = 0; p < dim_size; ++p)
         {
             sum += input[input_offset];
             input_offset += input.strides[dim];
@@ -170,10 +148,12 @@ static void sum_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
         result[c] = sum;
     }
 }
+
 void sum_impl_cpu(Tensor a, int64_t dim, Tensor& result)
 {
     SWITCH_MACRO_FLOAT(a.scalar_type(), sum_impl_cpu, a, dim, result);
 }
+
 template <typename T>
 static void log_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
@@ -320,7 +300,7 @@ static void prod_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result
 {
     int64_t dims = input.dims;
 
-    int64_t to_prod = input.sizes[dim];
+    int64_t dim_size = input.sizes[dim];
     int64_t count   = input.numel() / input.sizes[dim];
     CHECK_EQ(count, result.numel());
 
@@ -330,7 +310,7 @@ static void prod_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result
 
         T prod = T(1);
 
-        for (int64_t p = 0; p < to_prod; ++p)
+        for (int64_t p = 0; p < dim_size; ++p)
         {
             prod *= input[input_offset];
             input_offset += input.strides[dim];

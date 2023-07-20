@@ -34,7 +34,11 @@ static __global__ void add_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInf
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = a[i] + b[i];
+    int64_t dims = result.dims;
+
+    int64_t offset_a, offset_b;
+    calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides, offset_a, offset_b);
+    result[i] = a.data[offset_a] + b.data[offset_b];
 }
 
 void add_impl_cuda(Tensor a, Tensor b, Tensor& result)
@@ -64,7 +68,11 @@ static __global__ void sub_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInf
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = a[i] - b[i];
+    int64_t dims = result.dims;
+
+    int64_t offset_a, offset_b;
+    calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides, offset_a, offset_b);
+    result[i] = a.data[offset_a] - b.data[offset_b];
 }
 
 void sub_impl_cuda(Tensor a, Tensor b, Tensor& result) 
@@ -79,7 +87,11 @@ static __global__ void mult_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorIn
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = a[i] * b[i];
+    int64_t dims = result.dims;
+
+    int64_t offset_a, offset_b;
+    calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides, offset_a, offset_b);
+    result[i] = a.data[offset_a] * b.data[offset_b];
 }
 
 void mult_impl_cuda(Tensor a, Tensor b, Tensor& result) 
@@ -109,7 +121,11 @@ static __global__ void div_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInf
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    result[i] = a[i] / b[i];
+    int64_t dims = result.dims;
+
+    int64_t offset_a, offset_b;
+    calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides, offset_a, offset_b);
+    result[i] = a.data[offset_a] / b.data[offset_b];
 }
 
 void div_impl_cuda(Tensor a, Tensor b, Tensor& result) 
