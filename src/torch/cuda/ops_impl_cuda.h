@@ -14,7 +14,7 @@ namespace tinytorch
 // Should NOT be called by the user
 void range_impl_cuda(Tensor a, double start, double end, double step);
 void fill_impl_cuda(Tensor a, double value);
-void copy_impl_cuda(Tensor src, Tensor target);
+void copy_and_convert_impl_cuda(Tensor src, Tensor& target);
 void uniform_impl_cuda(Tensor& t, double mi, double ma);
 void uniform_int_impl_cuda(Tensor& t, int low, int high);
 

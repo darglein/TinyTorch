@@ -119,7 +119,7 @@ void uniform_int(Tensor& t, int low, int high)
 void copy(Tensor src, Tensor target)
 {
     CHECK(!src.requires_grad() || !GradMode::is_enabled());
-    copy_impl_cpu(src, target);
+    copy_and_convert_impl_cpu(src, target);
 }
 
 
@@ -161,14 +161,14 @@ struct ToScalarTypeNode : public FunctionNode<ToScalarTypeNode>
         ctx->saved_data["old_dtype"] = (int)a.dtype();
         Dtype new_dtype              = (Dtype)new_dtype_.toInt();
 
-        Tensor result;
+        Tensor result = empty_like(a, a.options().dtype(new_dtype));
         if (a.is_cpu())
         {
-            result = to_impl_cpu(a, new_dtype);
+            copy_and_convert_impl_cpu(a, result);
         }
         else
         {
-            CHECK(false);
+            copy_and_convert_impl_cuda(a, result);
         }
         return {result};
     }
@@ -178,7 +178,7 @@ struct ToScalarTypeNode : public FunctionNode<ToScalarTypeNode>
         Dtype old_dtype = (Dtype)ctx->saved_data["old_dtype"].toInt();
         auto g = grad[0];
         Tensor grad_a   = empty_like(grad[0], grad[0].options().dtype(old_dtype));
-        grad_a = to_impl_cpu(g, old_dtype);
+        copy_and_convert_impl_cpu(g, grad_a);
         return {grad_a, {}};
     }
 };
@@ -308,12 +308,12 @@ struct CloneNode : public FunctionNode<CloneNode>
 
         if (a.is_cpu())
         {
-            copy_impl_cpu(a, result);
+            copy_and_convert_impl_cpu(a, result);
         }
         else
         {
 #ifdef TT_HAS_CUDA
-            copy_impl_cuda(a, result);
+            copy_and_convert_impl_cuda(a, result);
 #endif
         }
         return {result};
@@ -325,12 +325,12 @@ struct CloneNode : public FunctionNode<CloneNode>
         Tensor grad_a = empty_like(grad[0]);
         if (grad_a.is_cpu())
         {
-            copy_impl_cpu(grad[0], grad_a);
+            copy_and_convert_impl_cpu(grad[0], grad_a);
         }
         else
         {
 #ifdef TT_HAS_CUDA
-            copy_impl_cuda(grad[0], grad_a);
+            copy_and_convert_impl_cuda(grad[0], grad_a);
 #endif
         }
         return {grad_a[0]};

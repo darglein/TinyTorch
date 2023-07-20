@@ -895,7 +895,7 @@ void max_backward_impl_cpu(Tensor grad_output, Tensor& grad_a, Tensor& grad_b)
 }
 
 template <typename T>
-static void to_double_cpu(TensorInfo<T> a, TensorInfo<double> result)
+static void to_double_impl_cpu(TensorInfo<T> a, TensorInfo<double> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
@@ -915,26 +915,54 @@ static void from_double_cpu(TensorInfo<double> a, TensorInfo<T> result)
 Tensor to_impl_cpu(Tensor a, ScalarType other_type)
 {
     Tensor t2 = empty_like(a, TensorOptions().dtype(kDouble));
-    SWITCH_MACRO_ALL(a.scalar_type(), to_double_cpu, a, t2);
+    SWITCH_MACRO_ALL(a.scalar_type(), to_double_impl_cpu, a, t2);
 
     Tensor result = empty_like(a, TensorOptions().dtype(other_type));
     SWITCH_MACRO_ALL(result.scalar_type(), from_double_cpu, t2, result);
     return result;
 }
 
-template <typename T>
-static void copy_cpu(TensorInfo<T> src, TensorInfo<T> dst)
+template <typename TSource, typename TTarget>
+static void copy_and_convert_impl_cpu(TensorInfo<TSource> src, TensorInfo<TTarget> target)
 {
     for (int64_t i = 0; i < src.numel(); ++i)
     {
-        dst[i] = src[i];
+        target[i] = TTarget(src[i]);
     }
 }
 
-void copy_impl_cpu(Tensor src, Tensor target)
+template <typename TSource>
+static void copy_and_convert_helper_cpu(TensorInfo<TSource> src, Tensor target)
+{
+    switch (target.scalar_type())
+    {
+        case kUInt8:
+            copy_and_convert_impl_cpu<TSource, uint8_t>(src, target);
+            break;
+        case kInt16:
+            copy_and_convert_impl_cpu<TSource, int16_t>(src, target);
+            break;
+        case kInt32:
+            copy_and_convert_impl_cpu<TSource, int32_t>(src, target);
+            break;
+        case kLong:
+            copy_and_convert_impl_cpu<TSource, int64_t>(src, target);
+            break;
+        case kFloat:
+            copy_and_convert_impl_cpu<TSource, float>(src, target);
+            break;
+        case kDouble:
+            copy_and_convert_impl_cpu<TSource, double>(src, target);
+            break;
+        default:
+            CHECK(false) << "invalid input type " << target.scalar_type();
+    }
+}
+
+void copy_and_convert_impl_cpu(Tensor src, Tensor& target)
 {
     CHECK_EQ(src.numel(), target.numel());
-    SWITCH_MACRO_ALL(src.scalar_type(), copy_cpu, src, target);
+    SWITCH_MACRO_ALL(src.scalar_type(), copy_and_convert_helper_cpu, src, target);
 }
 
 template <typename T>

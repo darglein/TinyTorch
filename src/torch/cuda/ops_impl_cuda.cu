@@ -44,19 +44,72 @@ void fill_impl_cuda(Tensor a, double value)
     SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), fill_impl_cuda, a, value);
 }
 
-template <typename T>
+template <typename TSource, typename TTarget>
 __launch_bounds__(128)
-static __global__ void copy_impl_cuda(TensorInfo<T> a, TensorInfo<T> b)
+static __global__ void copy_and_convert_impl_cuda(TensorInfo<TSource> a, TensorInfo<TTarget> b)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
 
-    b[i] = a[i];
+    b[i] = TTarget(a[i]);
 }
 
-void copy_impl_cuda(Tensor src, Tensor target)
+template <typename TSource>
+static void copy_and_convert_helper_cuda(TensorInfo<TSource> src, Tensor target)
 {
-    SWITCH_MACRO_ALL(src.scalar_type(), src.numel(), copy_impl_cuda, src, target);
+    auto stream = cuda::getCurrentCUDAStream();
+    int64_t numel = src.numel();
+    
+    switch (target.scalar_type())
+    {
+        case kUInt8:
+            copy_and_convert_impl_cuda<TSource, uint8_t><<<iDivUp(numel, 128), 128, 0, stream>>>(src, target);
+            break;
+        case kInt16:
+            copy_and_convert_impl_cuda<TSource, int16_t><<<iDivUp(numel, 128), 128, 0, stream>>>(src, target);
+            break;
+        case kInt32:
+            copy_and_convert_impl_cuda<TSource, int32_t><<<iDivUp(numel, 128), 128, 0, stream>>>(src, target);
+            break;
+        case kLong:
+            copy_and_convert_impl_cuda<TSource, int64_t><<<iDivUp(numel, 128), 128, 0, stream>>>(src, target);
+            break;
+        case kFloat:
+            copy_and_convert_impl_cuda<TSource, float><<<iDivUp(numel, 128), 128, 0, stream>>>(src, target);
+            break;
+        case kDouble:
+            copy_and_convert_impl_cuda<TSource, double><<<iDivUp(numel, 128), 128, 0, stream>>>(src, target);
+            break;
+        default:
+            CHECK(false) << "invalid input type " << target.scalar_type();
+    }
+}
+
+void copy_and_convert_impl_cuda(Tensor src, Tensor& target)
+{
+    switch (src.scalar_type())
+    {
+        case kUInt8:
+            copy_and_convert_helper_cuda<uint8_t>(src, target);
+            break;
+        case kInt16:
+            copy_and_convert_helper_cuda<int16_t>(src, target);
+            break;
+        case kInt32:
+            copy_and_convert_helper_cuda<int32_t>(src, target);
+            break;
+        case kLong:
+            copy_and_convert_helper_cuda<int64_t>(src, target);
+            break;
+        case kFloat:
+            copy_and_convert_helper_cuda<float>(src, target);
+            break;
+        case kDouble:
+            copy_and_convert_helper_cuda<double>(src, target);
+            break;
+        default:
+            CHECK(false) << "invalid input type " << src.scalar_type();
+    }
 }
 
 

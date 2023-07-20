@@ -46,8 +46,7 @@ void index_add_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor data, Te
 void repeat_interleave_impl_cpu(Tensor input, int64_t count, Tensor& result);
 void stack_impl_cpu(const std::vector<Tensor>& tensors, Tensor& result);
 void transpose_impl_cpu(Tensor input, int64_t dim0, int64_t dim1, Tensor& result);
-Tensor to_impl_cpu(Tensor a, ScalarType other_type);
-void copy_impl_cpu(Tensor src, Tensor target);
+void copy_and_convert_impl_cpu(Tensor src, Tensor& target);
 void clamp_impl_cpu_(Tensor& a, double low, double high);
 
 void sum_backward_impl_cpu(Tensor grad_output, Tensor& grad_a);

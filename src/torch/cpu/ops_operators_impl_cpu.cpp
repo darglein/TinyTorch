@@ -97,9 +97,7 @@ static void mult_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result
 
 void mult_impl_cpu(Tensor a, Tensor b, Tensor& result)
 {
-    // Tensor result = empty(max_size(a, b), a.options());
     SWITCH_MACRO_ALL(a.scalar_type(), mult_impl_cpu, a, b, result);
-    // return result;
 }
 
 template <typename T>
