@@ -154,8 +154,12 @@ struct Module
 
 
 
-    void register_buffer(std::string name, Tensor t) { buffers_[name] = t; }
-    void register_parameter(std::string name, Tensor t) { parameters_[name] = t; }
+    void register_buffer(std::string name, Tensor& t) { buffers_[name] = t; }
+    void register_parameter(std::string name, Tensor& t)
+    {
+        t.set_requires_grad(true);
+        parameters_[name] = t;
+    }
 
     template <typename ModuleType>
     std::shared_ptr<ModuleType> register_module(std::string name, std::shared_ptr<ModuleType> module)

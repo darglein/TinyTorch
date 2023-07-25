@@ -152,7 +152,10 @@ struct TINYTORCH_API Tensor
 
     Tensor view(const SizeType& sizes) const;
     Tensor operator[](int64_t index) const { return slice(0, index, index + 1).squeeze(0); }
+
     Tensor slice(int64_t dim, int64_t start, int64_t end, int64_t step = 1) const;
+    // no grad version
+    Tensor slice_view(int64_t dim, int64_t start, int64_t end, int64_t step = 1) const;
 
     Tensor scatter_add(int64_t dim, Tensor ids, Tensor value) const
     {

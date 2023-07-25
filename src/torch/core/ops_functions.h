@@ -25,7 +25,7 @@ TINYTORCH_API void fill(Tensor& t, double value);
 TINYTORCH_API void uniform(Tensor& t, double mi = 0, double ma = 1);
 TINYTORCH_API void uniform_int(Tensor& t, int low, int high);
 
-inline std::pair<Tensor,Tensor> sort(Tensor t, int64_t a)
+inline std::pair<Tensor, Tensor> sort(Tensor t, int64_t a)
 {
     throw std::runtime_error("not implemented");
     return {};
@@ -38,6 +38,7 @@ TINYTORCH_API Tensor to(Tensor a, Device other_type);
 
 
 
+TINYTORCH_API Tensor slice(Tensor a, int64_t dim, int64_t start, int64_t end, int64_t step);
 TINYTORCH_API Tensor stack(const std::vector<Tensor>& a);
 TINYTORCH_API Tensor cat(const std::vector<Tensor>& a, int64_t dim);
 TINYTORCH_API Tensor index_select(Tensor input, int64_t dim, Tensor index);

@@ -134,6 +134,7 @@ static void fill_neg_one_dim(SizeType& new_sizes, int64_t old_numel)
 
 Tensor Tensor::view(const SizeType& sizes) const
 {
+    CHECK(!this->requires_grad() || !GradMode::is_enabled());
     SizeType new_sizes = sizes;
     fill_neg_one_dim(new_sizes, numel());
 
@@ -161,20 +162,26 @@ Tensor Tensor::view(const SizeType& sizes) const
 
 Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) const
 {
+    return tinytorch::slice(*this, dim, start, end, step);
+}
+
+Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step) const
+{
+    CHECK(!this->requires_grad() || !GradMode::is_enabled());
     int64_t dims = this->dim();
 
     CHECK_LT(dim, dims);
     CHECK_LT(start, end);
-    CHECK_LE(end, size(dim));
+    CHECK_LE(end, this->size(dim));
     CHECK_EQ((end - start) % step, 0);
 
-    int64_t offset = start * stride(dim);
-    offset *= element_size();
+    int64_t offset = start * this->stride(dim);
+    offset *= this->element_size();
 
-    std::vector<int64_t> new_sizes = sizes();
+    std::vector<int64_t> new_sizes = this->sizes();
     new_sizes[dim]                 = (end - start) / step;
 
-    auto new_strides = strides();
+    auto new_strides = this->strides();
     new_strides[dim] *= step;
 
     std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_ + offset,
@@ -185,6 +192,7 @@ Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) cons
 
 Tensor Tensor::unsqueeze(int64_t dim) const
 {
+    CHECK(!this->requires_grad() || !GradMode::is_enabled());
     CHECK(dim >= -this->dim() - 1 && dim < this->dim() + 1);
 
     if (dim < 0)
@@ -208,6 +216,7 @@ Tensor Tensor::unsqueeze(int64_t dim) const
 
 Tensor Tensor::squeeze(int64_t dim) const
 {
+    CHECK(!this->requires_grad() || !GradMode::is_enabled());
     CHECK_LT(dim, this->dim());
     CHECK_EQ(size(dim), 1);
     if (this->dim() == 1)
@@ -229,6 +238,7 @@ Tensor Tensor::squeeze(int64_t dim) const
 
 Tensor Tensor::squeeze() const
 {
+    CHECK(!this->requires_grad() || !GradMode::is_enabled());
     if (this->dim() == 1)
     {
         return *this;

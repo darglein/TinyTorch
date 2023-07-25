@@ -566,6 +566,8 @@ void index_add_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor data, Te
         case kLong:
             index_add_helper<int64_t>(input, dim, index, data, result);
             break;
+        default:
+            throw std::runtime_error("invalid type");
     }
 }
 

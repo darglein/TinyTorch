@@ -172,7 +172,6 @@ struct ToScalarTypeNode : public FunctionNode<ToScalarTypeNode>
         Tensor result = empty_like(a, a.options().dtype(new_dtype));
         if (a.is_cpu())
         {
-
             copy_and_convert_impl_cpu(a, result);
         }
         else
@@ -215,16 +214,60 @@ Tensor to(Tensor a, ScalarType other_type)
 }
 
 
+namespace autograd
+{
+struct IndexSelectNode : public FunctionNode<IndexSelectNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor input, IValue dim, Tensor index)
+    {
+        ctx->saved_data["dim"]        = dim;
+        ctx->data_sizes["input_size"] = input.sizes();
+        ctx->save_for_backward({index});
+
+
+        CHECK_LT(dim.toInt(), input.dim());
+        CHECK(index.dtype() == kInt32 || index.dtype() == kInt64);
+        CHECK_EQ(index.dim(), 1);
+
+
+
+        CHECK(!input.requires_grad() || !GradMode::is_enabled());
+
+        auto result_size         = input.sizes().vec();
+        result_size[dim.toInt()] = index.numel();
+        Tensor result            = empty(result_size, input.options());
+        if (result.is_cpu())
+        {
+            index_select_impl_cpu(input, dim.toInt(), index, result);
+        }
+        else
+        {
+            index_select_impl_cuda(input, dim.toInt(), index, result);
+        }
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        int dim          = ctx->saved_data["dim"].toInt();
+        auto l           = ctx->get_saved_variables();
+        auto index       = l[0];
+        auto input_sizes = ctx->data_sizes["input_size"];
+
+        auto g = grad[0];
+
+        auto grad_input = zeros(input_sizes, g.options());
+
+        index_add(g, dim, index, grad_input);
+        return {grad_input, {}, {}};
+    }
+};
+}  // namespace autograd
+
+
 Tensor index_select(Tensor input, int64_t dim, Tensor index)
 {
-    CHECK(!input.requires_grad() || !GradMode::is_enabled());
-
-    auto result_size = input.sizes().vec();
-    result_size[dim] = index.numel();
-    Tensor result    = empty(result_size, input.options());
-    index_select_impl_cpu(input, dim, index, result);
-
-    return result;
+    return autograd::IndexSelectNode::apply(input, dim, index)[0];
 }
 
 namespace autograd
@@ -250,10 +293,11 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
+        int dim    = ctx->saved_data["dim"].toInt();
         auto l     = ctx->get_saved_variables();
         auto index = l[0];
 
-        auto grad_data  = index_select(grad[0], ctx->saved_data["dim"].toInt(), index);
+        auto grad_data  = index_select(grad[0], dim, index);
         auto grad_input = grad[0];
 
         // Tensor grad_a = empty_like(grad[0]);
@@ -265,10 +309,46 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
 
 Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data)
 {
-    // CHECK(!input.requires_grad() || !GradMode::is_enabled());
-    // CHECK(!data.requires_grad() || !GradMode::is_enabled());
-
     return autograd::IndexAddNode::apply(input, dim, index, data)[0];
+}
+
+
+namespace autograd
+{
+struct SliceNode : public FunctionNode<SliceNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue dim, IValue start, IValue end, IValue step)
+    {
+        ctx->saved_data["dim"]   = dim;
+        ctx->saved_data["start"] = start;
+        ctx->saved_data["end"]   = end;
+        ctx->saved_data["step"]  = step;
+        ctx->save_for_backward({a});
+        Tensor result = a.slice_view(dim.toInt(), start.toInt(), end.toInt(), step.toInt());
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        int dim   = ctx->saved_data["dim"].toInt();
+        int start = ctx->saved_data["start"].toInt();
+        int end   = ctx->saved_data["end"].toInt();
+        int step  = ctx->saved_data["step"].toInt();
+
+        auto l      = ctx->get_saved_variables();
+        auto a      = l[0];
+        auto g      = grad[0];
+        auto grad_a = zeros_like(a);
+
+        grad_a.slice_view(dim, start, end, step) += g;
+
+        return {grad_a, {}, {}, {}, {}};
+    }
+};
+}  // namespace autograd
+Tensor slice(Tensor a, int64_t dim, int64_t start, int64_t end, int64_t step)
+{
+    return autograd::SliceNode::apply(a, dim, start, end, step)[0];
 }
 
 Tensor stack(const std::vector<Tensor>& tensors)
@@ -278,7 +358,7 @@ Tensor stack(const std::vector<Tensor>& tensors)
         CHECK(!b.requires_grad() || !GradMode::is_enabled());
     }
 
-    
+
     if (tensors.empty())
     {
         return {};
@@ -352,23 +432,48 @@ Tensor permute(Tensor t, const SizeType& size)
     return Tensor();
 }
 
+
+namespace autograd
+{
+struct Cat2Node : public FunctionNode<Cat2Node>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b, IValue dim)
+    {
+        auto output_size = a.sizes();
+        output_size[dim.toInt()] += b.size(dim.toInt());
+
+        auto result = empty(output_size, a.options());
+        result.slice_view(dim.toInt(), 0, 0 + a.size(dim.toInt())).copy_(a);
+        result.slice_view(dim.toInt(), a.size(dim.toInt()), a.size(dim.toInt()) + b.size(dim.toInt())).copy_(b);
+
+        ctx->save_for_backward({a, b});
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        int dim     = ctx->saved_data["dim"].toInt();
+        auto l      = ctx->get_saved_variables();
+        auto a      = l[0];
+        auto b      = l[1];
+        auto g      = grad[0];
+        auto grad_a = zeros_like(a);
+        auto grad_b = zeros_like(b);
+
+        grad_a.copy_(g.slice_view(dim, 0, 0 + a.size(dim)));
+        grad_b.copy_(g.slice_view(dim, a.size(dim), a.size(dim) + b.size(dim)));
+
+        return {grad_a, grad_b, {}};
+    }
+};
+}  // namespace autograd
+
 Tensor cat(const std::vector<Tensor>& list, int64_t dim)
 {
-    CHECK_GT(list.size(), 0);
-    auto output_size        = list.front().sizes();
-    int64_t target_dim_size = 0;
-    for (auto a : list)
+    auto result = list.front();
+    for (int i = 1; i < list.size(); ++i)
     {
-        target_dim_size += a.size(dim);
-    }
-    output_size[dim] = target_dim_size;
-
-    auto result = empty(output_size, list.front().options());
-
-    int64_t current_offset = 0;
-    for (auto a : list)
-    {
-        result.slice(dim, current_offset, current_offset + a.size(dim)).copy_(a);
+        result = autograd::Cat2Node::apply(result, list[i], dim)[0];
     }
 
     return result;
