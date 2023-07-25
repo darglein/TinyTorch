@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="tinytorch::Tensor">
+	  <DisplayString Condition="impl_._Ptr &amp;&amp; ((impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Mylast - impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst) == 1)">{{ dim=({*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst)}), dtype={impl_._Ptr-&gt;options_.dtype_}, device={impl_._Ptr-&gt;options_.device_} }}</DisplayString>
+	  <DisplayString Condition="impl_._Ptr &amp;&amp; ((impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Mylast - impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst) == 2)">{{ dim=({*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 1)}), dtype={impl_._Ptr-&gt;options_.dtype_}, device={impl_._Ptr-&gt;options_.device_} }}</DisplayString>
+	  <DisplayString Condition="impl_._Ptr &amp;&amp; ((impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Mylast - impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst) == 3)">{{ dim=({*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 1)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 2)}), dtype={impl_._Ptr-&gt;options_.dtype_}, device={impl_._Ptr-&gt;options_.device_} }}</DisplayString>
+	  <DisplayString Condition="impl_._Ptr &amp;&amp; ((impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Mylast - impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst) == 4)">{{ dim=({*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 1)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 2)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 3)}), dtype={impl_._Ptr-&gt;options_.dtype_}, device={impl_._Ptr-&gt;options_.device_} }}</DisplayString>
+	  <DisplayString Condition="impl_._Ptr &amp;&amp; ((impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Mylast - impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst) == 5)">{{ dim=({*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 1)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 2)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 3)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 4)}), dtype={impl_._Ptr-&gt;options_.dtype_}, device={impl_._Ptr-&gt;options_.device_} }}</DisplayString>
+	  <DisplayString Condition="impl_._Ptr &amp;&amp; ((impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Mylast - impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst) == 6)">{{ dim=({*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 1)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 2)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 3)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 4)} x {*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + 5)}), dtype={impl_._Ptr-&gt;options_.dtype_}, device={impl_._Ptr-&gt;options_.device_} }}</DisplayString>
+	  <DisplayString>empty</DisplayString>
+			
+	  <Expand>
+		  <Synthetic Name="data">
+			  <Expand>
+				  <ArrayItems Condition="impl_._Ptr">
+					  <Direction>Forward</Direction>
+					  <Rank>(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Mylast - impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst)</Rank>
+					  <Size>*(impl_._Ptr-&gt;sizes_.data_._Mypair._Myval2._Myfirst + $i)</Size>
+					  <LowerBound>0</LowerBound>
+					  <ValuePointer Condition="impl_._Ptr-&gt;options_.dtype_ == kUInt8">(uint8_t*)((uint8_t*)impl_._Ptr-&gt;storage_._Ptr-&gt;data_ptr_ + impl_._Ptr-&gt;storage_offset_)</ValuePointer>
+					  <ValuePointer Condition="impl_._Ptr-&gt;options_.dtype_ == kInt16">(int16_t*)((uint8_t*)impl_._Ptr-&gt;storage_._Ptr-&gt;data_ptr_ + impl_._Ptr-&gt;storage_offset_)</ValuePointer>
+					  <ValuePointer Condition="impl_._Ptr-&gt;options_.dtype_ == kInt32">(int32_t*)((uint8_t*)impl_._Ptr-&gt;storage_._Ptr-&gt;data_ptr_ + impl_._Ptr-&gt;storage_offset_)</ValuePointer>
+					  <ValuePointer Condition="impl_._Ptr-&gt;options_.dtype_ == kInt64">(int64_t*)((uint8_t*)impl_._Ptr-&gt;storage_._Ptr-&gt;data_ptr_ + impl_._Ptr-&gt;storage_offset_)</ValuePointer>
+					  <ValuePointer Condition="impl_._Ptr-&gt;options_.dtype_ == kFloat16">(uint16_t*)((uint8_t*)impl_._Ptr-&gt;storage_._Ptr-&gt;data_ptr_ + impl_._Ptr-&gt;storage_offset_)</ValuePointer>
+					  <ValuePointer Condition="impl_._Ptr-&gt;options_.dtype_ == kFloat32">(float*)((uint8_t*)impl_._Ptr-&gt;storage_._Ptr-&gt;data_ptr_ + impl_._Ptr-&gt;storage_offset_)</ValuePointer>
+					  <ValuePointer Condition="impl_._Ptr-&gt;options_.dtype_ == kFloat64">(double*)((uint8_t*)impl_._Ptr-&gt;storage_._Ptr-&gt;data_ptr_ + impl_._Ptr-&gt;storage_offset_)</ValuePointer>
+				  </ArrayItems>
+			  </Expand>
+		  </Synthetic>
+	  </Expand>
+  </Type>
+</AutoVisualizer>
+

@@ -9,6 +9,7 @@
 #include "ops_impl_cpu_helper.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cpu/ops_impl_cpu.h"
+#include "ops_operators_impl_cpu.h"
 
 
 #define SWITCH_MACRO_ALL_OPERATOR(real_scalar_type, op, func, ...)      \
@@ -66,10 +67,16 @@ void add_impl_cpu(Tensor a, double b, Tensor& result)
 {
     SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::plus, element_wise_operator, a, b, result);
 }
+
 void sub_impl_cpu(Tensor a, Tensor b, Tensor& result)
 {
     SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::minus, element_wise_operator, a, b, result);
 }
+void sub_impl_cpu(Tensor a, double b, Tensor& result)
+{
+    SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::minus, element_wise_operator, a, b, result);
+}
+
 void mult_impl_cpu(Tensor a, Tensor b, Tensor& result)
 {
     SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::multiplies, element_wise_operator, a, b, result);

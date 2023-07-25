@@ -9,6 +9,7 @@
 #include "graph.h"
 
 #include "torch/cpu/ops_impl_cpu.h"
+#include "torch/cuda/ops_impl_cuda.h"
 
 
 namespace tinytorch
@@ -24,7 +25,14 @@ struct SqrtNode : public FunctionNode<SqrtNode>
     {
         ctx->save_for_backward({a});
         auto result = empty_like(a);
-        sqrt_impl_cpu(a, result);
+        if (a.is_cpu())
+        {
+            sqrt_impl_cpu(a, result);
+        }
+        else
+        {
+            sqrt_impl_cuda(a, result);
+        }
         return {result};
     }
 
@@ -44,15 +52,18 @@ struct SumNode : public FunctionNode<SumNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
         ctx->data_sizes["sizes"] = a.sizes();
-        auto result              = sum_impl_cpu(a);
+        Tensor result            = zeros({1}, a.options().requires_grad(false));
+        sum_impl_cpu(a, result);
         return {result};
     }
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         CHECK_EQ(grad.size(), 1);
-        auto grad_a = sum_backward_impl_cpu(ctx->data_sizes["sizes"], grad[0]);
-        return grad_a;
+        CHECK_EQ(grad[0].numel(), 1);
+        Tensor grad_a = empty(ctx->data_sizes["sizes"]);
+        sum_backward_impl_cpu(grad[0], grad_a);
+        return {grad_a};
     }
 };
 }  // namespace autograd
@@ -76,37 +87,63 @@ Tensor min(Tensor a)
 {
     CHECK(!a.requires_grad());
     CHECK(a.is_cpu());
-    return min_impl_cpu(a);
+
+    Tensor result = empty({1}, a.options());
+    min_impl_cpu(a, result);
+    return result;
 }
 Tensor max(Tensor a)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     CHECK(a.is_cpu());
-    return max_impl_cpu(a);
+
+    Tensor result = empty({1}, a.options());
+    max_impl_cpu(a, result);
+    return result;
 }
 std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     CHECK(a.is_cpu());
-    return min_impl_cpu(a, dim, keepdim);
+
+    auto result_size = a.sizes();
+    result_size[dim] = 1;
+
+    Tensor result  = empty(result_size, a.options());
+    Tensor indices = empty(result_size, a.options().dtype(kLong));
+    min_impl_cpu(a, dim, keepdim, result, indices);
+    return {result, indices};
 }
 std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     CHECK(a.is_cpu());
-    return max_impl_cpu(a, dim, keepdim);
+
+    auto result_size = a.sizes();
+    result_size[dim] = 1;
+
+    Tensor result  = empty(result_size, a.options());
+    Tensor indices = empty(result_size, a.options().dtype(kLong));
+    max_impl_cpu(a, dim, keepdim, result, indices);
+    return {result, indices};
 }
 Tensor min(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     CHECK(a.is_cpu());
-    return min_impl_cpu(a, b);
+    
+    Tensor result = empty_like(a);
+    min_impl_cpu(a, b, result);
+    return result;
 }
 Tensor max(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     CHECK(a.is_cpu());
-    return max_impl_cpu(a, b);
+
+    Tensor result = empty_like(a);
+    max_impl_cpu(a, b, result);
+    return result;
 }
 
 Tensor sum(Tensor a)
@@ -117,12 +154,20 @@ Tensor sum(Tensor a)
 Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    CHECK(a.is_cpu());
 
     auto out_size = a.sizes();
     out_size[dim] = 1;
-    auto result   = empty(out_size, a.options());
-    sum_impl_cpu(a, dim, result);
+    Tensor result;
+    if (a.is_cpu())
+    {
+        result = empty(out_size, a.options());
+        sum_impl_cpu(a, dim, result);
+    }
+    else
+    {
+        result = zeros(out_size, a.options());
+        sum_impl_cuda(a, dim, result);
+    }
     if (squeeze_dim)
     {
         auto dims_before = result.dim();
@@ -150,7 +195,7 @@ Tensor mean(Tensor a, int64_t dim, bool squeeze_dim)
 {
     auto count  = a.size(dim);
     auto result = sum(a, dim, squeeze_dim);
-    return result / count;
+    return result / (double)count;
 }
 Tensor mean(Tensor a, SizeType s)
 {
@@ -164,7 +209,10 @@ Tensor mean(Tensor a, SizeType s)
 Tensor std(Tensor a)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    return std_impl_cpu(a);
+
+    Tensor result = empty({1}, a.options());
+    std_impl_cpu(a, result);
+    return result;
 }
 
 
@@ -177,7 +225,10 @@ Tensor std(Tensor a, int64_t dim)
 Tensor abs(Tensor a)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    return abs_impl_cpu(a);
+
+    Tensor result = empty_like(a);
+    abs_impl_cpu(a, result);
+    return result;
 }
 Tensor clamp(Tensor a, double low, double high)
 {

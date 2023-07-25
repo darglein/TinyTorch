@@ -71,4 +71,4 @@ static SizeType max_size(Tensor a, Tensor b)
     return new_sizes;
 }
 
-}  // namespace tinytorch
+}

@@ -50,13 +50,25 @@ Tensor repeat(Tensor t, SizeType sizes)
 Tensor repeat_interleave(Tensor t, int64_t count)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
-    return repeat_interleave_impl_cpu(t, count);
+
+    SizeType new_sizes = t.sizes();
+    new_sizes[0] *= count;
+    Tensor result = empty(new_sizes, t.options());
+    repeat_interleave_impl_cpu(t, count, result);
+    return result;
 }
 
 Tensor transpose(Tensor t, int64_t dim0, int64_t dim1)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
-    return transpose_impl_cpu(t, dim0, dim1);
+
+    SizeType new_sizes = t.sizes();
+    std::swap(new_sizes[dim0], new_sizes[dim1]);
+
+    Tensor result = empty(new_sizes, t.options());
+
+    transpose_impl_cpu(t, dim0, dim1, result);
+    return result;
 }
 
 void fill(Tensor& t, double value)
@@ -107,8 +119,15 @@ void uniform_int(Tensor& t, int low, int high)
 void copy(Tensor src, Tensor target)
 {
     CHECK(!src.requires_grad() || !GradMode::is_enabled());
-    CHECK_EQ(src.sizes(), target.sizes());
-    copy_impl_cpu(src, target);
+
+    if (src.is_cpu())
+    {
+        copy_and_convert_impl_cpu(src, target);
+    }
+    else
+    {
+        copy_and_convert_impl_cuda(src, target);
+    }
 }
 
 
@@ -153,11 +172,12 @@ struct ToScalarTypeNode : public FunctionNode<ToScalarTypeNode>
         Tensor result = empty_like(a, a.options().dtype(new_dtype));
         if (a.is_cpu())
         {
-            copy_impl_cpu(a, result);
+
+            copy_and_convert_impl_cpu(a, result);
         }
         else
         {
-            copy_impl_cuda(a, result);
+            copy_and_convert_impl_cuda(a, result);
         }
         return {result};
     }
@@ -168,8 +188,7 @@ struct ToScalarTypeNode : public FunctionNode<ToScalarTypeNode>
         auto g          = grad[0];
         Tensor grad_a   = empty_like(grad[0], grad[0].options().dtype(old_dtype));
 
-        copy_impl_cpu(g, grad_a);
-
+        copy_and_convert_impl_cpu(g, grad_a);
         return {grad_a, {}};
     }
 };
@@ -204,6 +223,7 @@ Tensor index_select(Tensor input, int64_t dim, Tensor index)
     result_size[dim] = index.numel();
     Tensor result    = empty(result_size, input.options());
     index_select_impl_cpu(input, dim, index, result);
+
     return result;
 }
 
@@ -215,7 +235,16 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
     {
         ctx->saved_data["dim"] = dim;
         ctx->save_for_backward({index});
-        auto result = index_add_impl_cpu(input, dim.toInt(), index, data);
+
+
+        CHECK_LT(dim.toInt(), input.dim());
+        CHECK(index.dtype() == kInt32 || index.dtype() == kInt64);
+        CHECK_EQ(input.dim(), data.dim());
+        CHECK_EQ(index.dim(), 1);
+        CHECK_EQ(index.numel(), data.size(0));
+
+        Tensor result = input.clone();
+        index_add_impl_cpu(input, dim.toInt(), index, data, result);
         return {result};
     }
 
@@ -242,13 +271,33 @@ Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data)
     return autograd::IndexAddNode::apply(input, dim, index, data)[0];
 }
 
-Tensor stack(const std::vector<Tensor>& a)
+Tensor stack(const std::vector<Tensor>& tensors)
 {
-    for (auto b : a)
+    for (auto b : tensors)
     {
         CHECK(!b.requires_grad() || !GradMode::is_enabled());
     }
-    return stack_impl_cpu(a);
+
+    
+    if (tensors.empty())
+    {
+        return {};
+    }
+
+    for (const auto& t : tensors)
+    {
+        CHECK_EQ(tensors.front().sizes(), t.sizes());
+        CHECK_EQ(tensors.front().device(), t.device());
+        CHECK_EQ(tensors.front().scalar_type(), t.scalar_type());
+    }
+
+    SizeType new_sizes = tensors.front().sizes();
+    new_sizes.vec().insert(new_sizes.vec().begin(), tensors.size());
+
+    Tensor result = empty(new_sizes, tensors.front().options());
+
+    stack_impl_cpu(tensors, result);
+    return result;
 }
 
 
@@ -263,12 +312,12 @@ struct CloneNode : public FunctionNode<CloneNode>
 
         if (a.is_cpu())
         {
-            copy_impl_cpu(a, result);
+            copy_and_convert_impl_cpu(a, result);
         }
         else
         {
 #ifdef TT_HAS_CUDA
-            copy_impl_cuda(a, result);
+            copy_and_convert_impl_cuda(a, result);
 #endif
         }
         return {result};
@@ -280,12 +329,12 @@ struct CloneNode : public FunctionNode<CloneNode>
         Tensor grad_a = empty_like(grad[0]);
         if (grad_a.is_cpu())
         {
-            copy_impl_cpu(grad[0], grad_a);
+            copy_and_convert_impl_cpu(grad[0], grad_a);
         }
         else
         {
 #ifdef TT_HAS_CUDA
-            copy_impl_cuda(grad[0], grad_a);
+            copy_and_convert_impl_cuda(grad[0], grad_a);
 #endif
         }
         return {grad_a[0]};

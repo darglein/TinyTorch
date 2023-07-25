@@ -10,6 +10,7 @@
 
 #include "torch/cpu/ops_impl_cpu.h"
 #include "torch/cpu/ops_operators_impl_cpu.h"
+#include "torch/cuda/ops_operators_impl_cuda.h"
 
 namespace tinytorch
 {
@@ -37,6 +38,23 @@ inline void CheckOperatorSizeMatchOneDim(const Tensor& a, const Tensor& b)
     CHECK_LE(num_missmatch, 1) << "only one dim can be expanded during operator " << a.sizes() << " " << b.sizes();
 }
 
+// Operators can have the case that one Tensor is dimension 1 along one axis and the other is not.
+// This computes the size of the result tensor and checks if everything else is ok.
+static SizeType max_size(Tensor a, Tensor b)
+{
+    CHECK_EQ(a.dim(), b.dim());
+    SizeType new_sizes;
+    new_sizes.resize(a.dim());
+    for (int64_t i = 0; i < a.dim(); ++i)
+    {
+        int64_t as = a.size(i);
+        int64_t bs = b.size(i);
+        CHECK(as == bs || as == 1 || bs == 1);
+        new_sizes[i] = std::max(as, bs);
+    }
+    return new_sizes;
+}
+
 
 namespace autograd
 {
@@ -46,8 +64,15 @@ struct AddNode : public FunctionNode<AddNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
         CheckOperatorSizeMatchOneDim(a, b);
-        auto result = empty_like(a);
-        add_impl_cpu(a, b, result);
+        Tensor result = empty(max_size(a, b), a.options());
+        if (a.is_cpu())
+        {
+            add_impl_cpu(a, b, result);
+        }
+        else
+        {
+            add_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -64,8 +89,15 @@ struct SubNode : public FunctionNode<SubNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
         CheckOperatorSizeMatchOneDim(a, b);
-        auto result = empty_like(a);
-        sub_impl_cpu(a, b, result);
+        Tensor result = empty(max_size(a, b), a.options());
+        if (a.is_cpu())
+        {
+            sub_impl_cpu(a, b, result);
+        }
+        else
+        {
+            sub_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -82,9 +114,16 @@ struct DivNode : public FunctionNode<DivNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
         CheckOperatorSizeMatchOneDim(a, b);
-        auto result = empty_like(a);
+        Tensor result = empty(max_size(a, b), a.options());
         ctx->save_for_backward({a, b});
-        div_impl_cpu(a, b, result);
+        if (a.is_cpu())
+        {
+            div_impl_cpu(a, b, result);
+        }
+        else
+        {
+            div_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -92,18 +131,13 @@ struct DivNode : public FunctionNode<DivNode>
     {
         auto l = ctx->get_saved_variables();
 
-#if 0
-        auto grad_a = empty_like(l[0]);
-        auto grad_b = empty_like(l[1]);
-        div_backward_impl_cpu(l[0], l[1], grad[0], grad_a, grad_b);
-#else
-        auto a      = l[0];
-        auto b      = l[1];
-        auto g      = grad[0];
+
+        auto a = l[0];
+        auto b = l[1];
+        auto g = grad[0];
         auto grad_a = 1.0 / b * g;
         auto grad_b = -a / (b * b) * g;
 
-#endif
         return {grad_a, grad_b};
     }
 };
@@ -112,10 +146,16 @@ struct MultNode : public FunctionNode<MultNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
-        CHECK_EQ(a.sizes(), b.sizes());
-        auto result = empty_like(a);
+        Tensor result = empty(max_size(a, b), a.options());
         ctx->save_for_backward({a, b});
-        mult_impl_cpu(a, b, result);
+        if (a.is_cpu())
+        {
+            mult_impl_cpu(a, b, result);
+        }
+        else
+        {
+            mult_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -143,7 +183,14 @@ struct DivScalarTensorNode : public FunctionNode<DivScalarTensorNode>
         auto result          = empty_like(b);
         ctx->saved_data["a"] = a;
         ctx->save_for_backward({b});
-        div_impl_cpu(a, b, result);
+        if (b.is_cpu())
+        {
+            div_impl_cpu(a, b, result);
+        }
+        else
+        {
+            div_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -168,7 +215,14 @@ struct MultTensorScalarNode : public FunctionNode<MultTensorScalarNode>
         auto result          = empty_like(a);
         ctx->saved_data["b"] = b;
         ctx->save_for_backward({a});
-        mult_impl_cpu(a, b, result);
+        if (a.is_cpu())
+        {
+            mult_impl_cpu(a, b, result);
+        }
+        else
+        {
+            mult_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -189,8 +243,14 @@ struct AddTensorScalarNode : public FunctionNode<AddTensorScalarNode>
         auto result          = empty_like(a);
         ctx->saved_data["b"] = b;
         ctx->save_for_backward({a});
-
-        add_impl_cpu(a, b, result);
+        if (a.is_cpu())
+        {
+            add_impl_cpu(a, b, result);
+        }
+        else
+        {
+            add_impl_cuda(a, b, result);
+        }
         return {result};
     }
 
@@ -276,20 +336,41 @@ Tensor operator+(double a, Tensor b)
 Tensor operator==(Tensor a, double b)
 {
     auto result = empty_like(a);
-    equal_impl_cpu(a, b, result);
+    if (a.is_cpu())
+    {
+        equal_impl_cpu(a, b, result);
+    }
+    else
+    {
+        equal_impl_cuda(a, b, result);
+    }
     return result;
 }
 
 Tensor operator<(Tensor a, double b)
 {
     auto result = empty_like(a);
-    less_impl_cpu(a, b, result);
+    if (a.is_cpu())
+    {
+        less_impl_cpu(a, b, result);
+    }
+    else
+    {
+        less_impl_cuda(a, b, result);
+    }
     return result;
 }
 Tensor operator>(Tensor a, double b)
 {
     auto result = empty_like(a);
-    greater_impl_cpu(a, b, result);
+    if (a.is_cpu())
+    {
+        greater_impl_cpu(a, b, result);
+    }
+    else
+    {
+        greater_impl_cuda(a, b, result);
+    }
     return result;
 }
 
@@ -297,37 +378,92 @@ Tensor operator>(Tensor a, double b)
 Tensor operator+=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    add_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        add_impl_cpu(a, b, a);
+    }
+    else
+    {
+        add_impl_cuda(a, b, a);
+    }
     return a;
 }
 Tensor operator+=(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    add_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        add_impl_cpu(a, b, a);
+    }
+    else
+    {
+        add_impl_cuda(a, b, a);
+    }
     return a;
 }
 Tensor operator-=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    sub_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        sub_impl_cpu(a, b, a);
+    }
+    else
+    {
+        sub_impl_cuda(a, b, a);
+    }
+    return a;
+}
+Tensor operator-=(Tensor a, double b)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    if (a.is_cpu())
+    {
+        sub_impl_cpu(a, b, a);
+    }
+    else
+    {
+        sub_impl_cuda(a, b, a);
+    }
     return a;
 }
 Tensor operator*=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    mult_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        mult_impl_cpu(a, b, a);
+    }
+    else
+    {
+        mult_impl_cuda(a, b, a);
+    }
     return a;
 }
 Tensor operator*=(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    mult_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        mult_impl_cpu(a, b, a);
+    }
+    else
+    {
+        mult_impl_cuda(a, b, a);
+    }
     return a;
 }
 Tensor operator/=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    div_impl_cpu(a, b, a);
+    if (a.is_cpu())
+    {
+        div_impl_cpu(a, b, a);
+    }
+    else
+    {
+        div_impl_cuda(a, b, a);
+    }
     return a;
 }
 

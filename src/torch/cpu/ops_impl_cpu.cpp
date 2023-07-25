@@ -100,7 +100,7 @@ static void sqrt_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[i] = std::sqrt(a[i]);
+        result[i]= T(std::sqrt(a[i]));
     }
 }
 
@@ -119,46 +119,27 @@ static void sum_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-Tensor sum_impl_cpu(Tensor a)
+void sum_impl_cpu(Tensor a, Tensor& result)
 {
-    Tensor result = zeros({1}, a.options().requires_grad(false));
     SWITCH_MACRO_ALL(a.scalar_type(), sum_impl_cpu, a, result);
-    return result;
 }
-
 
 template <typename T>
 static void sum_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
     int64_t dims = input.dims;
 
-    int64_t to_prod = input.sizes[dim];
+    int64_t dim_size = input.sizes[dim];
     int64_t count   = input.numel() / input.sizes[dim];
     CHECK_EQ(count, result.numel());
 
     for (int64_t c = 0; c < count; ++c)
     {
-        int64_t linearId = c;
-
-        int64_t input_offset = 0;
-        for (int64_t i = dims - 1; i > 0; --i)
-        {
-            if (i != dim)
-            {
-                int64_t curDimIndex = linearId % input.sizes[i];
-                input_offset += curDimIndex * input.strides[i];
-                linearId /= input.sizes[i];
-            }
-        }
-
-        if (dim != 0)
-        {
-            input_offset += linearId * input.strides[0];
-        }
+        int64_t input_offset = index_along_dim(c, dims, dim, input.sizes, input.strides);
 
         T sum = T(0);
 
-        for (int64_t p = 0; p < to_prod; ++p)
+        for (int64_t p = 0; p < dim_size; ++p)
         {
             sum += input[input_offset];
             input_offset += input.strides[dim];
@@ -167,10 +148,12 @@ static void sum_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
         result[c] = sum;
     }
 }
+
 void sum_impl_cpu(Tensor a, int64_t dim, Tensor& result)
 {
     SWITCH_MACRO_FLOAT(a.scalar_type(), sum_impl_cpu, a, dim, result);
 }
+
 template <typename T>
 static void log_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
@@ -180,11 +163,9 @@ static void log_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-Tensor log_impl_cpu(Tensor a)
+void log_impl_cpu(Tensor a, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_FLOAT(a.scalar_type(), log_impl_cpu, a, result);
-    return result;
 }
 
 template <typename T>
@@ -196,11 +177,9 @@ static void log1p_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-Tensor log1p_impl_cpu(Tensor a)
+void log1p_impl_cpu(Tensor a, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_FLOAT(a.scalar_type(), log1p_impl_cpu, a, result);
-    return result;
 }
 
 template <typename T>
@@ -212,11 +191,9 @@ static void exp_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-Tensor exp_impl_cpu(Tensor a)
+void exp_impl_cpu(Tensor a, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_FLOAT(a.scalar_type(), exp_impl_cpu, a, result);
-    return result;
 }
 
 template <typename T>
@@ -229,11 +206,9 @@ static void sign_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-Tensor sign_impl_cpu(Tensor a)
+void sign_impl_cpu(Tensor a, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_FLOAT(a.scalar_type(), sign_impl_cpu, a, result);
-    return result;
 }
 
 template <typename T>
@@ -245,11 +220,9 @@ static void pow_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> result)
     }
 }
 
-Tensor pow_impl_cpu(Tensor a, double b)
+void pow_impl_cpu(Tensor a, double b, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_FLOAT(a.scalar_type(), pow_impl_cpu, a, b, result);
-    return result;
 }
 
 template <typename T>
@@ -261,11 +234,9 @@ static void sin_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-Tensor sin_impl_cpu(Tensor a)
+void sin_impl_cpu(Tensor a, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_FLOAT(a.scalar_type(), sin_impl_cpu, a, result);
-    return result;
 }
 
 template <typename T>
@@ -277,11 +248,9 @@ static void cos_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-Tensor cos_impl_cpu(Tensor a)
+void cos_impl_cpu(Tensor a, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_FLOAT(a.scalar_type(), cos_impl_cpu, a, result);
-    return result;
 }
 
 template <typename T>
@@ -293,11 +262,9 @@ static void relu_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-Tensor relu_impl_cpu(Tensor a)
+void relu_impl_cpu(Tensor a, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_FLOAT(a.scalar_type(), relu_impl_cpu, a, result);
-    return result;
 }
 
 template <typename T>
@@ -309,11 +276,9 @@ static void sigmoid_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-Tensor sigmoid_impl_cpu(Tensor a)
+void sigmoid_impl_cpu(Tensor a, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_FLOAT(a.scalar_type(), sigmoid_impl_cpu, a, result);
-    return result;
 }
 
 template <typename T>
@@ -325,11 +290,9 @@ static void softplus_impl_cpu(TensorInfo<T> a, double beta, TensorInfo<T> result
     }
 }
 
-Tensor softplus_impl_cpu(Tensor a, double beta)
+void softplus_impl_cpu(Tensor a, double beta, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_FLOAT(a.scalar_type(), softplus_impl_cpu, a, beta, result);
-    return result;
 }
 
 template <typename T>
@@ -337,33 +300,17 @@ static void prod_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result
 {
     int64_t dims = input.dims;
 
-    int64_t to_prod = input.sizes[dim];
+    int64_t dim_size = input.sizes[dim];
     int64_t count   = input.numel() / input.sizes[dim];
     CHECK_EQ(count, result.numel());
 
     for (int64_t c = 0; c < count; ++c)
     {
-        int64_t linearId = c;
-
-        int64_t input_offset = 0;
-        for (int64_t i = dims - 1; i > 0; --i)
-        {
-            if (i != dim)
-            {
-                int64_t curDimIndex = linearId % input.sizes[i];
-                input_offset += curDimIndex * input.strides[i];
-                linearId /= input.sizes[i];
-            }
-        }
-
-        if (dim != 0)
-        {
-            input_offset += linearId * input.strides[0];
-        }
+        int64_t input_offset = index_along_dim(c, dims, dim, input.sizes, input.strides);
 
         T prod = T(1);
 
-        for (int64_t p = 0; p < to_prod; ++p)
+        for (int64_t p = 0; p < dim_size; ++p)
         {
             prod *= input[input_offset];
             input_offset += input.strides[dim];
@@ -373,20 +320,19 @@ static void prod_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<T> result
     }
 }
 
-Tensor prod_impl_cpu(Tensor input, int64_t dim)
+void prod_impl_cpu(Tensor input, int64_t dim, Tensor& result)
 {
+    /*
     CHECK_LT(dim, input.dim());
 
     auto result_size = input.sizes();
     result_size[dim] = 1;
 
     Tensor result = empty(result_size, input.options());
+    */
 
     SWITCH_MACRO_ALL(input.scalar_type(), prod_impl_cpu, input, dim, result);
-
     result = result.squeeze(dim);
-
-    return result;
 }
 
 template <typename T>
@@ -398,11 +344,9 @@ static void min_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
     }
 }
 
-Tensor min_impl_cpu(Tensor a, Tensor b)
+void min_impl_cpu(Tensor a, Tensor b, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), min_impl_cpu, a, b, result);
-    return result;
 }
 
 template <typename T>
@@ -415,11 +359,9 @@ static void min_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-Tensor min_impl_cpu(Tensor a)
+void min_impl_cpu(Tensor a, Tensor& result)
 {
-    Tensor result = empty({1}, a.options());
     SWITCH_MACRO_ALL(a.scalar_type(), min_impl_cpu, a, result);
-    return result;
 }
 
 template <typename T>
@@ -431,11 +373,24 @@ static void max_impl_cpu(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
     }
 }
 
-Tensor max_impl_cpu(Tensor a, Tensor b)
+void max_impl_cpu(Tensor a, Tensor b, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), max_impl_cpu, a, b, result);
-    return result;
+}
+
+template <typename T>
+static void max_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
+{
+    result[0] = -std::numeric_limits<T>::infinity();
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[0] = std::max(a[i], result[0]);
+    }
+}
+
+void max_impl_cpu(Tensor a, Tensor& result)
+{
+    SWITCH_MACRO_ALL(a.scalar_type(), max_impl_cpu, a, result);
 }
 
 template <typename T>
@@ -486,14 +441,8 @@ static void minmax_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t
     }
 }
 
-std::pair<Tensor, Tensor> min_impl_cpu(Tensor input, int64_t dim, bool keepdim)
+void min_impl_cpu(Tensor input, int64_t dim, bool keepdim, Tensor& result, Tensor& indices)
 {
-    auto result_size = input.sizes();
-    result_size[dim] = 1;
-
-    Tensor result  = empty(result_size, input.options());
-    Tensor indices = empty(result_size, input.options().dtype(kLong));
-
     SWITCH_MACRO_ALL(input.scalar_type(), minmax_impl_cpu, input, dim, indices, result, true);
 
     if (!keepdim)
@@ -501,18 +450,10 @@ std::pair<Tensor, Tensor> min_impl_cpu(Tensor input, int64_t dim, bool keepdim)
         result  = result.squeeze(dim);
         indices = indices.squeeze(dim);
     }
-
-    return {result, indices};
 }
 
-std::pair<Tensor, Tensor> max_impl_cpu(Tensor input, int64_t dim, bool keepdim)
+void max_impl_cpu(Tensor input, int64_t dim, bool keepdim, Tensor& result, Tensor& indices)
 {
-    auto result_size = input.sizes();
-    result_size[dim] = 1;
-
-    Tensor result  = empty(result_size, input.options());
-    Tensor indices = empty(result_size, input.options().dtype(kLong));
-
     SWITCH_MACRO_ALL(input.scalar_type(), minmax_impl_cpu, input, dim, indices, result, false);
 
     if (!keepdim)
@@ -520,8 +461,6 @@ std::pair<Tensor, Tensor> max_impl_cpu(Tensor input, int64_t dim, bool keepdim)
         result  = result.squeeze(dim);
         indices = indices.squeeze(dim);
     }
-
-    return {result, indices};
 }
 
 template <typename T>
@@ -536,12 +475,10 @@ static void std_impl_cpu(TensorInfo<T> a, double mean, TensorInfo<T> result)
     result[0] = std::sqrt(s / a.numel());
 }
 
-Tensor std_impl_cpu(Tensor a)
+void std_impl_cpu(Tensor a, Tensor& result)
 {
-    double mean   = (sum_impl_cpu(a) / (double)a.numel()).toDouble();
-    Tensor result = empty({1}, a.options());
+    double mean = a.mean().toDouble();
     SWITCH_MACRO_FLOAT(a.scalar_type(), std_impl_cpu, a, mean, result);
-    return result;
 }
 
 template <typename T>
@@ -553,39 +490,23 @@ static void abs_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-Tensor abs_impl_cpu(Tensor a)
+void abs_impl_cpu(Tensor a, Tensor& result)
 {
-    Tensor result = empty_like(a);
     SWITCH_MACRO_ALL(a.scalar_type(), abs_impl_cpu, a, result);
-    return result;
 }
 
-template <typename T>
-static void max_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
-{
-    result[0] = -std::numeric_limits<T>::infinity();
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[0] = std::max(a[i], result[0]);
-    }
-}
-
-Tensor max_impl_cpu(Tensor a)
-{
-    Tensor result = empty({1}, a.options());
-    SWITCH_MACRO_ALL(a.scalar_type(), max_impl_cpu, a, result);
-    return result;
-}
 
 template <typename T, typename Indextype>
 static void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<Indextype> index, TensorInfo<T> result)
 {
     for (int64_t result_linear_index = 0; result_linear_index < result.numel(); ++result_linear_index)
+
     {
         auto index_result = result.LinearIndexToDimIndex(result_linear_index);
 
         auto index_input = index_result;
         index_input[dim] = index[index_result[dim]];
+
 
         result[index_result] = input[index_input];
     }
@@ -615,8 +536,8 @@ void index_select_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor& resu
     }
 }
 
-template <typename T>
-static void index_add_impl_cpu(int64_t dim, TensorInfo<int64_t> index, TensorInfo<T> data, TensorInfo<T> result)
+template <typename T, typename TIndex>
+static void index_add_impl_cpu(int64_t dim, TensorInfo<TIndex> index, TensorInfo<T> data, TensorInfo<T> result)
 {
     for (int64_t input_linear_index = 0; input_linear_index < data.numel(); ++input_linear_index)
     {
@@ -629,17 +550,23 @@ static void index_add_impl_cpu(int64_t dim, TensorInfo<int64_t> index, TensorInf
     }
 }
 
-Tensor index_add_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor data)
+template <typename TIndex>
+static void index_add_helper(Tensor input, int64_t dim, TensorInfo<TIndex> index, Tensor data, Tensor result)
 {
-    CHECK_LT(dim, input.dim());
-    CHECK_EQ(index.dtype(), kLong);
-    CHECK_EQ(input.dim(), data.dim());
-    CHECK_EQ(index.dim(), 1);
-    CHECK_EQ(index.numel(), data.size(0));
-
-    Tensor result = input.clone();
     SWITCH_MACRO_ALL(input.scalar_type(), index_add_impl_cpu, dim, index, data, result);
-    return result;
+}
+
+void index_add_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor data, Tensor& result)
+{
+    switch (index.scalar_type())
+    {
+        case kInt32:
+            index_add_helper<int32_t>(input, dim, index, data, result);
+            break;
+        case kLong:
+            index_add_helper<int64_t>(input, dim, index, data, result);
+            break;
+    }
 }
 
 template <typename T>
@@ -667,13 +594,9 @@ static void repeat_interleave_impl_cpu(TensorInfo<T> input, int64_t count, Tenso
     CHECK_EQ(output_start, result.numel());
 }
 
-Tensor repeat_interleave_impl_cpu(Tensor input, int64_t count)
+void repeat_interleave_impl_cpu(Tensor input, int64_t count, Tensor& result)
 {
-    SizeType new_sizes = input.sizes();
-    new_sizes[0] *= count;
-    Tensor result = empty(new_sizes, input.options());
     SWITCH_MACRO_ALL(input.scalar_type(), repeat_interleave_impl_cpu, input, count, result);
-    return result;
 }
 
 template <typename T>
@@ -685,26 +608,9 @@ static void stack_impl_cpu(TensorInfo<T> input, int64_t result_offset, TensorInf
     }
 }
 
-Tensor stack_impl_cpu(const std::vector<Tensor>& tensors)
+void stack_impl_cpu(const std::vector<Tensor>& tensors, Tensor& result)
 {
-    if (tensors.empty())
-    {
-        return {};
-    }
-
-    for (const auto& t : tensors)
-    {
-        CHECK_EQ(tensors.front().sizes(), t.sizes());
-        CHECK_EQ(tensors.front().device(), t.device());
-        CHECK_EQ(tensors.front().scalar_type(), t.scalar_type());
-    }
-
-    SizeType new_sizes = tensors.front().sizes();
-    new_sizes.vec().insert(new_sizes.vec().begin(), tensors.size());
-
     int64_t individual_numel = tensors.front().numel();
-
-    Tensor result = empty(new_sizes, tensors.front().options());
 
     int64_t offset = 0;
     for (const auto& t : tensors)
@@ -712,8 +618,6 @@ Tensor stack_impl_cpu(const std::vector<Tensor>& tensors)
         SWITCH_MACRO_ALL(t.scalar_type(), stack_impl_cpu, t, offset, result);
         offset += individual_numel;
     }
-
-    return result;
 }
 
 template <typename T>
@@ -747,14 +651,9 @@ static void transpose_impl_cpu(TensorInfo<T> input, int64_t dim0, int64_t dim1, 
     }
 }
 
-Tensor transpose_impl_cpu(Tensor input, int64_t dim0, int64_t dim1)
+void transpose_impl_cpu(Tensor input, int64_t dim0, int64_t dim1, Tensor& result)
 {
-    SizeType new_sizes = input.sizes();
-    std::swap(new_sizes[dim0], new_sizes[dim1]);
-
-    Tensor result = empty(new_sizes, input.options());
     SWITCH_MACRO_ALL(input.scalar_type(), transpose_impl_cpu, input, dim0, dim1, result);
-    return result;
 }
 
 // ================================================================================================================
@@ -788,12 +687,9 @@ static void sum_backward_impl_cpu(TensorInfo<T> grad_output, TensorInfo<T> grad_
     }
 }
 
-std::vector<Tensor> sum_backward_impl_cpu(const SizeType& input_sizes, Tensor grad_output)
+void sum_backward_impl_cpu(Tensor grad_output, Tensor& grad_a)
 {
-    CHECK_EQ(grad_output.numel(), 1);
-    Tensor grad_a = empty(input_sizes);
     SWITCH_MACRO_ALL(grad_output.scalar_type(), sum_backward_impl_cpu, grad_output, grad_a);
-    return {grad_a};
 }
 
 template <typename T>
@@ -805,11 +701,9 @@ static void log_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, Te
     }
 }
 
-std::vector<Tensor> log_backward_impl_cpu(Tensor a, Tensor grad_output)
+void log_backward_impl_cpu(Tensor a, Tensor grad_output, Tensor& grad_a)
 {
-    Tensor grad_a = empty_like(a);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), log_backward_impl_cpu, a, grad_output, grad_a);
-    return {grad_a};
 }
 
 template <typename T>
@@ -821,11 +715,9 @@ static void log1p_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, 
     }
 }
 
-std::vector<Tensor> log1p_backward_impl_cpu(Tensor a, Tensor grad_output)
+void log1p_backward_impl_cpu(Tensor a, Tensor grad_output, Tensor& grad_a)
 {
-    Tensor grad_a = empty_like(a);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), log1p_backward_impl_cpu, a, grad_output, grad_a);
-    return {grad_a};
 }
 
 template <typename T>
@@ -837,17 +729,14 @@ static void exp_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, Te
     }
 }
 
-std::vector<Tensor> exp_backward_impl_cpu(Tensor a, Tensor grad_output)
+void exp_backward_impl_cpu(Tensor a, Tensor grad_output, Tensor& grad_a)
 {
-    Tensor grad_a = empty_like(a);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), exp_backward_impl_cpu, a, grad_output, grad_a);
-    return {grad_a};
 }
 
-std::vector<Tensor> sign_backward_impl_cpu(Tensor a, Tensor grad_output)
+void sign_backward_impl_cpu(Tensor a, Tensor grad_output, Tensor& grad_a)
 {
     throw std::runtime_error("not implemented");
-    return {};
 }
 
 template <typename T>
@@ -859,11 +748,9 @@ static void pow_backward_impl_cpu(TensorInfo<T> a, double b, TensorInfo<T> grad_
     }
 }
 
-std::vector<Tensor> pow_backward_impl_cpu(Tensor a, double b, Tensor grad_output)
+void pow_backward_impl_cpu(Tensor a, double b, Tensor grad_output, Tensor& grad_a)
 {
-    Tensor grad_a = empty_like(a);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), pow_backward_impl_cpu, a, b, grad_output, grad_a);
-    return {grad_a};
 }
 
 template <typename T>
@@ -875,11 +762,9 @@ static void sin_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, Te
     }
 }
 
-std::vector<Tensor> sin_backward_impl_cpu(Tensor a, Tensor grad_output)
+void sin_backward_impl_cpu(Tensor a, Tensor grad_output, Tensor& grad_a)
 {
-    Tensor grad_a = empty_like(a);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), sin_backward_impl_cpu, a, grad_output, grad_a);
-    return {grad_a};
 }
 
 template <typename T>
@@ -891,11 +776,9 @@ static void cos_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, Te
     }
 }
 
-std::vector<Tensor> cos_backward_impl_cpu(Tensor a, Tensor grad_output)
+void cos_backward_impl_cpu(Tensor a, Tensor grad_output, Tensor& grad_a)
 {
-    Tensor grad_a = empty_like(a);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), cos_backward_impl_cpu, a, grad_output, grad_a);
-    return {grad_a};
 }
 
 template <typename T>
@@ -907,11 +790,9 @@ static void relu_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output, T
     }
 }
 
-std::vector<Tensor> relu_backward_impl_cpu(Tensor a, Tensor grad_output)
+void relu_backward_impl_cpu(Tensor a, Tensor grad_output, Tensor& grad_a)
 {
-    Tensor grad_a = empty_like(a);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), relu_backward_impl_cpu, a, grad_output, grad_a);
-    return {grad_a};
 }
 
 template <typename T>
@@ -923,11 +804,9 @@ static void sigmoid_backward_impl_cpu(TensorInfo<T> a, TensorInfo<T> grad_output
     }
 }
 
-std::vector<Tensor> sigmoid_backward_impl_cpu(Tensor a, Tensor grad_output)
+void sigmoid_backward_impl_cpu(Tensor a, Tensor grad_output, Tensor& grad_a)
 {
-    Tensor grad_a = empty_like(a);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), sigmoid_backward_impl_cpu, a, grad_output, grad_a);
-    return {grad_a};
 }
 
 template <typename T>
@@ -939,17 +818,14 @@ static void softplus_backward_impl_cpu(TensorInfo<T> a, double beta, TensorInfo<
     }
 }
 
-std::vector<Tensor> softplus_backward_impl_cpu(Tensor a, double beta, Tensor grad_output)
+void softplus_backward_impl_cpu(Tensor a, double beta, Tensor grad_output, Tensor& grad_a)
 {
-    Tensor grad_a = empty_like(a);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), softplus_backward_impl_cpu, a, beta, grad_output, grad_a);
-    return {grad_a};
 }
 
-std::vector<Tensor> prod_backward_impl_cpu(Tensor a, int64_t dim, Tensor grad_output)
+void prod_backward_impl_cpu(Tensor a, int64_t dim, Tensor grad_output, Tensor& grad_a)
 {
     throw std::runtime_error("not implemented");
-    return {};
 }
 
 template <typename T>
@@ -963,57 +839,49 @@ static void one_backward_impl_cpu(TensorInfo<T> grad_output, TensorInfo<T> grad_
     }
 }
 
-std::vector<Tensor> min_backward_impl_cpu(Tensor grad_output)
+void min_backward_impl_cpu(Tensor grad_output, Tensor& grad_a, Tensor& grad_b)
 {
-    Tensor grad_a = empty_like(grad_output);
-    Tensor grad_b = empty_like(grad_output);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), one_backward_impl_cpu, grad_output, grad_a, grad_b);
-    return {grad_a, grad_b};
 }
 
-std::vector<Tensor> max_backward_impl_cpu(Tensor grad_output)
+void max_backward_impl_cpu(Tensor grad_output, Tensor& grad_a, Tensor& grad_b)
 {
-    Tensor grad_a = empty_like(grad_output);
-    Tensor grad_b = empty_like(grad_output);
     SWITCH_MACRO_FLOAT(grad_output.scalar_type(), one_backward_impl_cpu, grad_output, grad_a, grad_b);
-    return {grad_a, grad_b};
 }
 
 
-template <typename T, typename G>
-static void copy_cpu(TensorInfo<T> src, TensorInfo<G> dst)
+template <typename TSource, typename TTarget>
+static void copy_and_convert_impl_cpu_kernel(TensorInfo<TSource> src, TensorInfo<TTarget> target)
 {
     for (int64_t i = 0; i < src.numel(); ++i)
     {
-        dst[i] = src[i];
+        target[i] = TTarget(src[i]);
     }
 }
 
-void copy_impl_cpu(Tensor src, Tensor target)
+void copy_and_convert_impl_cpu(Tensor src, Tensor& target)
 {
     CHECK_EQ(src.numel(), target.numel());
-
-
     switch (target.dtype())
     {
         case kInt32:
         {
-            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int32_t, copy_cpu, src, target);
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int32_t, copy_and_convert_impl_cpu_kernel, src, target);
             break;
         }
         case kInt64:
         {
-            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int64_t, copy_cpu, src, target);
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int64_t, copy_and_convert_impl_cpu_kernel, src, target);
             break;
         }
         case kFloat32:
         {
-            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), float, copy_cpu, src, target);
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), float, copy_and_convert_impl_cpu_kernel, src, target);
             break;
         }
         case kFloat64:
         {
-            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), double, copy_cpu, src, target);
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), double, copy_and_convert_impl_cpu_kernel, src, target);
             break;
         }
         default:

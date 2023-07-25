@@ -17,6 +17,7 @@ void print_impl_cpu(std::ostream& strm, Tensor t);
 void add_impl_cpu(Tensor a, Tensor b, Tensor& result);
 void add_impl_cpu(Tensor a, double b, Tensor& result);
 void sub_impl_cpu(Tensor a, Tensor b, Tensor& result);
+void sub_impl_cpu(Tensor a, double b, Tensor& result);
 void mult_impl_cpu(Tensor a, Tensor b, Tensor& result);
 void mult_impl_cpu(Tensor a, double b, Tensor& result);
 void div_impl_cpu(Tensor a, Tensor b, Tensor& result);
