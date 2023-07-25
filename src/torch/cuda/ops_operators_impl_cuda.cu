@@ -13,21 +13,6 @@ namespace tinytorch
 {
 
 template <typename T>
-static void print_impl_cpu(std::ostream& strm, TensorInfo<T> a)
-{
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        strm << a[i] << " ";
-    }
-}
-
-void print_impl_cuda(std::ostream& strm, Tensor t) 
-{
-    t = t.cpu();
-    print_impl_cpu<float>(strm, t);
-}
-
-template <typename T>
 __launch_bounds__(128) 
 static __global__ void add_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
@@ -39,7 +24,7 @@ static __global__ void add_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInf
 
 void add_impl_cuda(Tensor a, Tensor b, Tensor& result)
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), add_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), add_impl_cuda, a, b, result);
 }
 
 template <typename T>
@@ -54,7 +39,7 @@ static __global__ void add_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> re
 
 void add_impl_cuda(Tensor a, double b, Tensor& result) 
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), add_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), add_impl_cuda, a, b, result);
 }
 
 template <typename T>
@@ -69,7 +54,7 @@ static __global__ void sub_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInf
 
 void sub_impl_cuda(Tensor a, Tensor b, Tensor& result) 
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), sub_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), sub_impl_cuda, a, b, result);
 }
 
 template <typename T>
@@ -84,7 +69,7 @@ static __global__ void mult_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorIn
 
 void mult_impl_cuda(Tensor a, Tensor b, Tensor& result) 
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), mult_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), mult_impl_cuda, a, b, result);
 }
 
 template <typename T>
@@ -99,7 +84,7 @@ static __global__ void mult_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> r
 
 void mult_impl_cuda(Tensor a, double b, Tensor& result) 
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), mult_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), mult_impl_cuda, a, b, result);
 }
 
 template <typename T>
@@ -114,7 +99,7 @@ static __global__ void div_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInf
 
 void div_impl_cuda(Tensor a, Tensor b, Tensor& result) 
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), div_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), div_impl_cuda, a, b, result);
 }
 
 template <typename T>
@@ -129,7 +114,7 @@ static __global__ void div_impl_cuda(double a, TensorInfo<T> b, TensorInfo<T> re
 
 void div_impl_cuda(double a, Tensor b, Tensor& result) 
 {
-    SWITCH_MACRO_ALL(b.scalar_type(), b.numel(), div_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(b.scalar_type(), b.numel(), div_impl_cuda, a, b, result);
 }
 
 template <typename T>
@@ -144,7 +129,7 @@ static __global__ void equal_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> 
 
 void equal_impl_cuda(Tensor a, double b, Tensor& result) 
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), equal_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), equal_impl_cuda, a, b, result);
 }
 
 template <typename T>
@@ -159,7 +144,7 @@ static __global__ void less_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> r
 
 void less_impl_cuda(Tensor a, double b, Tensor& result) 
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), less_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), less_impl_cuda, a, b, result);
 }
 
 template <typename T>
@@ -174,7 +159,7 @@ static __global__ void greater_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T
 
 void greater_impl_cuda(Tensor a, double b, Tensor& result) 
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), greater_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), greater_impl_cuda, a, b, result);
 }
 
 }  // namespace tinytorch

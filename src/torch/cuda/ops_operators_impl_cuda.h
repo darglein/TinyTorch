@@ -12,7 +12,6 @@
 namespace tinytorch
 {
 
-void print_impl_cuda(std::ostream& strm, Tensor t);
 // basic operators
 void add_impl_cuda(Tensor a, Tensor b, Tensor& result);
 void add_impl_cuda(Tensor a, double b, Tensor& result);

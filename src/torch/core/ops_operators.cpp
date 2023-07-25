@@ -22,6 +22,21 @@ std::ostream& operator<<(std::ostream& strm, Tensor t)
 }
 
 
+inline void CheckOperatorSizeMatchOneDim(const Tensor& a, const Tensor& b)
+{
+    CHECK_EQ(a.dim(), b.dim());
+    int num_missmatch = 0;
+    for (int i = 0; i < a.dim(); ++i)
+    {
+        if (a.size(i) != b.size(i))
+        {
+            CHECK(a.size(i) == 1 || b.size(i) == 1) << "Size Missmatch " << a.sizes() << " " << b.sizes();
+            num_missmatch++;
+        }
+    }
+    CHECK_LE(num_missmatch, 1) << "only one dim can be expanded during operator " << a.sizes() << " " << b.sizes();
+}
+
 
 namespace autograd
 {
@@ -30,7 +45,7 @@ struct AddNode : public FunctionNode<AddNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
-        CHECK_EQ(a.sizes(), b.sizes());
+        CheckOperatorSizeMatchOneDim(a, b);
         auto result = empty_like(a);
         add_impl_cpu(a, b, result);
         return {result};
@@ -48,7 +63,7 @@ struct SubNode : public FunctionNode<SubNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
-        CHECK_EQ(a.sizes(), b.sizes());
+        CheckOperatorSizeMatchOneDim(a, b);
         auto result = empty_like(a);
         sub_impl_cpu(a, b, result);
         return {result};
@@ -66,7 +81,7 @@ struct DivNode : public FunctionNode<DivNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
-        CHECK_EQ(a.sizes(), b.sizes());
+        CheckOperatorSizeMatchOneDim(a, b);
         auto result = empty_like(a);
         ctx->save_for_backward({a, b});
         div_impl_cpu(a, b, result);
@@ -82,9 +97,9 @@ struct DivNode : public FunctionNode<DivNode>
         auto grad_b = empty_like(l[1]);
         div_backward_impl_cpu(l[0], l[1], grad[0], grad_a, grad_b);
 #else
-        auto a = l[0];
-        auto b = l[1];
-        auto g = grad[0];
+        auto a      = l[0];
+        auto b      = l[1];
+        auto g      = grad[0];
         auto grad_a = 1.0 / b * g;
         auto grad_b = -a / (b * b) * g;
 
@@ -134,10 +149,10 @@ struct DivScalarTensorNode : public FunctionNode<DivScalarTensorNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        double a    = ctx->saved_data["a"].toDouble();
-        auto l      = ctx->get_saved_variables();
-        auto b = l[0];
-        auto g = grad[0];
+        double a = ctx->saved_data["a"].toDouble();
+        auto l   = ctx->get_saved_variables();
+        auto b   = l[0];
+        auto g   = grad[0];
 
         auto grad_b = -a / (b * b) * g;
         // auto grad_b = empty_like(l[0]);

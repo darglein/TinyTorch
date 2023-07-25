@@ -107,6 +107,7 @@ void uniform_int(Tensor& t, int low, int high)
 void copy(Tensor src, Tensor target)
 {
     CHECK(!src.requires_grad() || !GradMode::is_enabled());
+    CHECK_EQ(src.sizes(), target.sizes());
     copy_impl_cpu(src, target);
 }
 
@@ -149,14 +150,14 @@ struct ToScalarTypeNode : public FunctionNode<ToScalarTypeNode>
         ctx->saved_data["old_dtype"] = (int)a.dtype();
         Dtype new_dtype              = (Dtype)new_dtype_.toInt();
 
-        Tensor result;
+        Tensor result = empty_like(a, a.options().dtype(new_dtype));
         if (a.is_cpu())
         {
-            result = to_impl_cpu(a, new_dtype);
+            copy_impl_cpu(a, result);
         }
         else
         {
-            CHECK(false);
+            copy_impl_cuda(a, result);
         }
         return {result};
     }
@@ -164,9 +165,11 @@ struct ToScalarTypeNode : public FunctionNode<ToScalarTypeNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         Dtype old_dtype = (Dtype)ctx->saved_data["old_dtype"].toInt();
-        auto g = grad[0];
+        auto g          = grad[0];
         Tensor grad_a   = empty_like(grad[0], grad[0].options().dtype(old_dtype));
-        grad_a = to_impl_cpu(g, old_dtype);
+
+        copy_impl_cpu(g, grad_a);
+
         return {grad_a, {}};
     }
 };
@@ -196,7 +199,12 @@ Tensor to(Tensor a, ScalarType other_type)
 Tensor index_select(Tensor input, int64_t dim, Tensor index)
 {
     CHECK(!input.requires_grad() || !GradMode::is_enabled());
-    return index_select_impl_cpu(input, dim, index);
+
+    auto result_size = input.sizes().vec();
+    result_size[dim] = index.numel();
+    Tensor result    = empty(result_size, input.options());
+    index_select_impl_cpu(input, dim, index, result);
+    return result;
 }
 
 namespace autograd
@@ -216,7 +224,7 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
         auto l     = ctx->get_saved_variables();
         auto index = l[0];
 
-        auto grad_data  = index_select_impl_cpu(grad[0], ctx->saved_data["dim"].toInt(), index);
+        auto grad_data  = index_select(grad[0], ctx->saved_data["dim"].toInt(), index);
         auto grad_input = grad[0];
 
         // Tensor grad_a = empty_like(grad[0]);

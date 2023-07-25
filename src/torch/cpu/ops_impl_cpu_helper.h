@@ -13,16 +13,16 @@
 namespace tinytorch
 {
 
-#define CASE_MACRO(func, type, scalar_type, ...) \
+#define CASE_MACRO(func,  scalar_type, ...) \
     case scalar_type:                            \
-        func<type>(__VA_ARGS__);                 \
+        func(__VA_ARGS__);                 \
         break;
 
 #define SWITCH_MACRO_FLOAT(real_scalar_type, func, ...)                \
     switch (real_scalar_type)                                          \
     {                                                                  \
-        CASE_MACRO(func, float, kFloat, __VA_ARGS__)                   \
-        CASE_MACRO(func, double, kDouble, __VA_ARGS__)                 \
+        CASE_MACRO(func<float>, kFloat, __VA_ARGS__)                   \
+        CASE_MACRO(func<double>, kDouble, __VA_ARGS__)                 \
         default:                                                       \
             CHECK(false) << "invalid input type " << real_scalar_type; \
     }
@@ -31,16 +31,29 @@ namespace tinytorch
 #define SWITCH_MACRO_ALL(real_scalar_type, func, ...)                  \
     switch (real_scalar_type)                                          \
     {                                                                  \
-        CASE_MACRO(func, uint8_t, kUInt8, __VA_ARGS__)                 \
-        CASE_MACRO(func, int16_t, kInt16, __VA_ARGS__)                 \
-        CASE_MACRO(func, int32_t, kInt32, __VA_ARGS__)                 \
-        CASE_MACRO(func, int64_t, kLong, __VA_ARGS__)                  \
-        CASE_MACRO(func, float, kFloat, __VA_ARGS__)                   \
-        CASE_MACRO(func, double, kDouble, __VA_ARGS__)                 \
+        CASE_MACRO(func<uint8_t>, kUInt8, __VA_ARGS__)                 \
+        CASE_MACRO(func<int16_t>, kInt16, __VA_ARGS__)                 \
+        CASE_MACRO(func<int32_t>, kInt32, __VA_ARGS__)                 \
+        CASE_MACRO(func<int64_t>, kLong, __VA_ARGS__)                  \
+        CASE_MACRO(func<float>, kFloat, __VA_ARGS__)                   \
+        CASE_MACRO(func<double>, kDouble, __VA_ARGS__)                 \
         default:                                                       \
             CHECK(false) << "invalid input type " << real_scalar_type; \
     }
 
+// used for conversion
+#define SWITCH_MACRO_ALL_DUAL(real_scalar_type, second_type, func, ...) \
+    switch (real_scalar_type)                                                  \
+    {                                                                          \
+        CASE_MACRO((func<uint8_t, second_type>), kUInt8,  __VA_ARGS__)   \
+        CASE_MACRO((func<int16_t, second_type>), kInt16,  __VA_ARGS__)   \
+        CASE_MACRO((func<int32_t, second_type>), kInt32,  __VA_ARGS__)   \
+        CASE_MACRO((func<int64_t, second_type>), kLong,  __VA_ARGS__)    \
+        CASE_MACRO((func<float, second_type>), kFloat,  __VA_ARGS__)     \
+        CASE_MACRO((func<double, second_type>), kDouble,  __VA_ARGS__)   \
+        default:                                                               \
+            CHECK(false) << "invalid input type " << real_scalar_type;         \
+    }
 
 
 static SizeType max_size(Tensor a, Tensor b)
@@ -58,4 +71,4 @@ static SizeType max_size(Tensor a, Tensor b)
     return new_sizes;
 }
 
-}
+}  // namespace tinytorch

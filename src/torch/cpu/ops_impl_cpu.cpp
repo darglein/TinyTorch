@@ -100,12 +100,12 @@ static void sqrt_impl_cpu(TensorInfo<T> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[i]= std::sqrt(a[i]);
+        result[i] = std::sqrt(a[i]);
     }
 }
 
-void sqrt_impl_cpu(Tensor a, Tensor& result) {
-
+void sqrt_impl_cpu(Tensor a, Tensor& result)
+{
     SWITCH_MACRO_ALL(a.scalar_type(), sqrt_impl_cpu, a, result);
 }
 
@@ -577,96 +577,55 @@ Tensor max_impl_cpu(Tensor a)
     return result;
 }
 
-template <typename T>
-static void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> index, TensorInfo<T> result)
+template <typename T, typename Indextype>
+static void index_select_impl_cpu(TensorInfo<T> input, int64_t dim, TensorInfo<Indextype> index, TensorInfo<T> result)
 {
-    int64_t dims = input.dims;
-
-    int64_t to_copy = input.numel() / input.sizes[dim];
-    for (int64_t index_index = 0; index_index < index.numel(); ++index_index)
+    for (int64_t result_linear_index = 0; result_linear_index < result.numel(); ++result_linear_index)
     {
-        int64_t slice        = index[index_index];
-        int64_t input_start  = slice * input.strides[dim];
-        int64_t result_start = index_index * result.strides[dim];
+        auto index_result = result.LinearIndexToDimIndex(result_linear_index);
 
-        for (int64_t c = 0; c < to_copy; ++c)
-        {
-            int64_t linearId = c;
+        auto index_input = index_result;
+        index_input[dim] = index[index_result[dim]];
 
-            int64_t input_offset  = input_start;
-            int64_t result_offset = result_start;
-            for (int64_t i = dims - 1; i > 0; --i)
-            {
-                if (i != dim)
-                {
-                    int64_t curDimIndex = linearId % input.sizes[i];
-                    input_offset += curDimIndex * input.strides[i];
-                    result_offset += curDimIndex * result.strides[i];
-                    linearId /= input.sizes[i];
-                }
-            }
-
-            if (dim != 0)
-            {
-                input_offset += linearId * input.strides[0];
-                result_offset += linearId * result.strides[0];
-            }
-
-            result.data[result_offset] = input.data[input_offset];
-        }
+        result[index_result] = input[index_input];
     }
 }
 
-Tensor index_select_impl_cpu(Tensor input, int64_t dim, Tensor index)
+void index_select_impl_cpu(Tensor input, int64_t dim, Tensor index, Tensor& result)
 {
+    CHECK(input.is_cpu());
+    CHECK(index.is_cpu());
     CHECK_LT(dim, input.dim());
-    CHECK_EQ(index.dtype(), kLong);
 
-    auto numel = index.numel();
 
-    auto result_size = input.sizes().vec();
-    result_size[dim] = numel;
-
-    Tensor result = empty(result_size, input.options());
-    SWITCH_MACRO_ALL(input.scalar_type(), index_select_impl_cpu, input, dim, index, result);
-    return result;
+    switch (index.dtype())
+    {
+        case kInt32:
+        {
+            SWITCH_MACRO_ALL_DUAL(input.scalar_type(), int32_t, index_select_impl_cpu, input, dim, index, result);
+            break;
+        }
+        case kInt64:
+        {
+            SWITCH_MACRO_ALL_DUAL(input.scalar_type(), int64_t, index_select_impl_cpu, input, dim, index, result);
+            break;
+        }
+        default:
+            throw std::runtime_error("invalid index type");
+    }
 }
 
 template <typename T>
 static void index_add_impl_cpu(int64_t dim, TensorInfo<int64_t> index, TensorInfo<T> data, TensorInfo<T> result)
 {
-    int64_t dims = result.dims;
-
-    int64_t to_add = data.numel() / data.sizes[0];
-
-    for (int64_t index_index = 0; index_index < index.numel(); ++index_index)
+    for (int64_t input_linear_index = 0; input_linear_index < data.numel(); ++input_linear_index)
     {
-        int64_t slice        = index[index_index];
-        int64_t data_start   = index_index * data.strides[dim];
-        int64_t result_start = slice * result.strides[dim];
+        auto index_input = result.LinearIndexToDimIndex(input_linear_index);
 
-        for (int64_t c = 0; c < to_add; ++c)
-        {
-            int64_t linearId = c;
+        auto index_result = index_input;
+        index_result[dim] = index[index_input[dim]];
 
-            int64_t result_offset = result_start;
-            for (int64_t i = dims - 1; i > 0; --i)
-            {
-                if (i != dim)
-                {
-                    int64_t curDimIndex = linearId % result.sizes[i];
-                    result_offset += curDimIndex * result.strides[i];
-                    linearId /= result.sizes[i];
-                }
-            }
-
-            if (dim != 0)
-            {
-                result_offset += linearId * result.strides[0];
-            }
-
-            result.data[result_offset] += data[data_start + c];
-        }
+        result[index_result] += data[index_input];
     }
 }
 
@@ -1020,36 +979,9 @@ std::vector<Tensor> max_backward_impl_cpu(Tensor grad_output)
     return {grad_a, grad_b};
 }
 
-template <typename T>
-static void to_double_cpu(TensorInfo<T> a, TensorInfo<double> result)
-{
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[i] = double(a[i]);
-    }
-}
 
-template <typename T>
-static void from_double_cpu(TensorInfo<double> a, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[i] = T(a[i]);
-    }
-}
-
-Tensor to_impl_cpu(Tensor a, ScalarType other_type)
-{
-    Tensor t2 = empty_like(a, TensorOptions().dtype(kDouble));
-    SWITCH_MACRO_ALL(a.scalar_type(), to_double_cpu, a, t2);
-
-    Tensor result = empty_like(a, TensorOptions().dtype(other_type));
-    SWITCH_MACRO_ALL(result.scalar_type(), from_double_cpu, t2, result);
-    return result;
-}
-
-template <typename T>
-static void copy_cpu(TensorInfo<T> src, TensorInfo<T> dst)
+template <typename T, typename G>
+static void copy_cpu(TensorInfo<T> src, TensorInfo<G> dst)
 {
     for (int64_t i = 0; i < src.numel(); ++i)
     {
@@ -1060,7 +992,33 @@ static void copy_cpu(TensorInfo<T> src, TensorInfo<T> dst)
 void copy_impl_cpu(Tensor src, Tensor target)
 {
     CHECK_EQ(src.numel(), target.numel());
-    SWITCH_MACRO_ALL(src.scalar_type(), copy_cpu, src, target);
+
+
+    switch (target.dtype())
+    {
+        case kInt32:
+        {
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int32_t, copy_cpu, src, target);
+            break;
+        }
+        case kInt64:
+        {
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int64_t, copy_cpu, src, target);
+            break;
+        }
+        case kFloat32:
+        {
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), float, copy_cpu, src, target);
+            break;
+        }
+        case kFloat64:
+        {
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), double, copy_cpu, src, target);
+            break;
+        }
+        default:
+            throw std::runtime_error("invalid type");
+    }
 }
 
 template <typename T>

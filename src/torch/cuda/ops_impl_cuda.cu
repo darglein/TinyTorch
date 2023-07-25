@@ -26,7 +26,7 @@ static __global__ void range_impl_cuda(TensorInfo<T> a, double start, double end
 
 void range_impl_cuda(Tensor a, double start, double end, double step)
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), range_impl_cuda, a, start, end, step);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), range_impl_cuda, a, start, end, step);
 }
 
 template <typename T>
@@ -41,12 +41,12 @@ static __global__ void fill_impl_cuda(TensorInfo<T> a, double value)
 
 void fill_impl_cuda(Tensor a, double value)
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), fill_impl_cuda, a, value);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), fill_impl_cuda, a, value);
 }
 
-template <typename T>
+template <typename T, typename G>
 __launch_bounds__(128)
-static __global__ void copy_impl_cuda(TensorInfo<T> a, TensorInfo<T> b)
+static __global__ void copy_impl_cuda(TensorInfo<T> a, TensorInfo<G> b)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -56,7 +56,17 @@ static __global__ void copy_impl_cuda(TensorInfo<T> a, TensorInfo<T> b)
 
 void copy_impl_cuda(Tensor src, Tensor target)
 {
-    SWITCH_MACRO_ALL(src.scalar_type(), src.numel(), copy_impl_cuda, src, target);
+    switch(target.dtype())
+    {
+        case kFloat32:
+        {
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.scalar_type(), float, src.numel(), copy_impl_cuda, src, target);
+            break;
+        }
+        default:
+            throw std::runtime_error("invalid type");
+    }
+
 }
 
 
@@ -77,7 +87,7 @@ void uniform_impl_cuda(Tensor& a, double mi, double ma)
     static int64_t seed = get_seed();
     srand((uint32_t)seed);
     seed = ::rand();
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), rand_float_impl_cuda, a, (float)mi, (float)ma, seed);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), rand_float_impl_cuda, a, (float)mi, (float)ma, seed);
 }
 
 template <typename T>
@@ -97,7 +107,7 @@ void uniform_int_impl_cuda(Tensor& a, int low, int high)
     static int64_t seed = get_seed();
     srand((uint32_t)seed);
     seed = ::rand();
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), rand_int_impl_cuda, a, low, high, seed);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), rand_int_impl_cuda, a, low, high, seed);
 }
 
 template <typename T>
@@ -114,7 +124,7 @@ static __global__ void square_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 Tensor square_impl_cuda(Tensor a)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), square_impl_cuda, a, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), square_impl_cuda, a, result);
     return result;
 }
 
@@ -137,9 +147,9 @@ Tensor sum_impl_cuda(Tensor a)
     auto stream = cuda::getCurrentCUDAStream();
     switch (a.scalar_type())
     {
-        CASE_MACRO(sum_impl_cuda, int32_t, kInt32, a.numel(), a, result)
-        CASE_MACRO(sum_impl_cuda, float, kFloat, a.numel(), a, result)
-        CASE_MACRO(sum_impl_cuda, double, kDouble, a.numel(), a, result)
+        CUDA_CASE_MACRO(sum_impl_cuda<int32_t>, kInt32, a.numel(), a, result)
+        CUDA_CASE_MACRO(sum_impl_cuda<float>, kFloat, a.numel(), a, result)
+        CUDA_CASE_MACRO(sum_impl_cuda<double>, kDouble, a.numel(), a, result)
         default:
             CHECK(false) << "invalid input type " << a.scalar_type();
     }
@@ -160,7 +170,7 @@ static __global__ void log_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 Tensor log_impl_cuda(Tensor a)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), log_impl_cuda, a, result);
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), log_impl_cuda, a, result);
     return result;
 }
 
@@ -177,7 +187,7 @@ static __global__ void log1p_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 Tensor log1p_impl_cuda(Tensor a)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), log1p_impl_cuda, a, result);
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), log1p_impl_cuda, a, result);
     return result;
 }
 
@@ -194,7 +204,7 @@ static __global__ void exp_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 Tensor exp_impl_cuda(Tensor a)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), exp_impl_cuda, a, result);
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), exp_impl_cuda, a, result);
     return result;
 }
 
@@ -212,7 +222,7 @@ static __global__ void sign_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 Tensor sign_impl_cuda(Tensor a)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), sign_impl_cuda, a, result);
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), sign_impl_cuda, a, result);
     return result;
 }
 
@@ -229,7 +239,7 @@ static __global__ void pow_impl_cuda(TensorInfo<T> a, double b, TensorInfo<T> re
 Tensor pow_impl_cuda(Tensor a, double b)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), pow_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), pow_impl_cuda, a, b, result);
     return result;
 }
 
@@ -246,7 +256,7 @@ static __global__ void sin_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 Tensor sin_impl_cuda(Tensor a)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), sin_impl_cuda, a, result);
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), sin_impl_cuda, a, result);
     return result;
 }
 
@@ -263,7 +273,7 @@ static __global__ void cos_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 Tensor cos_impl_cuda(Tensor a)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), cos_impl_cuda, a, result);
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), cos_impl_cuda, a, result);
     return result;
 }
 
@@ -280,7 +290,7 @@ static __global__ void relu_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 Tensor relu_impl_cuda(Tensor a)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), relu_impl_cuda, a, result);
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), relu_impl_cuda, a, result);
     return result;
 }
 
@@ -297,7 +307,7 @@ static __global__ void sigmoid_impl_cuda(TensorInfo<T> a, TensorInfo<T> result)
 Tensor sigmoid_impl_cuda(Tensor a)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), sigmoid_impl_cuda, a, result);
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), sigmoid_impl_cuda, a, result);
     return result;
 }
 
@@ -314,7 +324,7 @@ static __global__ void softplus_impl_cuda(TensorInfo<T> a, double beta, TensorIn
 Tensor softplus_impl_cuda(Tensor a, double beta)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), softplus_impl_cuda, a, beta, result);
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), softplus_impl_cuda, a, beta, result);
     return result;
 }
 
@@ -331,7 +341,7 @@ static __global__ void min_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInf
 Tensor min_impl_cuda(Tensor a, Tensor b)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), min_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), min_impl_cuda, a, b, result);
     return result;
 }
 
@@ -348,7 +358,7 @@ static __global__ void max_impl_cuda(TensorInfo<T> a, TensorInfo<T> b, TensorInf
 Tensor max_impl_cuda(Tensor a, Tensor b)
 {
     Tensor result = empty_like(a);
-    SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), max_impl_cuda, a, b, result);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), max_impl_cuda, a, b, result);
     return result;
 }
 
