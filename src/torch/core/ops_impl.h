@@ -5,6 +5,12 @@
 #include "torch/tiny_torch_config.h"
 
 
+#include "torch/cpu/binary_operators.h"
+#include "torch/cpu/unary_operators.h"
+#include "torch/cuda/binary_operators.h"
+#include "torch/cuda/unary_operators.h"
+
+
 #ifdef TT_HAS_CUDA
 #    define SELECT_DEVICE_CUDA(func, ...) \
         case kCUDA:                       \

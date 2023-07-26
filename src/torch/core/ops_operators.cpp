@@ -8,9 +8,7 @@
 
 #include "graph.h"
 
-#include "torch/cpu/ops_impl_cpu.h"
-#include "torch/cpu/ops_operators_impl_cpu.h"
-#include "torch/cuda/ops_operators_impl_cuda.h"
+#include "torch/core/ops_impl.h"
 
 namespace tinytorch
 {

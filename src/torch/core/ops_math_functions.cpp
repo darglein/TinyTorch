@@ -40,7 +40,7 @@ struct SqrtNode : public FunctionNode<SqrtNode>
         auto l      = ctx->get_saved_variables();
         auto a      = l[0];
         auto g      = grad[0];
-        auto grad_a = 1 / (2*a.sqrt()) * g;
+        auto grad_a = 1 / (2 * a.sqrt()) * g;
         return {grad_a};
     }
 };
@@ -61,8 +61,34 @@ struct SumNode : public FunctionNode<SumNode>
         CHECK_EQ(grad.size(), 1);
         CHECK_EQ(grad[0].numel(), 1);
         Tensor grad_a = empty(ctx->data_sizes["sizes"]);
-        auto g = grad[0];
-        cpu_impl::sum_backward_impl(grad[0], grad_a);
+        auto g        = grad[0];
+        SELECT_DEVICE(grad_a.device(), fill_impl, grad_a, g);
+        return {grad_a};
+    }
+};
+struct SumDimNode : public FunctionNode<SumDimNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue dim)
+    {
+        ctx->data_sizes["sizes"] = a.sizes();
+        ctx->saved_data["dim"]   = dim;
+        auto out_size            = a.sizes();
+        out_size[dim.toInt()]    = 1;
+        Tensor result            = zeros(out_size, a.options());
+        SELECT_DEVICE(result.device(), sum_impl, a, dim.toInt(), result);
+
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        CHECK(false);
+        CHECK_EQ(grad.size(), 1);
+        CHECK_EQ(grad[0].numel(), 1);
+        int dim       = ctx->saved_data["dim"].toInt();
+        Tensor grad_a = empty(ctx->data_sizes["sizes"]);
+        auto g        = grad[0];
+        SELECT_DEVICE(grad_a.device(), fill_impl, grad_a, g, dim);
         return {grad_a};
     }
 };
@@ -98,7 +124,7 @@ Tensor max(Tensor a)
     CHECK(a.is_cpu());
 
     Tensor result = empty({1}, a.options());
-    cpu_impl:: max_impl(a, result);
+    cpu_impl::max_impl(a, result);
     return result;
 }
 std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
@@ -111,7 +137,7 @@ std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
 
     Tensor result  = empty(result_size, a.options());
     Tensor indices = empty(result_size, a.options().dtype(kLong));
-    cpu_impl:: min_impl(a, dim, keepdim, result, indices);
+    cpu_impl::min_impl(a, dim, keepdim, result, indices);
     return {result, indices};
 }
 std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
@@ -124,14 +150,14 @@ std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
 
     Tensor result  = empty(result_size, a.options());
     Tensor indices = empty(result_size, a.options().dtype(kLong));
-    cpu_impl::  max_impl(a, dim, keepdim, result, indices);
+    cpu_impl::max_impl(a, dim, keepdim, result, indices);
     return {result, indices};
 }
 Tensor min(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     CHECK(a.is_cpu());
-    
+
     Tensor result = empty_like(a);
     cpu_impl::min_impl(a, b, result);
     return result;
@@ -142,7 +168,7 @@ Tensor max(Tensor a, Tensor b)
     CHECK(a.is_cpu());
 
     Tensor result = empty_like(a);
-    cpu_impl:: max_impl(a, b, result);
+    cpu_impl::max_impl(a, b, result);
     return result;
 }
 
@@ -153,21 +179,7 @@ Tensor sum(Tensor a)
 
 Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
 {
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
-
-    auto out_size = a.sizes();
-    out_size[dim] = 1;
-    Tensor result;
-    if (a.is_cpu())
-    {
-        result = empty(out_size, a.options());
-        cpu_impl::  sum_impl(a, dim, result);
-    }
-    else
-    {
-        result = zeros(out_size, a.options());
-       cuda_impl::  sum_impl(a, dim, result);
-    }
+    auto result = autograd::SumDimNode::apply(a, dim)[0];
     if (squeeze_dim)
     {
         auto dims_before = result.dim();
@@ -211,7 +223,7 @@ Tensor std(Tensor a)
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
 
     Tensor result = empty({1}, a.options());
-    cpu_impl:: std_impl(a, result);
+    cpu_impl::std_impl(a, result);
     return result;
 }
 
@@ -227,7 +239,7 @@ Tensor abs(Tensor a)
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
 
     Tensor result = empty_like(a);
-    cpu_impl:: abs_impl(a, result);
+    cpu_impl::abs_impl(a, result);
     return result;
 }
 Tensor clamp(Tensor a, double low, double high)
@@ -241,7 +253,7 @@ void clamp_(Tensor& a, double low, double high)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     CHECK(a.is_cpu());
-    cpu_impl:: clamp_impl_(a, low, high);
+    cpu_impl::clamp_impl_(a, low, high);
 }
 
 Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)

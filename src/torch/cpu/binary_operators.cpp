@@ -9,7 +9,7 @@
 #include "ops_impl_cpu_helper.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cpu/ops_impl_cpu.h"
-#include "ops_operators_impl_cpu.h"
+#include "binary_operators.h"
 
 
 #define SWITCH_MACRO_ALL_OPERATOR(real_scalar_type, op, func, ...)      \
