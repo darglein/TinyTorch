@@ -177,12 +177,12 @@ Tensor range(double start, double end, TensorOptions options, double step)
     Tensor t      = empty({count}, options);
     if (t.is_cpu())
     {
-        range_impl_cpu(t, start, end, step);
+        cpu_impl::range_impl(t, start, end, step);
     }
     else
     {
 #ifdef  TT_HAS_CUDA
-        range_impl_cuda(t, start, end, step);
+        cuda_impl::range_impl(t, start, end, step);
 #endif
     }
     return t;

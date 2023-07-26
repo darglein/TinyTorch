@@ -8,8 +8,7 @@
 
 #include "graph.h"
 
-#include "torch/cpu/ops_impl_cpu.h"
-#include "torch/cuda/ops_impl_cuda.h"
+#include "torch/core/ops_impl.h"
 
 
 namespace tinytorch
@@ -27,11 +26,11 @@ struct SqrtNode : public FunctionNode<SqrtNode>
         auto result = empty_like(a);
         if (a.is_cpu())
         {
-            sqrt_impl_cpu(a, result);
+            cpu_impl::sqrt_impl(a, result);
         }
         else
         {
-            sqrt_impl_cuda(a, result);
+            cuda_impl::sqrt_impl(a, result);
         }
         return {result};
     }
@@ -53,7 +52,7 @@ struct SumNode : public FunctionNode<SumNode>
     {
         ctx->data_sizes["sizes"] = a.sizes();
         Tensor result            = zeros({1}, a.options().requires_grad(false));
-        sum_impl_cpu(a, result);
+        cpu_impl::sum_impl(a, result);
         return {result};
     }
 
@@ -62,7 +61,8 @@ struct SumNode : public FunctionNode<SumNode>
         CHECK_EQ(grad.size(), 1);
         CHECK_EQ(grad[0].numel(), 1);
         Tensor grad_a = empty(ctx->data_sizes["sizes"]);
-        sum_backward_impl_cpu(grad[0], grad_a);
+        auto g = grad[0];
+        cpu_impl::sum_backward_impl(grad[0], grad_a);
         return {grad_a};
     }
 };
@@ -89,7 +89,7 @@ Tensor min(Tensor a)
     CHECK(a.is_cpu());
 
     Tensor result = empty({1}, a.options());
-    min_impl_cpu(a, result);
+    cpu_impl::min_impl(a, result);
     return result;
 }
 Tensor max(Tensor a)
@@ -98,7 +98,7 @@ Tensor max(Tensor a)
     CHECK(a.is_cpu());
 
     Tensor result = empty({1}, a.options());
-    max_impl_cpu(a, result);
+    cpu_impl:: max_impl(a, result);
     return result;
 }
 std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
@@ -111,7 +111,7 @@ std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
 
     Tensor result  = empty(result_size, a.options());
     Tensor indices = empty(result_size, a.options().dtype(kLong));
-    min_impl_cpu(a, dim, keepdim, result, indices);
+    cpu_impl:: min_impl(a, dim, keepdim, result, indices);
     return {result, indices};
 }
 std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
@@ -124,7 +124,7 @@ std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
 
     Tensor result  = empty(result_size, a.options());
     Tensor indices = empty(result_size, a.options().dtype(kLong));
-    max_impl_cpu(a, dim, keepdim, result, indices);
+    cpu_impl::  max_impl(a, dim, keepdim, result, indices);
     return {result, indices};
 }
 Tensor min(Tensor a, Tensor b)
@@ -133,7 +133,7 @@ Tensor min(Tensor a, Tensor b)
     CHECK(a.is_cpu());
     
     Tensor result = empty_like(a);
-    min_impl_cpu(a, b, result);
+    cpu_impl::min_impl(a, b, result);
     return result;
 }
 Tensor max(Tensor a, Tensor b)
@@ -142,7 +142,7 @@ Tensor max(Tensor a, Tensor b)
     CHECK(a.is_cpu());
 
     Tensor result = empty_like(a);
-    max_impl_cpu(a, b, result);
+    cpu_impl:: max_impl(a, b, result);
     return result;
 }
 
@@ -161,12 +161,12 @@ Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
     if (a.is_cpu())
     {
         result = empty(out_size, a.options());
-        sum_impl_cpu(a, dim, result);
+        cpu_impl::  sum_impl(a, dim, result);
     }
     else
     {
         result = zeros(out_size, a.options());
-        sum_impl_cuda(a, dim, result);
+       cuda_impl::  sum_impl(a, dim, result);
     }
     if (squeeze_dim)
     {
@@ -211,7 +211,7 @@ Tensor std(Tensor a)
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
 
     Tensor result = empty({1}, a.options());
-    std_impl_cpu(a, result);
+    cpu_impl:: std_impl(a, result);
     return result;
 }
 
@@ -227,7 +227,7 @@ Tensor abs(Tensor a)
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
 
     Tensor result = empty_like(a);
-    abs_impl_cpu(a, result);
+    cpu_impl:: abs_impl(a, result);
     return result;
 }
 Tensor clamp(Tensor a, double low, double high)
@@ -241,7 +241,7 @@ void clamp_(Tensor& a, double low, double high)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     CHECK(a.is_cpu());
-    clamp_impl_cpu_(a, low, high);
+    cpu_impl:: clamp_impl_(a, low, high);
 }
 
 Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)

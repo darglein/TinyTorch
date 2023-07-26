@@ -8,8 +8,7 @@
 
 #include "graph.h"
 
-#include "torch/cpu/ops_impl_cpu.h"
-#include "torch/cuda/ops_impl_cuda.h"
+#include "torch/core/ops_impl.h"
 
 
 namespace tinytorch
@@ -54,7 +53,7 @@ Tensor repeat_interleave(Tensor t, int64_t count)
     SizeType new_sizes = t.sizes();
     new_sizes[0] *= count;
     Tensor result = empty(new_sizes, t.options());
-    repeat_interleave_impl_cpu(t, count, result);
+    cpu_impl::repeat_interleave_impl(t, count, result);
     return result;
 }
 
@@ -67,67 +66,45 @@ Tensor transpose(Tensor t, int64_t dim0, int64_t dim1)
 
     Tensor result = empty(new_sizes, t.options());
 
-    transpose_impl_cpu(t, dim0, dim1, result);
+    cpu_impl::transpose_impl(t, dim0, dim1, result);
     return result;
 }
 
 void fill(Tensor& t, double value)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
-    if (t.is_cpu())
-    {
-        fill_impl_cpu(t, value);
-    }
-    else
-    {
-#ifdef TT_HAS_CUDA
-        fill_impl_cuda(t, value);
-#endif
-    }
+    SELECT_DEVICE(t.device(), fill_impl, t, value);
+}
+
+void fill(Tensor& t, Tensor value)
+{
+    CHECK_EQ(value.numel(), 1);
+    CHECK(!t.requires_grad() || !GradMode::is_enabled());
+    SELECT_DEVICE(t.device(), fill_impl, t, value);
+}
+void fill(Tensor& t, Tensor values, int dim)
+{
+    CHECK_EQ(values.numel(), t.size(dim));
+    CHECK(!t.requires_grad() || !GradMode::is_enabled());
+    SELECT_DEVICE(t.device(), fill_impl, t, values, dim);
 }
 
 void uniform(Tensor& t, double mi, double ma)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
-    if (t.is_cpu())
-    {
-        uniform_impl_cpu(t, mi, ma);
-    }
-    else
-    {
-#ifdef TT_HAS_CUDA
-        uniform_impl_cuda(t, mi, ma);
-#endif
-    }
+    SELECT_DEVICE(t.device(), uniform_impl, t, mi, ma);
 }
 
 void uniform_int(Tensor& t, int low, int high)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
-    if (t.is_cpu())
-    {
-        uniform_int_impl_cpu(t, low, high);
-    }
-    else
-    {
-#ifdef TT_HAS_CUDA
-        uniform_int_impl_cuda(t, low, high);
-#endif
-    }
+    SELECT_DEVICE(t.device(), uniform_int_impl, t, low, high);
 }
 
 void copy(Tensor src, Tensor target)
 {
     CHECK(!src.requires_grad() || !GradMode::is_enabled());
-
-    if (src.is_cpu())
-    {
-        copy_and_convert_impl_cpu(src, target);
-    }
-    else
-    {
-        copy_and_convert_impl_cuda(src, target);
-    }
+    SELECT_DEVICE(src.device(), copy_and_convert_impl, src, target);
 }
 
 
@@ -145,7 +122,7 @@ struct ToNode : public FunctionNode<ToNode>
 #ifdef TT_HAS_CUDA
         Tensor contig = a.contiguous();
         Tensor result = empty(contig.sizes(), a.options().device(new_device));
-        to_impl_cpu_cuda(a, result);
+        cpu_impl::to_impl_cpu_cuda(a, result);
         return {result};
 #else
         CHECK(false);
@@ -156,7 +133,7 @@ struct ToNode : public FunctionNode<ToNode>
     {
         Device old_device = (Device)ctx->saved_data["old_device"].toInt();
         Tensor grad_a     = empty_like(grad[0], grad[0].options().device(old_device));
-        to_impl_cpu_cuda(grad[0], grad_a);
+        cpu_impl::to_impl_cpu_cuda(grad[0], grad_a);
         return {grad_a, {}};
     }
 };
@@ -170,14 +147,8 @@ struct ToScalarTypeNode : public FunctionNode<ToScalarTypeNode>
         Dtype new_dtype              = (Dtype)new_dtype_.toInt();
 
         Tensor result = empty_like(a, a.options().dtype(new_dtype));
-        if (a.is_cpu())
-        {
-            copy_and_convert_impl_cpu(a, result);
-        }
-        else
-        {
-            copy_and_convert_impl_cuda(a, result);
-        }
+
+        SELECT_DEVICE(a.device(), copy_and_convert_impl, a, result);
         return {result};
     }
 
@@ -186,8 +157,7 @@ struct ToScalarTypeNode : public FunctionNode<ToScalarTypeNode>
         Dtype old_dtype = (Dtype)ctx->saved_data["old_dtype"].toInt();
         auto g          = grad[0];
         Tensor grad_a   = empty_like(grad[0], grad[0].options().dtype(old_dtype));
-
-        copy_and_convert_impl_cpu(g, grad_a);
+        SELECT_DEVICE(g.device(), copy_and_convert_impl, g, grad_a);
         return {grad_a, {}};
     }
 };
@@ -236,14 +206,9 @@ struct IndexSelectNode : public FunctionNode<IndexSelectNode>
         auto result_size         = input.sizes().vec();
         result_size[dim.toInt()] = index.numel();
         Tensor result            = empty(result_size, input.options());
-        if (result.is_cpu())
-        {
-            index_select_impl_cpu(input, dim.toInt(), index, result);
-        }
-        else
-        {
-            index_select_impl_cuda(input, dim.toInt(), index, result);
-        }
+
+
+        SELECT_DEVICE(result.device(), index_select_impl, input, dim.toInt(), index, result);
         return {result};
     }
 
@@ -287,7 +252,7 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
         CHECK_EQ(index.numel(), data.size(0));
 
         Tensor result = input.clone();
-        index_add_impl_cpu(input, dim.toInt(), index, data, result);
+        SELECT_DEVICE(result.device(), index_add_impl, dim.toInt(), index, data, result);
         return {result};
     }
 
@@ -301,7 +266,7 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
         auto grad_input = grad[0];
 
         // Tensor grad_a = empty_like(grad[0]);
-        // copy_impl_cpu(grad[0], grad_a);
+        // copy_impl(grad[0], grad_a);
         return {grad_input, {}, {}, grad_data};
     }
 };
@@ -376,7 +341,7 @@ Tensor stack(const std::vector<Tensor>& tensors)
 
     Tensor result = empty(new_sizes, tensors.front().options());
 
-    stack_impl_cpu(tensors, result);
+    cpu_impl::stack_impl(tensors, result);
     return result;
 }
 
@@ -387,36 +352,15 @@ struct CloneNode : public FunctionNode<CloneNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
-        // ctx->save_for_backward({a});
         Tensor result = empty_like(a);
-
-        if (a.is_cpu())
-        {
-            copy_and_convert_impl_cpu(a, result);
-        }
-        else
-        {
-#ifdef TT_HAS_CUDA
-            copy_and_convert_impl_cuda(a, result);
-#endif
-        }
+        SELECT_DEVICE(result.device(), copy_and_convert_impl,a, result);
         return {result};
     }
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        // auto l        = ctx->get_saved_variables();
         Tensor grad_a = empty_like(grad[0]);
-        if (grad_a.is_cpu())
-        {
-            copy_and_convert_impl_cpu(grad[0], grad_a);
-        }
-        else
-        {
-#ifdef TT_HAS_CUDA
-            copy_and_convert_impl_cuda(grad[0], grad_a);
-#endif
-        }
+        SELECT_DEVICE(grad_a.device(), copy_and_convert_impl,grad[0], grad_a);
         return {grad_a[0]};
     }
 };
