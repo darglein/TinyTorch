@@ -14,9 +14,74 @@
 namespace tinytorch
 {
 
+static void fill_neg_one_dim(SizeType& new_sizes, int64_t old_numel)
+{
+    int64_t new_numel = 1;
+    int64_t* neg_dim  = nullptr;
+    for (int64_t& i : new_sizes.vec())
+    {
+        if (i == -1)
+        {
+            CHECK_EQ(neg_dim, nullptr);
+            neg_dim = &i;
+        }
+        else
+        {
+            new_numel *= i;
+        }
+    }
+
+    if (neg_dim)
+    {
+        CHECK_EQ(old_numel % new_numel, 0);
+        *neg_dim = old_numel / new_numel;
+        new_numel *= *neg_dim;
+    }
+
+    CHECK_EQ(old_numel, new_numel);
+}
+
+
+namespace autograd
+{
+struct ReshapeNode : public FunctionNode<ReshapeNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue new_sizes_)
+    {
+        NoGradGuard ngg;
+        ctx->saved_data["old_sizes"] = a.sizes();
+        SizeType new_sizes           = new_sizes_.toSizes();
+        fill_neg_one_dim(new_sizes, a.numel());
+
+        Tensor result = empty(new_sizes, a.options());
+        tinytorch::copy(a, result);
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        SizeType old_sizes = ctx->saved_data["old_sizes"].toSizes();
+        auto g             = grad[0];
+        Tensor grad_a      = empty(old_sizes, g.options());
+        tinytorch::copy(g, grad_a);
+        return {grad_a, {}};
+    }
+};
+}  // namespace autograd
+
+
+Tensor reshape(Tensor t, SizeType sizes)
+{
+    if (t.sizes() == sizes)
+    {
+        return t;
+    }
+    return autograd::ReshapeNode::apply(t, sizes)[0];
+}
+
 Tensor repeat(Tensor t, SizeType sizes)
 {
-    CHECK(!t.requires_grad());
+    CHECK(!t.requires_grad() || !GradMode::is_enabled());
     CHECK_EQ(t.dim(), sizes.size());
 
     int repeat_dim = -1;
@@ -27,6 +92,11 @@ Tensor repeat(Tensor t, SizeType sizes)
             CHECK_EQ(repeat_dim, -1);
             repeat_dim = i;
         }
+    }
+
+    if (repeat_dim == -1)
+    {
+        return t;
     }
 
 
@@ -171,7 +241,7 @@ Tensor to(Tensor a, Device new_device)
         return a;
     }
 
-    return autograd::ToNode::apply(a, (int)new_device)[0];
+    return autograd::ToNode::apply(a.contiguous(), (int)new_device)[0];
 }
 
 Tensor to(Tensor a, ScalarType other_type)
@@ -353,14 +423,14 @@ struct CloneNode : public FunctionNode<CloneNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
         Tensor result = empty_like(a);
-        SELECT_DEVICE(result.device(), copy_and_convert_impl,a, result);
+        SELECT_DEVICE(result.device(), copy_and_convert_impl, a, result);
         return {result};
     }
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         Tensor grad_a = empty_like(grad[0]);
-        SELECT_DEVICE(grad_a.device(), copy_and_convert_impl,grad[0], grad_a);
+        SELECT_DEVICE(grad_a.device(), copy_and_convert_impl, grad[0], grad_a);
         return {grad_a[0]};
     }
 };

@@ -19,6 +19,40 @@ namespace tinytorch
 namespace cpu_impl
 {
 
+
+template <typename T>
+static void std_impl(TensorInfo<T> a, double mean, TensorInfo<T> result)
+{
+    T s = T(0);
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        T v = a[i] - T(mean);
+        s += v * v;
+    }
+    result[0] = std::sqrt(s / a.numel());
+}
+
+void std_impl(Tensor a, Tensor& result)
+{
+    double mean = a.mean().toDouble();
+    SWITCH_MACRO_FLOAT(a.scalar_type(), std_impl, a, mean, result);
+}
+
+template <typename T>
+static void abs_impl(TensorInfo<T> a, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = std::abs(a[i]);
+    }
+}
+
+void abs_impl(Tensor a, Tensor& result)
+{
+    SWITCH_MACRO_ALL(a.scalar_type(), abs_impl, a, result);
+}
+
+
 template <typename T>
 static void sqrt_impl(TensorInfo<T> a, TensorInfo<T> result)
 {

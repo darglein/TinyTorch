@@ -11,20 +11,21 @@
 #include "torch/tiny_torch_config.h"
 namespace tinytorch
 {
-
+namespace cuda_impl
+{
 // basic operators
-void add_impl_cuda(Tensor a, Tensor b, Tensor& result);
-void add_impl_cuda(Tensor a, double b, Tensor& result);
-void sub_impl_cuda(Tensor a, Tensor b, Tensor& result);
-void sub_impl_cuda(Tensor a, double b, Tensor& result);
-void mult_impl_cuda(Tensor a, Tensor b, Tensor& result);
-void mult_impl_cuda(Tensor a, double b, Tensor& result);
-void div_impl_cuda(Tensor a, Tensor b, Tensor& result);
-void div_impl_cuda(double a, Tensor b, Tensor& result);
+void add_impl(Tensor a, Tensor b, Tensor& result);
+void add_impl(Tensor a, double b, Tensor& result);
+void sub_impl(Tensor a, Tensor b, Tensor& result);
+void sub_impl(Tensor a, double b, Tensor& result);
+void mult_impl(Tensor a, Tensor b, Tensor& result);
+void mult_impl(Tensor a, double b, Tensor& result);
+void div_impl(Tensor a, Tensor b, Tensor& result);
+void div_impl(double a, Tensor b, Tensor& result);
 
 // comparison operators (no grad needed)
-void equal_impl_cuda(Tensor a, double b, Tensor& result);
-void less_impl_cuda(Tensor a, double b, Tensor& result);
-void greater_impl_cuda(Tensor a, double b, Tensor& result);
-
+void equal_impl(Tensor a, double b, Tensor& result);
+void less_impl(Tensor a, double b, Tensor& result);
+void greater_impl(Tensor a, double b, Tensor& result);
+}
 }  // namespace tinytorch

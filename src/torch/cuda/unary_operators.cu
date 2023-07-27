@@ -21,6 +21,22 @@ namespace tinytorch
 namespace cuda_impl
 {
 
+
+template <typename T>
+__launch_bounds__(128) static __global__ void abs_impl(TensorInfo<T> a, TensorInfo<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= a.numel()) return;
+
+    result[i] = std::abs(a[i]);
+}
+
+void abs_impl(Tensor a, Tensor& result)
+{
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), abs_impl, a, result);
+}
+
+
 template <typename T>
 __launch_bounds__(128) static __global__ void sqrt_impl(TensorInfo<T> a, TensorInfo<T> result)
 {

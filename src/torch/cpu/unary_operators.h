@@ -13,6 +13,8 @@ namespace tinytorch
 {
 namespace cpu_impl
 {
+void std_impl(Tensor a, Tensor& result);
+void abs_impl(Tensor a, Tensor& result);
 
 void sqrt_impl(Tensor a, Tensor& result);
 void log_impl(Tensor a, Tensor& result);

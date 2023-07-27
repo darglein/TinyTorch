@@ -123,7 +123,6 @@ void uniform_int_impl(Tensor& t, int low, int high)
 
 
 
-
 template <typename T>
 static void sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
@@ -141,25 +140,12 @@ void sum_impl(Tensor a, Tensor& result)
 template <typename T>
 static void sum_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
-    int64_t dims = input.dims;
-
-    int64_t dim_size = input.sizes[dim];
-    int64_t count    = input.numel() / input.sizes[dim];
-    CHECK_EQ(count, result.numel());
-
-    for (int64_t c = 0; c < count; ++c)
+    for (int64_t linear_index_input = 0; linear_index_input < input.numel(); ++linear_index_input)
     {
-        int64_t input_offset = index_along_dim(c, dims, dim, input.sizes, input.strides);
-
-        T sum = T(0);
-
-        for (int64_t p = 0; p < dim_size; ++p)
-        {
-            sum += input[input_offset];
-            input_offset += input.strides[dim];
-        }
-
-        result[c] = sum;
+        auto index_input  = input.LinearIndexToDimIndex(linear_index_input);
+        auto result_index = index_input;
+        result_index[dim] = 0;
+        result[result_index] += input[index_input];
     }
 }
 
@@ -269,7 +255,7 @@ void max_impl(Tensor a, Tensor& result)
 
 template <typename T>
 static void minmax_impl(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> indices, TensorInfo<T> result,
-                            bool calc_min)
+                        bool calc_min)
 {
     int64_t dims = input.dims;
 
@@ -337,38 +323,6 @@ void max_impl(Tensor input, int64_t dim, bool keepdim, Tensor& result, Tensor& i
     }
 }
 
-template <typename T>
-static void std_impl(TensorInfo<T> a, double mean, TensorInfo<T> result)
-{
-    T s = T(0);
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        T v = a[i] - T(mean);
-        s += v * v;
-    }
-    result[0] = std::sqrt(s / a.numel());
-}
-
-void std_impl(Tensor a, Tensor& result)
-{
-    double mean = a.mean().toDouble();
-    SWITCH_MACRO_FLOAT(a.scalar_type(), std_impl, a, mean, result);
-}
-
-template <typename T>
-static void abs_impl(TensorInfo<T> a, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[i] = std::abs(a[i]);
-    }
-}
-
-void abs_impl(Tensor a, Tensor& result)
-{
-    SWITCH_MACRO_ALL(a.scalar_type(), abs_impl, a, result);
-}
-
 
 template <typename T, typename Indextype>
 static void index_select_impl(TensorInfo<T> input, int64_t dim, TensorInfo<Indextype> index, TensorInfo<T> result)
@@ -434,10 +388,10 @@ void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result)
     switch (index.scalar_type())
     {
         case kInt32:
-            index_add_helper<int32_t>( dim, index, data, result);
+            index_add_helper<int32_t>(dim, index, data, result);
             break;
         case kLong:
-            index_add_helper<int64_t>( dim, index, data, result);
+            index_add_helper<int64_t>(dim, index, data, result);
             break;
         default:
             throw std::runtime_error("invalid type");

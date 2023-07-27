@@ -138,15 +138,7 @@ Tensor randint(int low, int high, const SizeType& sizes, TensorOptions options)
 
 Tensor rand_like(Tensor t)
 {
-    static std::mt19937 mersenne_engine{572547235};
-    std::uniform_real_distribution<float> dist{0.f, 1.f};
-
-    Tensor t2 = empty_like(t);
-    for (int64_t i = 0; i < t.numel(); ++i)
-    {
-        t2.data_ptr<float>()[i] = dist(mersenne_engine);
-    }
-    return t2;
+    return rand(t.sizes(), t.options());
 }
 Tensor from_blob(void* data, const SizeType& sizes, const SizeType& stride, TensorOptions options)
 {
@@ -181,7 +173,7 @@ Tensor range(double start, double end, TensorOptions options, double step)
     }
     else
     {
-#ifdef  TT_HAS_CUDA
+#ifdef TT_HAS_CUDA
         cuda_impl::range_impl(t, start, end, step);
 #endif
     }

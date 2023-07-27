@@ -12,6 +12,7 @@
 namespace tinytorch
 {
 
+TINYTORCH_API Tensor reshape(Tensor t, SizeType sizes);
 TINYTORCH_API Tensor repeat(Tensor t, SizeType sizes);
 TINYTORCH_API Tensor repeat_interleave(Tensor t, int64_t count);
 TINYTORCH_API Tensor transpose(Tensor t, int64_t dim0, int64_t dim1);

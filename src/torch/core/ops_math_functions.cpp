@@ -52,7 +52,7 @@ struct SumNode : public FunctionNode<SumNode>
     {
         ctx->data_sizes["sizes"] = a.sizes();
         Tensor result            = zeros({1}, a.options().requires_grad(false));
-        cpu_impl::sum_impl(a, result);
+        SELECT_DEVICE(a.device(), sum_impl, a, result);
         return {result};
     }
 
@@ -107,8 +107,6 @@ Tensor sqrt(Tensor a)
     return SqrtNode::forward_and_build_graph(a)[0];
 }
 
-
-
 Tensor min(Tensor a)
 {
     CHECK(!a.requires_grad());
@@ -124,7 +122,7 @@ Tensor max(Tensor a)
     CHECK(a.is_cpu());
 
     Tensor result = empty({1}, a.options());
-    cpu_impl::max_impl(a, result);
+    SELECT_DEVICE(a.device(), max_impl, a, result);
     return result;
 }
 std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
@@ -199,7 +197,6 @@ Tensor sum(Tensor a, SizeType s)
 
 Tensor mean(Tensor a)
 {
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
     return sum(a) / (double)a.numel();  // TODO: This is not safe for small datatypes, which might overflow in the sum.
 }
 
@@ -239,7 +236,9 @@ Tensor abs(Tensor a)
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
 
     Tensor result = empty_like(a);
-    cpu_impl::abs_impl(a, result);
+
+    SELECT_DEVICE(a.device(), abs_impl, a, result);
+    // cpu_impl::abs_impl(a, result);
     return result;
 }
 Tensor clamp(Tensor a, double low, double high)

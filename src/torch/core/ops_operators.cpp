@@ -16,7 +16,7 @@ namespace tinytorch
 
 std::ostream& operator<<(std::ostream& strm, Tensor t)
 {
-    print_impl_cpu(strm, t);
+    cpu_impl::print_impl(strm, t);
     return strm;
 }
 
@@ -63,14 +63,7 @@ struct AddNode : public FunctionNode<AddNode>
     {
         CheckOperatorSizeMatchOneDim(a, b);
         Tensor result = empty(max_size(a, b), a.options());
-        if (a.is_cpu())
-        {
-            add_impl_cpu(a, b, result);
-        }
-        else
-        {
-            add_impl_cuda(a, b, result);
-        }
+        SELECT_DEVICE(a.device(), add_impl, a, b, result);
         return {result};
     }
 
@@ -88,14 +81,7 @@ struct SubNode : public FunctionNode<SubNode>
     {
         CheckOperatorSizeMatchOneDim(a, b);
         Tensor result = empty(max_size(a, b), a.options());
-        if (a.is_cpu())
-        {
-            sub_impl_cpu(a, b, result);
-        }
-        else
-        {
-            sub_impl_cuda(a, b, result);
-        }
+        SELECT_DEVICE(a.device(), sub_impl, a, b, result);
         return {result};
     }
 
@@ -114,14 +100,7 @@ struct DivNode : public FunctionNode<DivNode>
         CheckOperatorSizeMatchOneDim(a, b);
         Tensor result = empty(max_size(a, b), a.options());
         ctx->save_for_backward({a, b});
-        if (a.is_cpu())
-        {
-            div_impl_cpu(a, b, result);
-        }
-        else
-        {
-            div_impl_cuda(a, b, result);
-        }
+        SELECT_DEVICE(a.device(), div_impl, a, b, result);
         return {result};
     }
 
@@ -130,9 +109,9 @@ struct DivNode : public FunctionNode<DivNode>
         auto l = ctx->get_saved_variables();
 
 
-        auto a = l[0];
-        auto b = l[1];
-        auto g = grad[0];
+        auto a      = l[0];
+        auto b      = l[1];
+        auto g      = grad[0];
         auto grad_a = 1.0 / b * g;
         auto grad_b = -a / (b * b) * g;
 
@@ -146,14 +125,7 @@ struct MultNode : public FunctionNode<MultNode>
     {
         Tensor result = empty(max_size(a, b), a.options());
         ctx->save_for_backward({a, b});
-        if (a.is_cpu())
-        {
-            mult_impl_cpu(a, b, result);
-        }
-        else
-        {
-            mult_impl_cuda(a, b, result);
-        }
+        SELECT_DEVICE(a.device(), mult_impl, a, b, result);
         return {result};
     }
 
@@ -181,14 +153,7 @@ struct DivScalarTensorNode : public FunctionNode<DivScalarTensorNode>
         auto result          = empty_like(b);
         ctx->saved_data["a"] = a;
         ctx->save_for_backward({b});
-        if (b.is_cpu())
-        {
-            div_impl_cpu(a, b, result);
-        }
-        else
-        {
-            div_impl_cuda(a, b, result);
-        }
+        SELECT_DEVICE(b.device(), div_impl, a, b, result);
         return {result};
     }
 
@@ -213,14 +178,8 @@ struct MultTensorScalarNode : public FunctionNode<MultTensorScalarNode>
         auto result          = empty_like(a);
         ctx->saved_data["b"] = b;
         ctx->save_for_backward({a});
-        if (a.is_cpu())
-        {
-            mult_impl_cpu(a, b, result);
-        }
-        else
-        {
-            mult_impl_cuda(a, b, result);
-        }
+
+        SELECT_DEVICE(a.device(), mult_impl, a, b, result);
         return {result};
     }
 
@@ -241,14 +200,8 @@ struct AddTensorScalarNode : public FunctionNode<AddTensorScalarNode>
         auto result          = empty_like(a);
         ctx->saved_data["b"] = b;
         ctx->save_for_backward({a});
-        if (a.is_cpu())
-        {
-            add_impl_cpu(a, b, result);
-        }
-        else
-        {
-            add_impl_cuda(a, b, result);
-        }
+
+        SELECT_DEVICE(a.device(), add_impl, a, b, result);
         return {result};
     }
 
@@ -334,41 +287,20 @@ Tensor operator+(double a, Tensor b)
 Tensor operator==(Tensor a, double b)
 {
     auto result = empty_like(a);
-    if (a.is_cpu())
-    {
-        equal_impl_cpu(a, b, result);
-    }
-    else
-    {
-        equal_impl_cuda(a, b, result);
-    }
+    SELECT_DEVICE(a.device(), equal_impl, a, b, result);
     return result;
 }
 
 Tensor operator<(Tensor a, double b)
 {
     auto result = empty_like(a);
-    if (a.is_cpu())
-    {
-        less_impl_cpu(a, b, result);
-    }
-    else
-    {
-        less_impl_cuda(a, b, result);
-    }
+    SELECT_DEVICE(a.device(), less_impl, a, b, result);
     return result;
 }
 Tensor operator>(Tensor a, double b)
 {
     auto result = empty_like(a);
-    if (a.is_cpu())
-    {
-        greater_impl_cpu(a, b, result);
-    }
-    else
-    {
-        greater_impl_cuda(a, b, result);
-    }
+    SELECT_DEVICE(a.device(), greater_impl, a, b, result);
     return result;
 }
 
@@ -376,92 +308,44 @@ Tensor operator>(Tensor a, double b)
 Tensor operator+=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    if (a.is_cpu())
-    {
-        add_impl_cpu(a, b, a);
-    }
-    else
-    {
-        add_impl_cuda(a, b, a);
-    }
+
+    SELECT_DEVICE(a.device(), add_impl, a, b, a);
     return a;
 }
 Tensor operator+=(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    if (a.is_cpu())
-    {
-        add_impl_cpu(a, b, a);
-    }
-    else
-    {
-        add_impl_cuda(a, b, a);
-    }
+    SELECT_DEVICE(a.device(), add_impl, a, b, a);
     return a;
 }
 Tensor operator-=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    if (a.is_cpu())
-    {
-        sub_impl_cpu(a, b, a);
-    }
-    else
-    {
-        sub_impl_cuda(a, b, a);
-    }
+    SELECT_DEVICE(a.device(), sub_impl, a, b, a);
     return a;
 }
 Tensor operator-=(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    if (a.is_cpu())
-    {
-        sub_impl_cpu(a, b, a);
-    }
-    else
-    {
-        sub_impl_cuda(a, b, a);
-    }
+    SELECT_DEVICE(a.device(), sub_impl, a, b, a);
     return a;
 }
 Tensor operator*=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    if (a.is_cpu())
-    {
-        mult_impl_cpu(a, b, a);
-    }
-    else
-    {
-        mult_impl_cuda(a, b, a);
-    }
+    SELECT_DEVICE(a.device(), mult_impl, a, b, a);
     return a;
 }
 Tensor operator*=(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    if (a.is_cpu())
-    {
-        mult_impl_cpu(a, b, a);
-    }
-    else
-    {
-        mult_impl_cuda(a, b, a);
-    }
+    SELECT_DEVICE(a.device(), mult_impl, a, b, a);
     return a;
 }
 Tensor operator/=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    if (a.is_cpu())
-    {
-        div_impl_cpu(a, b, a);
-    }
-    else
-    {
-        div_impl_cuda(a, b, a);
-    }
+    SELECT_DEVICE(a.device(), div_impl, a, b, a);
     return a;
 }
 

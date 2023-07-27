@@ -32,13 +32,12 @@ void pow_impl(Tensor a, double b, Tensor& result);
 
 void prod_impl(Tensor a, int64_t dim, Tensor& result);
 void min_impl(Tensor a, Tensor& result);
-void max_impl(Tensor a, Tensor& result);
 void min_impl(Tensor a, Tensor b, Tensor& result);
-void max_impl(Tensor a, Tensor b, Tensor& result);
 void min_impl(Tensor a, int64_t dim, bool keepdim, Tensor& result, Tensor& indices);
+void max_impl(Tensor a, Tensor& result);
+void max_impl(Tensor a, Tensor b, Tensor& result);
 void max_impl(Tensor a, int64_t dim, bool keepdim, Tensor& result, Tensor& indices);
-void std_impl(Tensor a, Tensor& result);
-void abs_impl(Tensor a, Tensor& result);
+
 void index_select_impl(Tensor input, int64_t dim, Tensor index, Tensor& result);
 void index_add_impl( int64_t dim, Tensor index, Tensor data, Tensor& result);
 void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result);

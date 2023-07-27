@@ -216,7 +216,6 @@ Tensor Tensor::unsqueeze(int64_t dim) const
 
 Tensor Tensor::squeeze(int64_t dim) const
 {
-    CHECK(!this->requires_grad() || !GradMode::is_enabled());
     CHECK_LT(dim, this->dim());
     CHECK_EQ(size(dim), 1);
     if (this->dim() == 1)
@@ -227,18 +226,11 @@ Tensor Tensor::squeeze(int64_t dim) const
     std::vector<int64_t> new_sizes = sizes();
     new_sizes.erase(std::next(new_sizes.begin(), dim));
 
-    std::vector<int64_t> new_strides = strides();
-    new_strides.erase(std::next(new_strides.begin(), dim));
-
-    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_,
-                                                              std::move(new_sizes), std::move(new_strides), options());
-
-    return Tensor(new_impl);
+    return reshape(new_sizes);
 }
 
 Tensor Tensor::squeeze() const
 {
-    CHECK(!this->requires_grad() || !GradMode::is_enabled());
     if (this->dim() == 1)
     {
         return *this;
@@ -247,13 +239,7 @@ Tensor Tensor::squeeze() const
     std::vector<int64_t> new_sizes = sizes();
     new_sizes.erase(std::remove(new_sizes.begin(), new_sizes.end(), 1), new_sizes.end());
 
-    std::vector<int64_t> new_strides = strides();
-    new_strides.erase(std::remove(new_strides.begin(), new_strides.end(), 1), new_strides.end());
-
-    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_,
-                                                              std::move(new_sizes), std::move(new_strides), options());
-
-    return Tensor(new_impl);
+    return reshape(new_sizes);
 }
 
 bool Tensor::is_contiguous() const
@@ -329,12 +315,7 @@ void Tensor::fill_(double a)
 }
 Tensor Tensor::reshape(const SizeType& size) const
 {
-    SizeType new_sizes = size;
-    fill_neg_one_dim(new_sizes, numel());
-
-    Tensor result = empty(new_sizes, options());
-    tinytorch::copy(*this, result);
-    return result;
+    return tinytorch::reshape(*this, size);
 }
 
 Tensor Tensor::repeat_interleave(int64_t count)

@@ -73,6 +73,7 @@ struct IValue
     IValue(int32_t i) : v_int64(i) {}
     IValue(int64_t i) : v_int64(i) {}
     IValue(Tensor t) : v_tensor(t) {}
+    IValue(SizeType s) : v_size(s) {}
 
     template <typename T>
     IValue(std::shared_ptr<T> i) : custom_class(i)
@@ -91,11 +92,13 @@ struct IValue
     double toDouble() { return v_double; }
     int64_t toInt() { return v_int64; }
     Tensor toTensor() { return v_tensor; }
+    SizeType toSizes() { return v_size; }
 
     bool v_bool;
     double v_double;
     int64_t v_int64;
     Tensor v_tensor;
+    SizeType v_size;
     std::shared_ptr<CustomClassHolder> custom_class;
 };
 
