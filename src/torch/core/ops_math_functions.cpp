@@ -51,7 +51,7 @@ struct SumNode : public FunctionNode<SumNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
         ctx->data_sizes["sizes"] = a.sizes();
-        Tensor result            = zeros({1}, a.options().requires_grad(false));
+        Tensor result            = zeros({1}, a.options());
         SELECT_DEVICE(a.device(), sum_impl, a, result);
         return {result};
     }
@@ -60,8 +60,8 @@ struct SumNode : public FunctionNode<SumNode>
     {
         CHECK_EQ(grad.size(), 1);
         CHECK_EQ(grad[0].numel(), 1);
-        Tensor grad_a = empty(ctx->data_sizes["sizes"]);
         auto g        = grad[0];
+        Tensor grad_a = empty(ctx->data_sizes["sizes"],g.options());
         SELECT_DEVICE(grad_a.device(), fill_impl, grad_a, g);
         return {grad_a};
     }
@@ -82,14 +82,12 @@ struct SumDimNode : public FunctionNode<SumDimNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        CHECK(false);
         CHECK_EQ(grad.size(), 1);
-        CHECK_EQ(grad[0].numel(), 1);
         int dim       = ctx->saved_data["dim"].toInt();
-        Tensor grad_a = empty(ctx->data_sizes["sizes"]);
         auto g        = grad[0];
+        Tensor grad_a = empty(ctx->data_sizes["sizes"], g.options());
         SELECT_DEVICE(grad_a.device(), fill_impl, grad_a, g, dim);
-        return {grad_a};
+        return {grad_a, {}};
     }
 };
 }  // namespace autograd

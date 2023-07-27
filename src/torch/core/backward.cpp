@@ -31,7 +31,7 @@ void backward(Tensor loss, Tensor grad)
     {
         CHECK_EQ(loss.numel(), 1);
         // The gradient of the final loss is 1
-        Tensor one = full({1}, 1);
+        Tensor one = full({1}, 1,loss.options());
         grad_map[root_node] = {one};
     }
 

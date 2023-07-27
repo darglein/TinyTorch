@@ -87,6 +87,10 @@ struct TensorInfo
         {
             for (int64_t i = 0; i < dims; ++i)
             {
+#ifndef __CUDACC__
+                CHECK_GE(index[i], 0);
+                CHECK_LT(index[i], sizes[i]);
+#endif
                 offset += index[i] * strides[i];
             }
         }
@@ -94,6 +98,10 @@ struct TensorInfo
         {
             for (int64_t i = 0; i < max_dims; ++i)
             {
+#ifndef __CUDACC__
+                CHECK_GE(index[i], 0);
+                CHECK_LT(index[i], sizes[i]);
+#endif
                 offset += index[i] * strides[i];
             }
         }

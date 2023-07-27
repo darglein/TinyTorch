@@ -23,6 +23,7 @@ std::ostream& operator<<(std::ostream& strm, Tensor t)
 
 inline void CheckOperatorSizeMatchOneDim(const Tensor& a, const Tensor& b)
 {
+    CHECK_EQ(a.device(), b.device());
     CHECK_EQ(a.dim(), b.dim());
     int num_missmatch = 0;
     for (int i = 0; i < a.dim(); ++i)
@@ -123,6 +124,7 @@ struct MultNode : public FunctionNode<MultNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
+        CheckOperatorSizeMatchOneDim(a, b);
         Tensor result = empty(max_size(a, b), a.options());
         ctx->save_for_backward({a, b});
         SELECT_DEVICE(a.device(), mult_impl, a, b, result);
@@ -303,7 +305,6 @@ Tensor operator>(Tensor a, double b)
     SELECT_DEVICE(a.device(), greater_impl, a, b, result);
     return result;
 }
-
 
 Tensor operator+=(Tensor a, Tensor b)
 {

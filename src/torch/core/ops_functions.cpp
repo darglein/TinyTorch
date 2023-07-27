@@ -453,6 +453,7 @@ struct Cat2Node : public FunctionNode<Cat2Node>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b, IValue dim)
     {
+        ctx->saved_data["dim"] = dim;
         auto output_size = a.sizes();
         output_size[dim.toInt()] += b.size(dim.toInt());
 
