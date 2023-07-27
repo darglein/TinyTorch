@@ -9,8 +9,7 @@
 #include "graph.h"
 #include "torch/core/ops.h"
 
-#include "torch/cpu/ops_impl_cpu.h"
-#include "torch/cuda/ops_impl_cuda.h"
+#include "torch/core/ops_impl.h"
 
 
 
@@ -167,16 +166,7 @@ Tensor range(double start, double end, TensorOptions options, double step)
 {
     int64_t count = int64_t((end - start) / step) + 1;
     Tensor t      = empty({count}, options);
-    if (t.is_cpu())
-    {
-        cpu_impl::range_impl(t, start, end, step);
-    }
-    else
-    {
-#ifdef TT_HAS_CUDA
-        cuda_impl::range_impl(t, start, end, step);
-#endif
-    }
+    SELECT_DEVICE(t.device(), range_impl,t,start,end,step);
     return t;
 }
 Tensor range(double start, double end, double step)

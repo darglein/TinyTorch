@@ -368,7 +368,7 @@ static void index_add_impl(int64_t dim, TensorInfo<TIndex> index, TensorInfo<T> 
 {
     for (int64_t input_linear_index = 0; input_linear_index < data.numel(); ++input_linear_index)
     {
-        auto index_input = result.LinearIndexToDimIndex(input_linear_index);
+        auto index_input = data.LinearIndexToDimIndex(input_linear_index);
 
         auto index_result = index_input;
         index_result[dim] = index[index_input[dim]];
@@ -401,26 +401,12 @@ void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result)
 template <typename T>
 static void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInfo<T> result)
 {
-    int64_t to_copy      = input.numel() / input.sizes[0];
-    int64_t input_start  = 0;
-    int64_t output_start = 0;
-    for (int64_t i = 0; i < input.sizes[0]; ++i)
+    for (int64_t i = 0; i < result.numel(); ++i)
     {
-        for (int64_t c = 0; c < count; ++c)
-        {
-            for (int64_t j = 0; j < to_copy; ++j)
-            {
-                result[output_start + j] = input[input_start + j];
-            }
-
-            output_start += to_copy;
-        }
-
-        input_start += to_copy;
+        auto index_result = result.LinearIndexToDimIndex(i);
+        auto index_input = input.LinearIndexToDimIndex(i / count);
+        result[index_result] = input[index_input];
     }
-
-    CHECK_EQ(input_start, input.numel());
-    CHECK_EQ(output_start, result.numel());
 }
 
 void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result)
@@ -428,55 +414,16 @@ void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result)
     SWITCH_MACRO_ALL(input.scalar_type(), repeat_interleave_impl, input, count, result);
 }
 
-template <typename T>
-static void stack_impl(TensorInfo<T> input, int64_t result_offset, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < input.numel(); ++i)
-    {
-        result[result_offset + i] = input[i];
-    }
-}
-
-void stack_impl(const std::vector<Tensor>& tensors, Tensor& result)
-{
-    int64_t individual_numel = tensors.front().numel();
-
-    int64_t offset = 0;
-    for (const auto& t : tensors)
-    {
-        SWITCH_MACRO_ALL(t.scalar_type(), stack_impl, t, offset, result);
-        offset += individual_numel;
-    }
-}
 
 template <typename T>
 static void transpose_impl(TensorInfo<T> input, int64_t dim0, int64_t dim1, TensorInfo<T> result)
 {
-    int64_t dims = input.dims;
-
-    for (int64_t n = 0; n < input.numel(); ++n)
+    for (int64_t i = 0; i < result.numel(); ++i)
     {
-        int64_t linearId      = n;
-        int64_t input_offset  = 0;
-        int64_t output_offset = 0;
-
-        for (int64_t i = dims - 1; i > 0; --i)
-        {
-            int64_t curDimIndex = linearId % input.sizes[i];
-            input_offset += curDimIndex * input.strides[i];
-
-            int64_t j = (i == dim0) ? dim1 : (i == dim1) ? dim0 : i;
-            output_offset += curDimIndex * result.strides[j];
-            linearId /= input.sizes[i];
-        }
-
-        input_offset += linearId * input.strides[0];
-
-        int64_t j = (0 == dim0) ? dim1 : (0 == dim1) ? dim0 : 0;
-        output_offset += linearId * result.strides[j];
-
-
-        result.data[output_offset] = input.data[input_offset];
+        auto index_result = result.LinearIndexToDimIndex(i);
+        auto index_input = index_result;
+        std::swap(index_input[dim0], index_input[dim1]);
+        result[index_result] = input[index_input];
     }
 }
 

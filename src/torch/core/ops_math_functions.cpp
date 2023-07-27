@@ -117,7 +117,6 @@ Tensor min(Tensor a)
 Tensor max(Tensor a)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    CHECK(a.is_cpu());
 
     Tensor result = empty({1}, a.options());
     SELECT_DEVICE(a.device(), max_impl, a, result);

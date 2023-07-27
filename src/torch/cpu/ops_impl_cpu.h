@@ -41,7 +41,6 @@ void max_impl(Tensor a, int64_t dim, bool keepdim, Tensor& result, Tensor& indic
 void index_select_impl(Tensor input, int64_t dim, Tensor index, Tensor& result);
 void index_add_impl( int64_t dim, Tensor index, Tensor data, Tensor& result);
 void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result);
-void stack_impl(const std::vector<Tensor>& tensors, Tensor& result);
 void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor& result);
 void copy_and_convert_impl(Tensor src, Tensor& target);
 void clamp_impl_(Tensor& a, double low, double high);

@@ -209,6 +209,37 @@ void min_impl(Tensor a, Tensor b, Tensor& result)
     CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), min_impl, a, b, result);
 }
 
+__device__ static float atomicMax(float* address, float val)
+{
+    int* address_as_i = (int*)address;
+    int old           = *address_as_i, assumed;
+    do
+    {
+        assumed = old;
+        old     = ::atomicCAS(address_as_i, assumed, __float_as_int(::fmaxf(val, __int_as_float(assumed))));
+    } while (assumed != old);
+    return __int_as_float(old);
+}
+__device__ static double atomicMax(double* address, double val)
+{
+    using T         = unsigned long long int;
+    static_assert(sizeof(T) == sizeof(double), "match");
+    T* address_as_i = (T*)address;
+    T old           = *address_as_i, assumed;
+    do
+    {
+        assumed = old;
+
+        double assumed_float = ((double*)&assumed)[0];
+        double new_value     = ::fmax(val, assumed_float);
+        T new_value_int      = ((T*)&new_value)[0];
+
+        old = ::atomicCAS(address_as_i, assumed, new_value_int);
+    } while (assumed != old);
+    double old_value = ((double*)&old)[0];
+    return old_value;
+}
+
 template <typename T>
 __launch_bounds__(128) static __global__ void max_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
@@ -217,14 +248,22 @@ __launch_bounds__(128) static __global__ void max_impl(TensorInfo<T> a, TensorIn
 
     result[i] = MAX(a[i], b[i]);
 }
-
+template <typename T>
+__launch_bounds__(128) static __global__ void set_max_result_impl(TensorInfo<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i == 0)
+    {
+        result[0] = -std::numeric_limits<T>::infinity();
+    }
+}
 
 template <typename T>
 __launch_bounds__(128) static __global__ void max_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
-    // atomicMax(&result[i], a[i]);
+    atomicMax(&result[i], a[i]);
 }
 void max_impl(Tensor a, Tensor b, Tensor& result)
 {
@@ -232,7 +271,7 @@ void max_impl(Tensor a, Tensor b, Tensor& result)
 }
 void max_impl(Tensor a, Tensor& result)
 {
-    CHECK(false);
+    CUDA_SWITCH_MACRO_FLOAT(result.scalar_type(), result.numel(), set_max_result_impl, result);
     CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), max_impl, a, result);
 }
 template <typename T, typename TIndex>
@@ -276,7 +315,7 @@ __launch_bounds__(128) static __global__
     int64_t input_linear_index = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (input_linear_index >= data.numel()) return;
 
-    auto index_input  = result.LinearIndexToDimIndex(input_linear_index);
+    auto index_input  = data.LinearIndexToDimIndex(input_linear_index);
     auto index_result = index_input;
     index_result[dim] = index[index_input[dim]];
     atomicAdd(&result[index_result], data[index_input]);
@@ -285,7 +324,7 @@ __launch_bounds__(128) static __global__
 template <typename TIndex>
 static void index_add_helper(Tensor data, int64_t dim, TensorInfo<TIndex> index, Tensor result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(result.scalar_type(), result.numel(), index_add_impl, dim, index, data, result);
+    CUDA_SWITCH_MACRO_FLOAT(result.scalar_type(), data.numel(), index_add_impl, dim, index, data, result);
 }
 
 void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result)
@@ -301,6 +340,45 @@ void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result)
     }
 }
 
+
+template <typename T>
+__launch_bounds__(128) static __global__
+    void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInfo<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= result.numel()) return;
+
+    auto index_result    = result.LinearIndexToDimIndex(i);
+    auto index_input     = input.LinearIndexToDimIndex(i / count);
+    result[index_result] = input[index_input];
+}
+void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result)
+{
+    CUDA_SWITCH_MACRO_ALL(result.scalar_type(), result.numel(), repeat_interleave_impl, input, count, result);
+}
+
+
+template <typename T>
+__launch_bounds__(128) static __global__
+    void transpose_impl(TensorInfo<T> input, int64_t dim0, int64_t dim1, TensorInfo<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= result.numel()) return;
+
+    auto index_result = result.LinearIndexToDimIndex(i);
+    auto index_input  = index_result;
+    // swap(index_input[dim0], index_input[dim1]);
+    auto t            = index_input[dim0];
+    index_input[dim0] = index_input[dim1];
+    index_input[dim1] = t;
+
+
+    result[index_result] = input[index_input];
+}
+void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor& result)
+{
+    CUDA_SWITCH_MACRO_ALL(result.scalar_type(), result.numel(), transpose_impl, input, dim0, dim1, result);
+}
 
 
 }  // namespace cuda_impl

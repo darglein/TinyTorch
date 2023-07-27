@@ -138,7 +138,7 @@ struct TensorInfo
     }
 
 
-    DimIndex clamp_index_to_size(DimIndex index)
+    TT_HD DimIndex clamp_index_to_size(DimIndex index)
     {
         DimIndex result;
         for (int i = 0; i < max_dims; ++i)

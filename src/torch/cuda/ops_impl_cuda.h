@@ -36,6 +36,8 @@ void max_impl(Tensor a, Tensor b, Tensor& result);
 
 void index_select_impl(Tensor input, int64_t dim, Tensor index, Tensor& result);
 void index_add_impl( int64_t dim, Tensor index, Tensor data, Tensor& result);
+void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result);
+void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor& result);
 
 }  // namespace cuda_impl
 }  // namespace tinytorch

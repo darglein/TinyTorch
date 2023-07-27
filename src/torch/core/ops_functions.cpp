@@ -123,7 +123,8 @@ Tensor repeat_interleave(Tensor t, int64_t count)
     SizeType new_sizes = t.sizes();
     new_sizes[0] *= count;
     Tensor result = empty(new_sizes, t.options());
-    cpu_impl::repeat_interleave_impl(t, count, result);
+
+    SELECT_DEVICE(t.device(), repeat_interleave_impl, t, count, result);
     return result;
 }
 
@@ -135,8 +136,7 @@ Tensor transpose(Tensor t, int64_t dim0, int64_t dim1)
     std::swap(new_sizes[dim0], new_sizes[dim1]);
 
     Tensor result = empty(new_sizes, t.options());
-
-    cpu_impl::transpose_impl(t, dim0, dim1, result);
+    SELECT_DEVICE(t.device(), transpose_impl, t, dim0, dim1, result);
     return result;
 }
 
@@ -388,31 +388,12 @@ Tensor slice(Tensor a, int64_t dim, int64_t start, int64_t end, int64_t step)
 
 Tensor stack(const std::vector<Tensor>& tensors)
 {
-    for (auto b : tensors)
+    std::vector<Tensor> tensors_unsqueeze;
+    for (auto& t : tensors)
     {
-        CHECK(!b.requires_grad() || !GradMode::is_enabled());
+        tensors_unsqueeze.push_back(t.unsqueeze(0));
     }
-
-
-    if (tensors.empty())
-    {
-        return {};
-    }
-
-    for (const auto& t : tensors)
-    {
-        CHECK_EQ(tensors.front().sizes(), t.sizes());
-        CHECK_EQ(tensors.front().device(), t.device());
-        CHECK_EQ(tensors.front().scalar_type(), t.scalar_type());
-    }
-
-    SizeType new_sizes = tensors.front().sizes();
-    new_sizes.vec().insert(new_sizes.vec().begin(), tensors.size());
-
-    Tensor result = empty(new_sizes, tensors.front().options());
-
-    cpu_impl::stack_impl(tensors, result);
-    return result;
+    return cat(tensors_unsqueeze, 0);
 }
 
 
@@ -454,7 +435,7 @@ struct Cat2Node : public FunctionNode<Cat2Node>
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b, IValue dim)
     {
         ctx->saved_data["dim"] = dim;
-        auto output_size = a.sizes();
+        auto output_size       = a.sizes();
         output_size[dim.toInt()] += b.size(dim.toInt());
 
         auto result = empty(output_size, a.options());

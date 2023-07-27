@@ -8,179 +8,102 @@
 #include "torch/cuda/ops_impl_cuda_helper.h"
 #include <cuda_runtime.h>
 
+
+#define CUDA_SWITCH_MACRO_ALL_OPERATOR(real_scalar_type, numel, op, func, ...)      \
+    switch (real_scalar_type)                                                       \
+    {                                                                               \
+        CUDA_CASE_MACRO((func<uint8_t>), kUInt8, numel, op<uint8_t>(), __VA_ARGS__) \
+        CUDA_CASE_MACRO((func<int16_t>), kInt16, numel, op<int16_t>(), __VA_ARGS__) \
+        CUDA_CASE_MACRO((func<int32_t>), kInt32, numel, op<int32_t>(), __VA_ARGS__) \
+        CUDA_CASE_MACRO((func<int64_t>), kLong, numel, op<int64_t>(), __VA_ARGS__)  \
+        CUDA_CASE_MACRO((func<float>), kFloat, numel, op<float>(), __VA_ARGS__)     \
+        CUDA_CASE_MACRO((func<double>), kDouble, numel, op<double>(), __VA_ARGS__)  \
+        default:                                                                    \
+            CHECK(false) << "invalid input type " << real_scalar_type;              \
+    }
+
+
 namespace tinytorch
 {
 namespace cuda_impl
 {
-template <typename T>
-__launch_bounds__(128) static __global__ void add_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
+
+template <typename T, typename Op>
+__launch_bounds__(128) __global__
+    static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
-
-    int64_t dims = result.dims;
-
-    int64_t offset_a, offset_b;
-    calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides, offset_a, offset_b);
-    result[i] = a.data[offset_a] + b.data[offset_b];
+    auto index_result = result.LinearIndexToDimIndex(i);
+    // the index clamping allows operations when one tensor has a 1-dimension
+    auto index_a         = a.clamp_index_to_size(index_result);
+    auto index_b         = b.clamp_index_to_size(index_result);
+    result[index_result] = op(a[index_a], b[index_b]);
 }
+
+template <typename T, typename Op>
+__launch_bounds__(128) __global__ static void element_wise_operator(Op op, TensorInfo<T> a, T b, TensorInfo<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= result.numel()) return;
+    result[i] = op(a[i], b);
+}
+template <typename T, typename Op>
+__launch_bounds__(128) __global__ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= result.numel()) return;
+    result[i] = op(a, b[i]);
+}
+
 
 void add_impl(Tensor a, Tensor b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), add_impl, a, b, result);
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::plus, element_wise_operator, a, b, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void add_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-
-    result[i] = a[i] + T(b);
-}
-
 void add_impl(Tensor a, double b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), add_impl, a, b, result);
-}
-
-template <typename T>
-__launch_bounds__(128) static __global__ void sub_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-
-    int64_t dims = result.dims;
-
-    int64_t offset_a, offset_b;
-    calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides, offset_a, offset_b);
-    result[i] = a.data[offset_a] - b.data[offset_b];
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::plus, element_wise_operator, a, b, result);
 }
 
 void sub_impl(Tensor a, Tensor b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), sub_impl, a, b, result);
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::minus, element_wise_operator, a, b, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void sub_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-
-    result[i] = a[i] - T(b);
-}
-
 void sub_impl(Tensor a, double b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), sub_impl, a, b, result);
-}
-
-template <typename T>
-__launch_bounds__(128) static __global__ void mult_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-
-    int64_t dims = result.dims;
-
-    int64_t offset_a, offset_b;
-    calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides, offset_a, offset_b);
-    result[i] = a.data[offset_a] * b.data[offset_b];
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::minus, element_wise_operator, a, b, result);
 }
 
 void mult_impl(Tensor a, Tensor b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), mult_impl, a, b, result);
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::multiplies, element_wise_operator, a, b, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void mult_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-
-    result[i] = a[i] * T(b);
-}
-
 void mult_impl(Tensor a, double b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), mult_impl, a, b, result);
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::multiplies, element_wise_operator, a, b, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void div_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-
-    int64_t dims = result.dims;
-
-    int64_t offset_a, offset_b;
-    calculate_offsets(i, dims, a.sizes, b.sizes, a.strides, b.strides, offset_a, offset_b);
-    result[i] = a.data[offset_a] / b.data[offset_b];
-}
-
 void div_impl(Tensor a, Tensor b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), div_impl, a, b, result);
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::divides, element_wise_operator, a, b, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void div_impl(double a, TensorInfo<T> b, TensorInfo<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-
-    result[i] = T(a / double(b[i]));
-}
-
 void div_impl(double a, Tensor b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL(b.scalar_type(), b.numel(), div_impl, a, b, result);
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(b.scalar_type(), result.numel(), std::divides, element_wise_operator, a, b, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void equal_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-
-    result[i] = T(a[i] == T(b));
-}
-
 void equal_impl(Tensor a, double b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), equal_impl, a, b, result);
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::equal_to, element_wise_operator, a, b, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void less_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-
-    result[i] = T(a[i] < T(b));
-}
-
 void less_impl(Tensor a, double b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), less_impl, a, b, result);
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::less, element_wise_operator, a, b, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void greater_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-
-    result[i] = T(a[i] > T(b));
-}
-
 void greater_impl(Tensor a, double b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), greater_impl, a, b, result);
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::greater, element_wise_operator, a, b, result);
 }
 
+
+}  // namespace cuda_impl
 }  // namespace tinytorch
-}
