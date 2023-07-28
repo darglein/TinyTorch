@@ -16,21 +16,10 @@ namespace tinytorch
 TINYTORCH_API Tensor square(Tensor a);
 TINYTORCH_API Tensor sqrt(Tensor a);
 
-inline Tensor log(Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor log1p(Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor exp(Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+TINYTORCH_API Tensor log(Tensor a);
+TINYTORCH_API Tensor log1p(Tensor a);
+TINYTORCH_API Tensor exp(Tensor a);
+
 inline Tensor sign(Tensor b)
 {
     throw std::runtime_error("not implemented");

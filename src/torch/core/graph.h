@@ -108,6 +108,11 @@ namespace autograd
 
 struct Context
 {
+    // the input tensor dimensions
+    // is used to check for the correct gradient size
+    std::vector<SizeType> next_sizes;
+
+
     std::map<std::string, int> data_int;
     // TODO: besser
     std::map<std::string, SizeType> data_sizes;
@@ -180,6 +185,8 @@ struct Node
     // The next edges are the inputs of the forward operator
     std::vector<std::shared_ptr<Edge>> next;
 
+
+
     // Variables that are required for the backward pass
     Context context;
 
@@ -201,6 +208,31 @@ struct FunctionNode : public Node
         // backward
         auto grad_list = T::backward(&context, fwd_output_grad);
         CHECK_EQ(grad_list.size(), num_inputs_of_forward);
+
+        // the gradient produced by the backward function must be either undefined
+        // or have the same dimensions as the input tensor
+        for (int i = 0; i < grad_list.size(); ++i)
+        {
+            if (grad_list[i].defined())
+            {
+                if (!(grad_list[i].sizes() == context.next_sizes[i]))
+                {
+                    std::cerr << "incorrect gradient size found for node " << typeid(FunctionNode<T>).name()
+                              << std::endl;
+                    for (int j = 0; j < fwd_output_grad.size(); ++j)
+                    {
+                        std::cerr << "fwd_output_grad " << fwd_output_grad[j].sizes() <<  std::endl;
+                    }
+                    for (int j = 0; j < grad_list.size(); ++j)
+                    {
+                        std::cerr << "input " << context.next_sizes[j] << " grad " << grad_list[i].sizes() <<  std::endl;
+                    }
+
+                    CHECK(false) << "incorrect gradient size";
+                }
+            }
+        }
+
         return grad_list;
     }
 
@@ -223,6 +255,7 @@ struct FunctionNode : public Node
                 {
                     auto t = input_ivalues[i].toTensor();
                     node->next.push_back(t.getEdge());
+                    node->context.next_sizes.push_back(t.sizes());
                     if (t.requires_grad())
                     {
                         need_grad = true;
@@ -231,6 +264,7 @@ struct FunctionNode : public Node
                 else
                 {
                     node->next.push_back({});
+                    node->context.next_sizes.push_back({});
                 }
             }
             CHECK_EQ(node->next.size(), node->num_inputs_of_forward);

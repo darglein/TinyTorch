@@ -29,6 +29,7 @@ void sum_impl(Tensor a, Tensor& result);
 void sum_impl(Tensor a, int64_t dim, Tensor& result);
 
 
+void min_impl(Tensor a, Tensor& result);
 void min_impl(Tensor a, Tensor b, Tensor& result);
 
 void max_impl(Tensor a,  Tensor& result);

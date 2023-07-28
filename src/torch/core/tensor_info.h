@@ -45,16 +45,16 @@ struct DimIndexStruct
 
 
 // CUDA kernel argument that defines tensor layout
-template <typename T, int MAX_DIMS = -1>
-struct TensorInfo
+template <typename T, bool TIS_CUDA, int MAX_DIMS = -1>
+struct TensorInfoBase
 {
     static constexpr bool is_dynamic = MAX_DIMS == -1;
     static constexpr int max_dims    = is_dynamic ? MAX_TENSORINFO_DIMS : MAX_DIMS;
     using DimIndex                   = DimIndexStruct<max_dims>;
 
-    TensorInfo();
-    TensorInfo(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims]);
-    TensorInfo(Tensor t)
+    TensorInfoBase();
+    TensorInfoBase(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims]);
+    TensorInfoBase(Tensor t)
     {
         data = t.template data_ptr<T>();
         dims = t.dim();
@@ -64,6 +64,14 @@ struct TensorInfo
             strides[i] = t.stride(i);
         }
         contiguous = t.is_contiguous();
+        if (TIS_CUDA)
+        {
+            CHECK(t.is_cuda());
+        }
+        else
+        {
+            CHECK(t.is_cpu());
+        }
     }
 
     TT_HD int64_t numel()
@@ -136,7 +144,18 @@ struct TensorInfo
         }
         return result;
     }
-
+    TT_HD bool index_in_range(DimIndex index)
+    {
+        bool result = true;
+        for (int i = 0; i < dims; ++i)
+        {
+            if (index[i] < 0 || index[i] > sizes[i])
+            {
+                result = false;
+            }
+        }
+        return result;
+    }
 
     TT_HD DimIndex clamp_index_to_size(DimIndex index)
     {
@@ -156,15 +175,15 @@ struct TensorInfo
 };
 
 
-template <typename T, int MAX_DIMS>
-TensorInfo<T, MAX_DIMS>::TensorInfo()
+template <typename T, bool TIS_CUDA, int MAX_DIMS>
+TensorInfoBase<T, TIS_CUDA, MAX_DIMS>::TensorInfoBase()
 {
     data = nullptr;
     dims = 0;
 }
 
-template <typename T, int MAX_DIMS>
-TensorInfo<T, MAX_DIMS>::TensorInfo(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims])
+template <typename T, bool TIS_CUDA, int MAX_DIMS>
+TensorInfoBase<T, TIS_CUDA, MAX_DIMS>::TensorInfoBase(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims])
 {
     data = p;
     dims = dim;
@@ -188,6 +207,12 @@ TensorInfo<T, MAX_DIMS>::TensorInfo(T* p, int dim, int64_t sz[max_dims], int64_t
     }
 }
 
+template <typename T, int MAX_DIMS = -1>
+using TensorInfo = TensorInfoBase<T, false, MAX_DIMS>;
+
+
+template <typename T, int MAX_DIMS = -1>
+using TensorInfoCuda = TensorInfoBase<T, true, MAX_DIMS>;
 
 
 }  // namespace tinytorch

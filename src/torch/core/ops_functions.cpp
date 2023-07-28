@@ -192,7 +192,7 @@ struct ToNode : public FunctionNode<ToNode>
 #ifdef TT_HAS_CUDA
         Tensor contig = a.contiguous();
         Tensor result = empty(contig.sizes(), a.options().device(new_device));
-        cpu_impl::to_impl_cpu_cuda(a, result);
+        cpu_impl::to_impl_cpu_cuda(contig, result);
         return {result};
 #else
         CHECK(false);
@@ -293,7 +293,7 @@ struct IndexSelectNode : public FunctionNode<IndexSelectNode>
 
         auto grad_input = zeros(input_sizes, g.options());
 
-        index_add(g, dim, index, grad_input);
+        grad_input = index_add(grad_input, dim, index, g);
         return {grad_input, {}, {}};
     }
 };
@@ -319,7 +319,7 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
         CHECK(index.dtype() == kInt32 || index.dtype() == kInt64);
         CHECK_EQ(input.dim(), data.dim());
         CHECK_EQ(index.dim(), 1);
-        CHECK_EQ(index.numel(), data.size(0));
+        CHECK_EQ(index.numel(), data.size(dim.toInt())) << index.sizes() << " " << data.sizes();
 
         Tensor result = input.clone();
         SELECT_DEVICE(result.device(), index_add_impl, dim.toInt(), index, data, result);
@@ -410,9 +410,11 @@ struct CloneNode : public FunctionNode<CloneNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        Tensor grad_a = empty_like(grad[0]);
-        SELECT_DEVICE(grad_a.device(), copy_and_convert_impl, grad[0], grad_a);
-        return {grad_a[0]};
+        auto g = grad[0];
+
+        Tensor grad_a = empty_like(g);
+        SELECT_DEVICE(grad_a.device(), copy_and_convert_impl, g, grad_a);
+        return {grad_a};
     }
 };
 }  // namespace autograd

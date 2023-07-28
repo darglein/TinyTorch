@@ -23,7 +23,7 @@ namespace cuda_impl
 
 
 template <typename T>
-__launch_bounds__(128) static __global__ void abs_impl(TensorInfo<T> a, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void abs_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -38,7 +38,7 @@ void abs_impl(Tensor a, Tensor& result)
 
 
 template <typename T>
-__launch_bounds__(128) static __global__ void sqrt_impl(TensorInfo<T> a, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void sqrt_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -53,7 +53,7 @@ void sqrt_impl(Tensor a, Tensor& result)
 
 
 template <typename T>
-__launch_bounds__(128) static __global__ void log_impl(TensorInfo<T> a, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void log_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -67,7 +67,7 @@ void log_impl(Tensor a, Tensor& result)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void log1p_impl(TensorInfo<T> a, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void log1p_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -81,7 +81,7 @@ void log1p_impl(Tensor a, Tensor& result)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void exp_impl(TensorInfo<T> a, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void exp_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -95,7 +95,7 @@ void exp_impl(Tensor a, Tensor& result)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void sign_impl(TensorInfo<T> a, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void sign_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -110,7 +110,7 @@ void sign_impl(Tensor a, Tensor& result)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void pow_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void pow_impl(TensorInfoCuda<T> a, double b, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -124,7 +124,7 @@ void pow_impl(Tensor a, double b, Tensor& result)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void sin_impl(TensorInfo<T> a, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void sin_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -138,7 +138,7 @@ void sin_impl(Tensor a, Tensor& result)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void cos_impl(TensorInfo<T> a, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void cos_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -152,7 +152,7 @@ void cos_impl(Tensor a, Tensor& result)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void relu_impl(TensorInfo<T> a, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void relu_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -166,7 +166,7 @@ void relu_impl(Tensor a, Tensor& result)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void sigmoid_impl(TensorInfo<T> a, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void sigmoid_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -180,7 +180,7 @@ void sigmoid_impl(Tensor a, Tensor& result)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void softplus_impl(TensorInfo<T> a, double beta, TensorInfo<T> result)
+__launch_bounds__(128) static __global__ void softplus_impl(TensorInfoCuda<T> a, double beta, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;

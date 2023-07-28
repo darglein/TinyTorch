@@ -29,6 +29,8 @@ Tensor empty(const SizeType& sizes, TensorOptions options)
         options.requires_grad_ = false;
     }
     Tensor t(TensorImpl::create(sizes, options));
+    // for debugging
+    fill(t, -128356);
     t.set_requires_grad(options.requires_grad_);
     return t;
 }

@@ -7,6 +7,7 @@
 
 #ifdef TT_HAS_CUDA
 #    include <cuda_runtime.h>
+#include "torch/cuda/ops_impl_cuda_helper.h"
 #endif
 
 
@@ -22,7 +23,7 @@ StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(dev
     else
     {
 #ifdef TT_HAS_CUDA
-        cudaMalloc(&data_ptr_, size);
+        CHECK_CUDA_ERROR(cudaMalloc(&data_ptr_, size));
         has_ownership = true;
 #else
         CHECK(false);
@@ -49,7 +50,7 @@ StorageImpl::~StorageImpl()
         else
         {
 #ifdef TT_HAS_CUDA
-            cudaFree(data_ptr_);
+            CHECK_CUDA_ERROR(cudaFree(data_ptr_));
 #else
             CHECK(false);
 #endif

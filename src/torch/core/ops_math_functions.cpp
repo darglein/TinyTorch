@@ -24,14 +24,7 @@ struct SqrtNode : public FunctionNode<SqrtNode>
     {
         ctx->save_for_backward({a});
         auto result = empty_like(a);
-        if (a.is_cpu())
-        {
-            cpu_impl::sqrt_impl(a, result);
-        }
-        else
-        {
-            cuda_impl::sqrt_impl(a, result);
-        }
+        SELECT_DEVICE(a.device(), sqrt_impl, a, result);
         return {result};
     }
 
@@ -44,7 +37,67 @@ struct SqrtNode : public FunctionNode<SqrtNode>
         return {grad_a};
     }
 };
+struct LogNode : public FunctionNode<LogNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a)
+    {
+        ctx->save_for_backward({a});
+        auto result = empty_like(a);
+        SELECT_DEVICE(a.device(), log_impl, a, result);
+        return {result};
+    }
 
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        auto l      = ctx->get_saved_variables();
+        auto a      = l[0];
+        auto g      = grad[0];
+        auto grad_a = 1 / a * g;
+        return {grad_a};
+    }
+};
+struct ExpNode : public FunctionNode<ExpNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a)
+    {
+        ctx->save_for_backward({a});
+        auto result = empty_like(a);
+        SELECT_DEVICE(a.device(), exp_impl, a, result);
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        auto l      = ctx->get_saved_variables();
+        auto a      = l[0];
+        auto g      = grad[0];
+        auto grad_a = exp(a) * g;
+        return {grad_a};
+    }
+};
+
+struct AbsNode : public FunctionNode<AbsNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a)
+    {
+        ctx->save_for_backward({a});
+        auto result = empty_like(a);
+        SELECT_DEVICE(a.device(), abs_impl, a, result);
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        auto l = ctx->get_saved_variables();
+        auto a = l[0];
+        auto g = grad[0];
+
+        auto low    = a < 0;
+        auto high   = a > 0;
+        auto grad_a = low * -1 + high;
+        return {grad_a};
+    }
+};
 
 struct SumNode : public FunctionNode<SumNode>
 {
@@ -61,7 +114,7 @@ struct SumNode : public FunctionNode<SumNode>
         CHECK_EQ(grad.size(), 1);
         CHECK_EQ(grad[0].numel(), 1);
         auto g        = grad[0];
-        Tensor grad_a = empty(ctx->data_sizes["sizes"],g.options());
+        Tensor grad_a = empty(ctx->data_sizes["sizes"], g.options());
         SELECT_DEVICE(grad_a.device(), fill_impl, grad_a, g);
         return {grad_a};
     }
@@ -98,26 +151,34 @@ Tensor square(Tensor a)
 {
     return a * a;
 }
-
-
 Tensor sqrt(Tensor a)
 {
     return SqrtNode::forward_and_build_graph(a)[0];
 }
+Tensor log(Tensor a)
+{
+    return LogNode::forward_and_build_graph(a)[0];
+}
+Tensor log1p(Tensor a)
+{
+    return log(1 + a);
+}
+Tensor exp(Tensor a)
+{
+    return ExpNode::forward_and_build_graph(a)[0];
+}
 
 Tensor min(Tensor a)
 {
-    CHECK(!a.requires_grad());
-    CHECK(a.is_cpu());
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
 
     Tensor result = empty({1}, a.options());
-    cpu_impl::min_impl(a, result);
+    SELECT_DEVICE(a.device(), min_impl, a, result);
     return result;
 }
 Tensor max(Tensor a)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-
     Tensor result = empty({1}, a.options());
     SELECT_DEVICE(a.device(), max_impl, a, result);
     return result;
@@ -230,13 +291,7 @@ Tensor std(Tensor a, int64_t dim)
 
 Tensor abs(Tensor a)
 {
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
-
-    Tensor result = empty_like(a);
-
-    SELECT_DEVICE(a.device(), abs_impl, a, result);
-    // cpu_impl::abs_impl(a, result);
-    return result;
+    return autograd::AbsNode::apply(a)[0];
 }
 Tensor clamp(Tensor a, double low, double high)
 {

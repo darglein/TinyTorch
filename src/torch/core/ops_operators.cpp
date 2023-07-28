@@ -16,25 +16,28 @@ namespace tinytorch
 
 std::ostream& operator<<(std::ostream& strm, Tensor t)
 {
-    cpu_impl::print_impl(strm, t);
+    cpu_impl::print_impl(strm, t.cpu());
     return strm;
 }
 
 
-inline void CheckOperatorSizeMatchOneDim(const Tensor& a, const Tensor& b)
+inline int CheckOperatorSizeMatchOneDim(const Tensor& a, const Tensor& b)
 {
     CHECK_EQ(a.device(), b.device());
     CHECK_EQ(a.dim(), b.dim());
     int num_missmatch = 0;
+    int expand_dim    = -1;
     for (int i = 0; i < a.dim(); ++i)
     {
         if (a.size(i) != b.size(i))
         {
             CHECK(a.size(i) == 1 || b.size(i) == 1) << "Size Missmatch " << a.sizes() << " " << b.sizes();
+            expand_dim = i;
             num_missmatch++;
         }
     }
     CHECK_LE(num_missmatch, 1) << "only one dim can be expanded during operator " << a.sizes() << " " << b.sizes();
+    return expand_dim;
 }
 
 // Operators can have the case that one Tensor is dimension 1 along one axis and the other is not.
@@ -62,7 +65,7 @@ struct AddNode : public FunctionNode<AddNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
-        CheckOperatorSizeMatchOneDim(a, b);
+        ctx->saved_data["expand_dim"] = CheckOperatorSizeMatchOneDim(a, b);
         Tensor result = empty(max_size(a, b), a.options());
         SELECT_DEVICE(a.device(), add_impl, a, b, result);
         return {result};
@@ -72,6 +75,17 @@ struct AddNode : public FunctionNode<AddNode>
     {
         auto grad_a = grad[0].clone();
         auto grad_b = grad[0].clone();
+
+        int expand_dim = ctx->saved_data["expand_dim"].toInt();
+        if (expand_dim != -1 && ctx->next_sizes[0][expand_dim] == 1)
+        {
+            grad_a = grad_a.sum(expand_dim, false);
+        }
+        if (expand_dim != -1 &&  ctx->next_sizes[1][expand_dim]== 1)
+        {
+            grad_b = grad_b.sum(expand_dim, false);
+        }
+
         return {grad_a, grad_b};
     }
 };
@@ -80,7 +94,7 @@ struct SubNode : public FunctionNode<SubNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
-        CheckOperatorSizeMatchOneDim(a, b);
+        ctx->saved_data["expand_dim"] = CheckOperatorSizeMatchOneDim(a, b);
         Tensor result = empty(max_size(a, b), a.options());
         SELECT_DEVICE(a.device(), sub_impl, a, b, result);
         return {result};
@@ -90,6 +104,17 @@ struct SubNode : public FunctionNode<SubNode>
     {
         auto grad_a = grad[0].clone();
         auto grad_b = -grad[0].clone();
+
+        int expand_dim = ctx->saved_data["expand_dim"].toInt();
+        if (expand_dim != -1 && ctx->next_sizes[0][expand_dim] == 1)
+        {
+            grad_a = grad_a.sum(expand_dim, false);
+        }
+        if (expand_dim != -1 &&  ctx->next_sizes[1][expand_dim]== 1)
+        {
+            grad_b = grad_b.sum(expand_dim, false);
+        }
+
         return {grad_a, grad_b};
     }
 };
@@ -97,9 +122,10 @@ struct SubNode : public FunctionNode<SubNode>
 struct DivNode : public FunctionNode<DivNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
+
     {
-        CheckOperatorSizeMatchOneDim(a, b);
-        Tensor result = empty(max_size(a, b), a.options());
+        ctx->saved_data["expand_dim"] = CheckOperatorSizeMatchOneDim(a, b);
+        Tensor result                 = empty(max_size(a, b), a.options());
         ctx->save_for_backward({a, b});
         SELECT_DEVICE(a.device(), div_impl, a, b, result);
         return {result};
@@ -107,14 +133,24 @@ struct DivNode : public FunctionNode<DivNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto l = ctx->get_saved_variables();
-
+        auto l         = ctx->get_saved_variables();
 
         auto a      = l[0];
         auto b      = l[1];
         auto g      = grad[0];
         auto grad_a = 1.0 / b * g;
         auto grad_b = -a / (b * b) * g;
+
+
+        int expand_dim = ctx->saved_data["expand_dim"].toInt();
+        if (expand_dim != -1 && ctx->next_sizes[0][expand_dim] == 1)
+        {
+            grad_a = grad_a.sum(expand_dim, false);
+        }
+        if (expand_dim != -1 &&  ctx->next_sizes[1][expand_dim]== 1)
+        {
+            grad_b = grad_b.sum(expand_dim, false);
+        }
 
         return {grad_a, grad_b};
     }
@@ -124,7 +160,7 @@ struct MultNode : public FunctionNode<MultNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
-        CheckOperatorSizeMatchOneDim(a, b);
+        ctx->saved_data["expand_dim"] = CheckOperatorSizeMatchOneDim(a, b);
         Tensor result = empty(max_size(a, b), a.options());
         ctx->save_for_backward({a, b});
         SELECT_DEVICE(a.device(), mult_impl, a, b, result);
@@ -137,13 +173,19 @@ struct MultNode : public FunctionNode<MultNode>
         auto a = l[0];
         auto b = l[1];
         auto g = grad[0];
-        CHECK(!g.requires_grad());
-
-        CHECK(!GradMode::is_enabled());
         auto grad_a = g * b;
         auto grad_b = g * a;
-        CHECK(!grad_a.requires_grad());
-        CHECK(!grad_b.requires_grad());
+
+        int expand_dim = ctx->saved_data["expand_dim"].toInt();
+        if (expand_dim != -1 && ctx->next_sizes[0][expand_dim] == 1)
+        {
+            grad_a = grad_a.sum(expand_dim, false);
+        }
+        if (expand_dim != -1 &&  ctx->next_sizes[1][expand_dim]== 1)
+        {
+            grad_b = grad_b.sum(expand_dim, false);
+        }
+
         return {grad_a, grad_b};
     }
 };

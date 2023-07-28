@@ -30,7 +30,7 @@ namespace cuda_impl
 
 template <typename T, typename Op>
 __launch_bounds__(128) __global__
-    static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
+    static void element_wise_operator(Op op, TensorInfoCuda<T> a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
@@ -42,14 +42,14 @@ __launch_bounds__(128) __global__
 }
 
 template <typename T, typename Op>
-__launch_bounds__(128) __global__ static void element_wise_operator(Op op, TensorInfo<T> a, T b, TensorInfo<T> result)
+__launch_bounds__(128) __global__ static void element_wise_operator(Op op, TensorInfoCuda<T> a, T b, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
     result[i] = op(a[i], b);
 }
 template <typename T, typename Op>
-__launch_bounds__(128) __global__ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> result)
+__launch_bounds__(128) __global__ static void element_wise_operator(Op op, T a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;

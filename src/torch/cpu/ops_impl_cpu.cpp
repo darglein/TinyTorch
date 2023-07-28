@@ -14,6 +14,7 @@
 #include "torch/core/ops_impl_shared.h"
 #include "torch/core/ops_operators.h"
 #include "torch/core/tensor_info.h"
+#include "torch/cuda/ops_impl_cuda_helper.h"
 
 
 
@@ -29,7 +30,8 @@ void to_impl_cpu_cuda(Tensor a, Tensor b)
     CHECK(b.is_contiguous());
     int64_t bytes = a.element_size() * a.numel();
     auto type     = (b.device() == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
-    cudaMemcpy(b.data_ptr(), a.data_ptr(), bytes, type);
+
+    CHECK_CUDA_ERROR(cudaMemcpy(b.data_ptr(), a.data_ptr(), bytes, type));
 #else
     CHECK(false);
 #endif
@@ -108,7 +110,8 @@ void uniform_impl(Tensor& t, double mi, double ma)
 template <typename T>
 static void rand_int_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, int low, int high)
 {
-    std::uniform_int_distribution<int> dist{low, high};
+    // the high bounds is exclusive
+    std::uniform_int_distribution<int> dist{low, high-1};
     for (int64_t i = 0; i < t.numel(); ++i)
     {
         t[i] = T(dist(mersenne_engine));
