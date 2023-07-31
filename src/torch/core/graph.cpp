@@ -6,6 +6,7 @@
 #include "graph.h"
 namespace tinytorch
 {
+int autograd::Node::current_seq_nr = 0;
 
 static thread_local bool grad_mode_ = true;
 

@@ -7,7 +7,6 @@ namespace tinytorch
 
 void backward(Tensor loss, Tensor grad)
 {
-
     // for graph traversal
     std::vector<std::shared_ptr<autograd::Node>> node_stack;
 
@@ -33,7 +32,7 @@ void backward(Tensor loss, Tensor grad)
     {
         CHECK_EQ(loss.numel(), 1);
         // The gradient of the final loss is 1
-        Tensor one = full({1}, 1,loss.options());
+        Tensor one          = full({1}, 1, loss.options());
         grad_map[root_node] = {one};
     }
 
@@ -42,6 +41,16 @@ void backward(Tensor loss, Tensor grad)
         // sort by sequence number
         std::sort(node_stack.begin(), node_stack.end(),
                   [](auto& n1, auto& n2) { return n1->sequence_nr < n2->sequence_nr; });
+
+        // remove duplicated nodes
+        //  this can happen if one tensor is used multiple times
+        auto end_it = std::unique(node_stack.begin(), node_stack.end());
+        for (auto it = end_it; it != node_stack.end(); ++it)
+        {
+            autograd::Node* node = it->get();
+            CHECK_EQ(dynamic_cast<autograd::AccumulateGrad*>(node), nullptr);
+        }
+        node_stack.erase(end_it, node_stack.end());
 
         // take the last node (which has the highest sequence number)
         auto current_node = node_stack.back();
@@ -60,7 +69,7 @@ void backward(Tensor loss, Tensor grad)
             if (next)
             {
                 auto next_node = next->function;
-                auto g = next_gradients[i];
+                auto g         = next_gradients[i];
                 CHECK(g.defined());
 
                 // Accumulate gradient
@@ -70,7 +79,8 @@ void backward(Tensor loss, Tensor grad)
                 {
                     // grad_map[next_node][next->input_nr] = zeros_like(next_gradients[next->input_nr]);
                     grad_map[next_node][next->input_nr] = g.clone();
-                }else
+                }
+                else
                 {
                     grad_map[next_node][next->input_nr] += g;
                 }
