@@ -235,6 +235,7 @@ Tensor sum(Tensor a)
 
 Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
 {
+    CHECK_LT(dim, a.dim());
     auto result = autograd::SumDimNode::apply(a, dim)[0];
     if (squeeze_dim)
     {

@@ -48,13 +48,19 @@ void backward(Tensor loss, Tensor grad)
         for (auto it = end_it; it != node_stack.end(); ++it)
         {
             autograd::Node* node = it->get();
-            CHECK_EQ(dynamic_cast<autograd::AccumulateGrad*>(node), nullptr);
+            // CHECK_EQ(dynamic_cast<autograd::AccumulateGrad*>(node), nullptr);
         }
         node_stack.erase(end_it, node_stack.end());
 
         // take the last node (which has the highest sequence number)
         auto current_node = node_stack.back();
         node_stack.pop_back();
+
+
+        if (dynamic_cast<autograd::AccumulateGrad*>(current_node.get()))
+        {
+            continue;
+        }
 
         // backpropagate gradients
         auto next_gradients = current_node->node_backward(grad_map[current_node]);
@@ -88,6 +94,15 @@ void backward(Tensor loss, Tensor grad)
                 // Add next node to the stack
                 node_stack.push_back(next->function);
             }
+        }
+    }
+
+    for (auto& it : grad_map)
+    {
+        autograd::AccumulateGrad* acc_node =  dynamic_cast<autograd::AccumulateGrad*>(it.first.get());
+        if (acc_node)
+        {
+            acc_node->node_backward(it.second);
         }
     }
 }

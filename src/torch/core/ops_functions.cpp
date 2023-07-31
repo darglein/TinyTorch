@@ -359,7 +359,7 @@ struct SliceNode : public FunctionNode<SliceNode>
         ctx->saved_data["end"]   = end;
         ctx->saved_data["step"]  = step;
         ctx->save_for_backward({a});
-        Tensor result = a.slice_view(dim.toInt(), start.toInt(), end.toInt(), step.toInt()).clone();
+        Tensor result = a.slice_view(dim.toInt(), start.toInt(), end.toInt(), step.toInt());
         return {result};
     }
 

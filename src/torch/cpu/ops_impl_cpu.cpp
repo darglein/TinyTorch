@@ -59,8 +59,10 @@ static void fill_impl(TensorInfo<T> a, TensorInfo<T> values, int dim)
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         auto index_a = a.LinearIndexToDimIndex(i);
-        int d        = index_a[dim];
-        a[index_a]   = values[d];
+        auto index_values = index_a;
+        index_values[dim] = 0;
+
+        a[index_a]   = values[index_values];
     }
 }
 

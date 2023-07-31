@@ -64,7 +64,7 @@ struct TINYTORCH_API TensorOptions
     template<typename T>
     TensorOptions& dtype()
     {
-        throw std::runtime_error("not implemented");
+        dtype_  = CppTypeToScalarType<T>::value;
         return *this;
     }
 };

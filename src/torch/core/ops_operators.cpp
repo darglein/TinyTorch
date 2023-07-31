@@ -16,6 +16,7 @@ namespace tinytorch
 
 std::ostream& operator<<(std::ostream& strm, Tensor t)
 {
+    CHECK(t.defined());
     cpu_impl::print_impl(strm, t.cpu());
     return strm;
 }
