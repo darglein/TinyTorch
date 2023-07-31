@@ -17,7 +17,6 @@ void abs_impl(Tensor a, Tensor& result);
 
 void sqrt_impl(Tensor a, Tensor& result);
 void log_impl(Tensor a, Tensor& result);
-void log1p_impl(Tensor a, Tensor& result);
 void exp_impl(Tensor a, Tensor& result);
 void sign_impl(Tensor a, Tensor& result);
 void pow_impl(Tensor a, double b, Tensor& result);

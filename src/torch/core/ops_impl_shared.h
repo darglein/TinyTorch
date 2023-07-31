@@ -1,5 +1,7 @@
 #pragma once
 
+#include "torch/core/half.h"
+
 #include "torch/tiny_torch_config.h"
 
 namespace tinytorch
@@ -81,7 +83,7 @@ inline TT_HD T softplus_backward(T x, T beta)
 }
 
 inline TT_HD int64_t index_along_dim(int64_t linearId, int64_t dims, int64_t dim, int64_t* input_sizes,
-                               int64_t* input_strides)
+                                     int64_t* input_strides)
 {
     int64_t input_offset = 0;
     for (int64_t i = dims - 1; i > 0; --i)

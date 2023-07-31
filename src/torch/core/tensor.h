@@ -304,6 +304,16 @@ T* Tensor::data_ptr() const
     {
         CHECK_EQ(dtype, kLong);
     }
+#ifdef __CUDACC__
+    else if constexpr (std::is_same_v<T, half>)
+    {
+        CHECK_EQ(dtype, kHalf);
+    }
+#endif
+    else if constexpr (std::is_same_v<T, Half>)
+    {
+        CHECK_EQ(dtype, kHalf);
+    }
     else if constexpr (std::is_same_v<T, float>)
     {
         CHECK_EQ(dtype, kFloat);
@@ -314,7 +324,7 @@ T* Tensor::data_ptr() const
     }
     else
     {
-        CHECK(false);
+        CHECK(false) << "invalid datatype " << typeid(T).name();
     }
     return (T*)ptr();
 }

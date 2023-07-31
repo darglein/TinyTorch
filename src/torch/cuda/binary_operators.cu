@@ -15,7 +15,8 @@
         CUDA_CASE_MACRO((func<uint8_t>), kUInt8, numel, op<uint8_t>(), __VA_ARGS__) \
         CUDA_CASE_MACRO((func<int16_t>), kInt16, numel, op<int16_t>(), __VA_ARGS__) \
         CUDA_CASE_MACRO((func<int32_t>), kInt32, numel, op<int32_t>(), __VA_ARGS__) \
-        CUDA_CASE_MACRO((func<int64_t>), kLong, numel, op<int64_t>(), __VA_ARGS__)  \
+        CUDA_CASE_MACRO((func<int64_t>), kInt64, numel, op<int64_t>(), __VA_ARGS__)  \
+        CUDA_CASE_MACRO((func<half>), kHalf, numel, op<half>(), __VA_ARGS__)        \
         CUDA_CASE_MACRO((func<float>), kFloat, numel, op<float>(), __VA_ARGS__)     \
         CUDA_CASE_MACRO((func<double>), kDouble, numel, op<double>(), __VA_ARGS__)  \
         default:                                                                    \
@@ -42,14 +43,16 @@ __launch_bounds__(128) __global__
 }
 
 template <typename T, typename Op>
-__launch_bounds__(128) __global__ static void element_wise_operator(Op op, TensorInfoCuda<T> a, T b, TensorInfoCuda<T> result)
+__launch_bounds__(128) __global__
+    static void element_wise_operator(Op op, TensorInfoCuda<T> a, T b, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
     result[i] = op(a[i], b);
 }
 template <typename T, typename Op>
-__launch_bounds__(128) __global__ static void element_wise_operator(Op op, T a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
+__launch_bounds__(128) __global__
+    static void element_wise_operator(Op op, T a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
@@ -77,11 +80,13 @@ void sub_impl(Tensor a, double b, Tensor& result)
 
 void mult_impl(Tensor a, Tensor b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::multiplies, element_wise_operator, a, b, result);
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::multiplies, element_wise_operator, a, b,
+                                   result);
 }
 void mult_impl(Tensor a, double b, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::multiplies, element_wise_operator, a, b, result);
+    CUDA_SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), result.numel(), std::multiplies, element_wise_operator, a, b,
+                                   result);
 }
 void div_impl(Tensor a, Tensor b, Tensor& result)
 {

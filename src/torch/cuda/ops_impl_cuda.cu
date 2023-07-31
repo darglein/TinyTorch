@@ -4,6 +4,7 @@
 #include "torch/core/ops_functions.h"
 #include "torch/core/ops_impl_shared.h"
 #include "torch/core/tensor_info.h"
+#include "torch/cuda/atomic_minmax.h"
 #include "torch/cuda/ops_impl_cuda.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
 #include <cuda_runtime.h>
@@ -21,7 +22,7 @@ __launch_bounds__(128) static __global__ void range_impl(TensorInfoCuda<T> a, do
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
 
-    a[i] = T(start) + T(i) * T(step);
+    a[i] = T(start + i * step);
 }
 
 void range_impl(Tensor a, double start, double end, double step)
@@ -69,12 +70,24 @@ void fill_impl(Tensor& a, Tensor values, int dim)
 }
 
 template <typename TSource, typename TTarget>
-__launch_bounds__(128) static __global__ void copy_and_convert_impl(TensorInfoCuda<TSource> a, TensorInfoCuda<TTarget> b)
+__launch_bounds__(128) static __global__
+    void copy_and_convert_impl(TensorInfoCuda<TSource> a, TensorInfoCuda<TTarget> b)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
 
-    b[i] = TTarget(a[i]);
+    if constexpr (std::is_same_v<TSource, int64_t>)
+    {
+        b[i] = TTarget((long long)a[i]);
+    }
+    else if constexpr (std::is_same_v<TTarget, int64_t>)
+    {
+        b[i] = TTarget((long long)a[i]);
+    }
+    else
+    {
+        b[i] = TTarget(a[i]);
+    }
 }
 
 
@@ -91,6 +104,11 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
         case kInt64:
         {
             CUDA_SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int64_t, src.numel(), copy_and_convert_impl, src, target);
+            break;
+        }
+        case kFloat16:
+        {
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.scalar_type(), half, src.numel(), copy_and_convert_impl, src, target);
             break;
         }
         case kFloat32:
@@ -162,6 +180,7 @@ void sum_impl(Tensor a, Tensor& result)
     switch (a.scalar_type())
     {
         CUDA_CASE_MACRO(sum_impl<int32_t>, kInt32, a.numel(), a, result)
+        CUDA_CASE_MACRO(sum_impl<half>, kFloat16, a.numel(), a, result)
         CUDA_CASE_MACRO(sum_impl<float>, kFloat, a.numel(), a, result)
         CUDA_CASE_MACRO(sum_impl<double>, kDouble, a.numel(), a, result)
         default:
@@ -196,7 +215,8 @@ void sum_impl(Tensor a, int64_t dim, Tensor& result)
 
 
 template <typename T>
-__launch_bounds__(128) static __global__ void min_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
+__launch_bounds__(128) static __global__
+    void min_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -204,37 +224,6 @@ __launch_bounds__(128) static __global__ void min_impl(TensorInfoCuda<T> a, Tens
     result[i] = MIN(a[i], b[i]);
 }
 
-
-__device__ static float atomicMin(float* address, float val)
-{
-    int* address_as_i = (int*)address;
-    int old           = *address_as_i, assumed;
-    do
-    {
-        assumed = old;
-        old     = ::atomicCAS(address_as_i, assumed, __float_as_int(::fminf(val, __int_as_float(assumed))));
-    } while (assumed != old);
-    return __int_as_float(old);
-}
-__device__ static double atomicMin(double* address, double val)
-{
-    using T         = unsigned long long int;
-    static_assert(sizeof(T) == sizeof(double), "match");
-    T* address_as_i = (T*)address;
-    T old           = *address_as_i, assumed;
-    do
-    {
-        assumed = old;
-
-        double assumed_float = ((double*)&assumed)[0];
-        double new_value     = ::fmin(val, assumed_float);
-        T new_value_int      = ((T*)&new_value)[0];
-
-        old = ::atomicCAS(address_as_i, assumed, new_value_int);
-    } while (assumed != old);
-    double old_value = ((double*)&old)[0];
-    return old_value;
-}
 
 template <typename T>
 __launch_bounds__(128) static __global__ void set_min_result_impl(TensorInfoCuda<T> result)
@@ -266,37 +255,6 @@ void min_impl(Tensor a, Tensor& result)
 }
 
 
-__device__ static float atomicMax(float* address, float val)
-{
-    int* address_as_i = (int*)address;
-    int old           = *address_as_i, assumed;
-    do
-    {
-        assumed = old;
-        old     = ::atomicCAS(address_as_i, assumed, __float_as_int(::fmaxf(val, __int_as_float(assumed))));
-    } while (assumed != old);
-    return __int_as_float(old);
-}
-__device__ static double atomicMax(double* address, double val)
-{
-    using T         = unsigned long long int;
-    static_assert(sizeof(T) == sizeof(double), "match");
-    T* address_as_i = (T*)address;
-    T old           = *address_as_i, assumed;
-    do
-    {
-        assumed = old;
-
-        double assumed_float = ((double*)&assumed)[0];
-        double new_value     = ::fmax(val, assumed_float);
-        T new_value_int      = ((T*)&new_value)[0];
-
-        old = ::atomicCAS(address_as_i, assumed, new_value_int);
-    } while (assumed != old);
-    double old_value = ((double*)&old)[0];
-    return old_value;
-}
-
 template <typename T>
 __launch_bounds__(128) static __global__ void set_max_result_impl(TensorInfoCuda<T> result)
 {
@@ -317,7 +275,8 @@ __launch_bounds__(128) static __global__ void max_impl(TensorInfoCuda<T> a, Tens
 
 
 template <typename T>
-__launch_bounds__(128) static __global__ void max_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
+__launch_bounds__(128) static __global__
+    void max_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;

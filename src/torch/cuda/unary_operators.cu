@@ -28,7 +28,7 @@ __launch_bounds__(128) static __global__ void abs_impl(TensorInfoCuda<T> a, Tens
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
 
-    result[i] = std::abs(a[i]);
+    result[i] = ::abs(a[i]);
 }
 
 void abs_impl(Tensor a, Tensor& result)
@@ -58,7 +58,7 @@ __launch_bounds__(128) static __global__ void log_impl(TensorInfoCuda<T> a, Tens
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
 
-    result[i] = std::log(a[i]);
+    result[i] = ::log(a[i]);
 }
 
 void log_impl(Tensor a, Tensor& result)
@@ -67,26 +67,12 @@ void log_impl(Tensor a, Tensor& result)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void log1p_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    result[i] = std::log1p(a[i]);
-}
-
-void log1p_impl(Tensor a, Tensor& result)
-{
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), log1p_impl, a, result);
-}
-
-template <typename T>
 __launch_bounds__(128) static __global__ void exp_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
 
-    result[i] = std::exp(a[i]);
+    result[i] = ::exp(a[i]);
 }
 
 void exp_impl(Tensor a, Tensor& result)

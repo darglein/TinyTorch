@@ -2,7 +2,7 @@
 
 
 #include "torch/tiny_torch_cuda.h"
-#include <cuda_fp16.h>
+
 
 TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 {
@@ -27,7 +27,7 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 #define CHECK_CUDA_ERROR(cudaFunction)                                                                \
     {                                                                                                 \
         cudaError_t cudaErrorCode = cudaFunction;                                                     \
-        CHECK_EQ(cudaErrorCode, cudaSuccess) << "Error String " << cudaGetErrorString(cudaErrorCode); \
+        CHECK_EQ(cudaErrorCode, cudaSuccess) << ": " << cudaGetErrorString(cudaErrorCode); \
     }
 
 #if defined(CUDA_DEBUG)
@@ -50,6 +50,7 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
     {                                                                      \
         switch (real_scalar_type)                                          \
         {                                                                  \
+            CUDA_CASE_MACRO(func<half>, kHalf, numel, __VA_ARGS__)         \
             CUDA_CASE_MACRO(func<float>, kFloat, numel, __VA_ARGS__)       \
             CUDA_CASE_MACRO(func<double>, kDouble, numel, __VA_ARGS__)     \
             default:                                                       \
@@ -65,6 +66,7 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
         CUDA_CASE_MACRO(func<int16_t>, kInt16, numel, __VA_ARGS__)     \
         CUDA_CASE_MACRO(func<int32_t>, kInt32, numel, __VA_ARGS__)     \
         CUDA_CASE_MACRO(func<int64_t>, kLong, numel, __VA_ARGS__)      \
+        CUDA_CASE_MACRO(func<half>, kHalf, numel, __VA_ARGS__)         \
         CUDA_CASE_MACRO(func<float>, kFloat, numel, __VA_ARGS__)       \
         CUDA_CASE_MACRO(func<double>, kDouble, numel, __VA_ARGS__)     \
         default:                                                       \
@@ -80,47 +82,10 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
         CUDA_CASE_MACRO((func<int16_t, second_type>), kInt16, numel, __VA_ARGS__)   \
         CUDA_CASE_MACRO((func<int32_t, second_type>), kInt32, numel, __VA_ARGS__)   \
         CUDA_CASE_MACRO((func<int64_t, second_type>), kLong, numel, __VA_ARGS__)    \
+        CUDA_CASE_MACRO((func<half, second_type>), kHalf, numel, __VA_ARGS__)       \
         CUDA_CASE_MACRO((func<float, second_type>), kFloat, numel, __VA_ARGS__)     \
         CUDA_CASE_MACRO((func<double, second_type>), kDouble, numel, __VA_ARGS__)   \
         default:                                                                    \
             CHECK(false) << "invalid input type " << real_scalar_type;              \
     }
 
-#ifdef __CUDACC__
-
-inline __device__ __half sqrt(__half a)
-{
-    return hsqrt(a);
-}
-
-inline __device__ __half exp(__half a)
-{
-    return hexp(a);
-}
-
-inline __device__ __half log(__half a)
-{
-    return hlog(a);
-}
-
-inline __device__ __half log1p(__half a)
-{
-    return hlog(__half(1.f) + a);
-}
-
-inline __device__ __half sin(__half a)
-{
-    return hsin(a);
-}
-
-inline __device__ __half cos(__half a)
-{
-    return hcos(a);
-}
-
-inline __device__ __half pow(__half a, double b)
-{
-    return __float2half(pow(__half2float(a), b));
-}
-
-#endif
