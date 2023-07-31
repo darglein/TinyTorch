@@ -17,7 +17,7 @@
             cuda_impl::func(__VA_ARGS__); \
             break;
 #else
-
+#define SELECT_DEVICE_CUDA(...)
 #endif
 
 

@@ -2,6 +2,7 @@
 
 #include "torch/tiny_torch_config.h"
 
+#ifdef TT_HAS_CUDA
 #include <cuda_fp16.h>
 
 #ifdef __CUDACC__
@@ -44,4 +45,5 @@ inline __device__ __half pow(__half a, double b)
     return __float2half(pow(__half2float(a), b));
 }
 
+#endif
 #endif
