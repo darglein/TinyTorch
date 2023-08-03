@@ -37,12 +37,12 @@ Tensor empty(const SizeType& sizes, TensorOptions options)
 
 Tensor empty_like(Tensor t)
 {
-    return empty_like(t, t.options());
+    return empty_like(t, t.options().requires_grad(false));
 }
 
 Tensor empty_like(Tensor t, TensorOptions options)
 {
-    return empty(t.sizes(), options);
+    return empty(t.sizes(), options.requires_grad(false));
 }
 
 
@@ -58,12 +58,12 @@ Tensor full(const SizeType& sizes, float value, TensorOptions options)
 }
 Tensor full_like(Tensor t, float value, TensorOptions options)
 {
-    return full(t.sizes(), value, options);
+    return full(t.sizes(), value, options.requires_grad(false));
 }
 
 Tensor full_like(Tensor t, float value)
 {
-    return full_like(t, value, t.options());
+    return full_like(t, value, t.options().requires_grad(false));
 }
 
 
@@ -76,12 +76,12 @@ Tensor zeros(const SizeType& sizes, TensorOptions options)
 }
 Tensor zeros_like(Tensor t, TensorOptions options)
 {
-    return zeros(t.sizes(), options);
+    return zeros(t.sizes(), options.requires_grad(false));
 }
 
 Tensor zeros_like(Tensor t)
 {
-    return zeros_like(t, t.options());
+    return zeros_like(t, t.options().requires_grad(false));
 }
 
 // ================================================================================
@@ -93,12 +93,12 @@ Tensor ones(const SizeType& sizes, TensorOptions options)
 }
 Tensor ones_like(Tensor t, TensorOptions options)
 {
-    return ones(t.sizes(), options);
+    return ones(t.sizes(), options.requires_grad(false));
 }
 
 Tensor ones_like(Tensor t)
 {
-    return ones_like(t, t.options());
+    return ones_like(t, t.options().requires_grad(false));
 }
 
 
@@ -139,7 +139,7 @@ Tensor randint(int low, int high, const SizeType& sizes, TensorOptions options)
 
 Tensor rand_like(Tensor t)
 {
-    return rand(t.sizes(), t.options());
+    return rand(t.sizes(), t.options().requires_grad(false));
 }
 Tensor from_blob(void* data, const SizeType& sizes, const SizeType& stride, TensorOptions options)
 {

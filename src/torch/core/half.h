@@ -6,7 +6,10 @@
 #include <cuda_fp16.h>
 
 #ifdef __CUDACC__
-
+inline __device__ __half round(__half a)
+{
+    return round(float(a));
+}
 inline __device__ __half sqrt(__half a)
 {
     return hsqrt(a);

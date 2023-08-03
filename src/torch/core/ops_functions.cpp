@@ -417,6 +417,38 @@ struct CloneNode : public FunctionNode<CloneNode>
         return {grad_a};
     }
 };
+
+
+struct PermuteNode : public FunctionNode<PermuteNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue new_indices)
+    {
+
+        auto new_sizes = a.sizes();
+        auto reverse_indices = new_indices.toSizes();
+        for (int i = 0; i < a.dim(); ++i)
+        {
+            reverse_indices[new_indices.toSizes()[i]] = a.size(i);
+            new_sizes[i] = a.size(new_indices.toSizes()[i]);
+
+            //reverse_indices
+        }
+        ctx->saved_data["new_indices"] = new_indices;
+        ctx->saved_data["reverse_indices"] = reverse_indices;
+
+        Tensor result = empty(new_sizes, a.options());
+        SELECT_DEVICE(result.device(), permute_impl, a, result, new_indices.toSizes());
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        auto g = grad[0];
+        Tensor grad_a = empty(ctx->next_sizes[0],g.options());
+        SELECT_DEVICE(grad_a.device(), permute_impl, g, grad_a, ctx->saved_data["reverse_indices"].toSizes());
+        return {grad_a, {}};
+    }
+};
 }  // namespace autograd
 
 Tensor clone(Tensor a)
@@ -425,8 +457,7 @@ Tensor clone(Tensor a)
 }
 Tensor permute(Tensor t, const SizeType& size)
 {
-    throw std::runtime_error("not implemented");
-    return Tensor();
+    return autograd::PermuteNode::apply(t, size)[0];
 }
 
 

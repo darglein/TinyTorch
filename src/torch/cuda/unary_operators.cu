@@ -6,11 +6,11 @@
 
 #include "torch/core/ops.h"
 
-#include "unary_operators.h"
 #include "torch/core/ops_impl_shared.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cuda/ops_impl_cuda.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
+#include "unary_operators.h"
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 
@@ -35,7 +35,18 @@ void abs_impl(Tensor a, Tensor& result)
 {
     CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), abs_impl, a, result);
 }
+template <typename T>
+__launch_bounds__(128) static __global__ void round_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= a.numel()) return;
 
+    result[i] = ::round(a[i]);
+}
+void round_impl(Tensor a, Tensor& result)
+{
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), round_impl, a, result);
+}
 
 template <typename T>
 __launch_bounds__(128) static __global__ void sqrt_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)

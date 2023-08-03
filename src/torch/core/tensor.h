@@ -55,6 +55,7 @@ struct SizeType
     SizeType(const std::initializer_list<int64_t>& v) : data_(v) {}
     SizeType(const SizeType&) = default;
     SizeType(SizeType&&)      = default;
+
     int64_t& operator[](int64_t i) { return data_[i]; }
     const int64_t& operator[](int64_t i) const { return data_[i]; }
     int64_t size() const { return data_.size(); }
@@ -190,18 +191,11 @@ struct TINYTORCH_API Tensor
     Tensor index_add(int64_t dim, Tensor index, Tensor data) const;
     Tensor square() const;
     Tensor sqrt() const;
-    Tensor cuda() const
-    {
-        return to(kCUDA);
-    }
-    bool allclose(Tensor other, double atol = 1e-07) const;
+    Tensor cuda() const { return to(kCUDA); }
+    bool allclose(Tensor other, double rtol, double atol = 1e-07) const;
 
 
-    Tensor round() const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor round() const;
 
     Tensor clamp(double mi, double ma) const;
     void clamp_(double mi, double ma);
@@ -249,7 +243,7 @@ struct TINYTORCH_API Tensor
     Tensor std() const;
     Tensor index_select(int64_t i, Tensor index) const;
     Tensor abs() const;
-    void set_data(Tensor t) { this->impl_ = t.impl_; }
+    void set_data(Tensor t);
     Tensor repeat_interleave(int64_t count);
     Tensor transpose(int64_t dim0, int64_t dim1);
     void backward() const;

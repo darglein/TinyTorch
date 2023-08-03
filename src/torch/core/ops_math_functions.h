@@ -20,6 +20,8 @@ TINYTORCH_API Tensor log(Tensor a);
 TINYTORCH_API Tensor log1p(Tensor a);
 TINYTORCH_API Tensor exp(Tensor a);
 
+TINYTORCH_API Tensor round(Tensor b);
+
 inline Tensor sign(Tensor b)
 {
     throw std::runtime_error("not implemented");

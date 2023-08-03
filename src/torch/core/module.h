@@ -15,7 +15,7 @@ namespace tinytorch
 
 inline void set_num_threads(int n)
 {
-    throw std::runtime_error("not implemented");
+    std::cerr << "tinytorch::set_num_threads is currently ignored!" << std::endl;
 }
 
 namespace nn
@@ -199,6 +199,18 @@ struct Module
         }
         return result;
     }
+
+    std::vector<std::shared_ptr<Module>> children()
+    {
+        std::vector<std::shared_ptr<Module>> result;
+        for (auto b : modules_)
+        {
+            result.push_back(b.second);
+        }
+        return result;
+    }
+
+    std::string name() { return typeid(*this).name(); }
 
     std::map<std::string, Tensor> buffers_;
     std::map<std::string, Tensor> parameters_;

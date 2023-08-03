@@ -14,6 +14,7 @@ namespace tinytorch
 namespace cuda_impl
 {
 void abs_impl(Tensor a, Tensor& result);
+void round_impl(Tensor a, Tensor& result);
 
 void sqrt_impl(Tensor a, Tensor& result);
 void log_impl(Tensor a, Tensor& result);

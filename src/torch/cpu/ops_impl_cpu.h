@@ -21,6 +21,7 @@ void range_impl(Tensor a, double start, double end, double step);
 void fill_impl(Tensor& a, double value);
 void fill_impl(Tensor& a, Tensor value);
 void fill_impl(Tensor& a, Tensor values, int dim);
+void permute_impl(Tensor& src, Tensor& result, SizeType new_dims);
 
 void uniform_impl(Tensor& t, double mi, double ma);
 void uniform_int_impl(Tensor& t, int low, int high);

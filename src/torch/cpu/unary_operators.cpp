@@ -9,9 +9,9 @@
 #include "torch/core/ops.h"
 
 #include "ops_impl_cpu_helper.h"
+#include "torch/core/ops_impl_shared.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cpu/ops_impl_cpu.h"
-#include "torch/core/ops_impl_shared.h"
 
 
 namespace tinytorch
@@ -51,7 +51,18 @@ void abs_impl(Tensor a, Tensor& result)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), abs_impl, a, result);
 }
-
+template <typename T>
+static void round_impl(TensorInfo<T> a, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = std::round(a[i]);
+    }
+}
+void round_impl(Tensor a, Tensor& result)
+{
+    SWITCH_MACRO_ALL(a.scalar_type(), round_impl, a, result);
+}
 
 template <typename T>
 static void sqrt_impl(TensorInfo<T> a, TensorInfo<T> result)
@@ -207,7 +218,6 @@ void softplus_impl(Tensor a, double beta, Tensor& result)
 {
     SWITCH_MACRO_FLOAT(a.scalar_type(), softplus_impl, a, beta, result);
 }
-
 
 
 

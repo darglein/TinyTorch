@@ -32,6 +32,18 @@ template <int DIM>
 struct DimIndexStruct
 {
     int64_t indices[DIM];
+
+    TT_HD DimIndexStruct() {}
+
+    DimIndexStruct(const std::vector<int64_t>& data)
+    {
+        CHECK_LT(data.size(), DIM);
+        for (int i = 0; i < data.size(); ++i)
+        {
+            indices[i] = data[i];
+        }
+    }
+
     TT_HD int64_t& operator[](int64_t i) { return indices[i]; }
 
     TT_HD void zero_()
@@ -73,6 +85,8 @@ struct TensorInfoBase
             CHECK(t.is_cpu());
         }
     }
+
+    TT_HD int64_t dim() { return dims; }
 
     TT_HD int64_t numel()
     {

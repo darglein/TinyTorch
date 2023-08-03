@@ -94,6 +94,16 @@ struct CppTypeToScalarType<__half>
 };
 #endif
 template <>
+struct CppTypeToScalarType<uint8_t>
+{
+    static constexpr ScalarType value = kUInt8;
+};
+template <>
+struct CppTypeToScalarType<int16_t>
+{
+    static constexpr ScalarType value = kInt16;
+};
+template <>
 struct CppTypeToScalarType<int32_t>
 {
     static constexpr ScalarType value = kInt32;

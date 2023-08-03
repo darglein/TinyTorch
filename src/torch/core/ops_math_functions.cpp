@@ -316,6 +316,13 @@ Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
     a = a.sqrt();
     return a;
 }
+Tensor round(Tensor a)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    auto result = empty_like(a);
+    SELECT_DEVICE(a.device(), round_impl, a, result);
+    return result;
+}
 
 
 }  // namespace tinytorch

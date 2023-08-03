@@ -69,6 +69,29 @@ void fill_impl(Tensor& a, Tensor values, int dim)
     CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), fill_impl, a, values, dim);
 }
 
+template <typename T>
+__launch_bounds__(128) static __global__
+    void permute_impl(TensorInfo<T> src, TensorInfo<T> result, DimIndexStruct<25> new_dims)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= src.numel()) return;
+
+    auto index_src    = src.LinearIndexToDimIndex(i);
+    auto index_result = index_src;
+
+    for (int d = 0; d < src.dim(); ++d)
+    {
+        // index_result[new_dims[d]] = index_src[d];
+        index_result[d] = index_src[new_dims[d]];
+    }
+    result[index_result] = src[index_src];
+}
+
+void permute_impl(Tensor& src, Tensor& result, SizeType new_dims)
+{
+    CUDA_SWITCH_MACRO_ALL(src.scalar_type(), src.numel(), permute_impl, src, result, new_dims.vec());
+}
+
 template <typename TSource, typename TTarget>
 __launch_bounds__(128) static __global__
     void copy_and_convert_impl(TensorInfoCuda<TSource> a, TensorInfoCuda<TTarget> b)

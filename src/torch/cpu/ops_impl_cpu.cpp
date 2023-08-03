@@ -58,11 +58,11 @@ static void fill_impl(TensorInfo<T> a, TensorInfo<T> values, int dim)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        auto index_a = a.LinearIndexToDimIndex(i);
+        auto index_a      = a.LinearIndexToDimIndex(i);
         auto index_values = index_a;
         index_values[dim] = 0;
 
-        a[index_a]   = values[index_values];
+        a[index_a] = values[index_values];
     }
 }
 
@@ -77,6 +77,29 @@ void fill_impl(Tensor& a, Tensor value)
 void fill_impl(Tensor& a, Tensor values, int dim)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), fill_impl, a, values, dim);
+}
+
+template <typename T>
+static void permute_impl(TensorInfo<T> src, TensorInfo<T> result, SizeType new_dims)
+{
+    for (int64_t i = 0; i < src.numel(); ++i)
+    {
+        auto index_src    = src.LinearIndexToDimIndex(i);
+        auto index_result = index_src;
+
+        for (int d = 0; d < src.dim(); ++d)
+        {
+            // index_result[new_dims[d]] = index_src[d];
+            index_result[d] = index_src[new_dims[d]];
+        }
+        result[index_result] = src[index_src];
+    }
+}
+
+
+void permute_impl(Tensor& src, Tensor& result, SizeType new_dims)
+{
+    SWITCH_MACRO_ALL(src.scalar_type(), permute_impl, src, result, new_dims);
 }
 
 template <typename T>
@@ -113,7 +136,7 @@ template <typename T>
 static void rand_int_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, int low, int high)
 {
     // the high bounds is exclusive
-    std::uniform_int_distribution<int> dist{low, high-1};
+    std::uniform_int_distribution<int> dist{low, high - 1};
     for (int64_t i = 0; i < t.numel(); ++i)
     {
         t[i] = T(dist(mersenne_engine));
@@ -408,8 +431,8 @@ static void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInf
 {
     for (int64_t i = 0; i < result.numel(); ++i)
     {
-        auto index_result = result.LinearIndexToDimIndex(i);
-        auto index_input = input.LinearIndexToDimIndex(i / count);
+        auto index_result    = result.LinearIndexToDimIndex(i);
+        auto index_input     = input.LinearIndexToDimIndex(i / count);
         result[index_result] = input[index_input];
     }
 }
@@ -426,7 +449,7 @@ static void transpose_impl(TensorInfo<T> input, int64_t dim0, int64_t dim1, Tens
     for (int64_t i = 0; i < result.numel(); ++i)
     {
         auto index_result = result.LinearIndexToDimIndex(i);
-        auto index_input = index_result;
+        auto index_input  = index_result;
         std::swap(index_input[dim0], index_input[dim1]);
         result[index_result] = input[index_input];
     }
@@ -498,6 +521,11 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
     CHECK_EQ(src.numel(), target.numel());
     switch (target.dtype())
     {
+        case kUInt8:
+        {
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), uint8_t , copy_and_convert_impl_kernel, src, target);
+            break;
+        }
         case kInt32:
         {
             SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int32_t, copy_and_convert_impl_kernel, src, target);

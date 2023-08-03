@@ -358,7 +358,7 @@ Tensor Tensor::index_add(int64_t dim, Tensor index, Tensor data) const
 {
     return tinytorch::index_add(*this, dim, index, data);
 }
-bool Tensor::allclose(Tensor other, double atol) const
+bool Tensor::allclose(Tensor other, double rtol, double atol) const
 {
     Tensor diff = (*this - other).abs().max();
     double v    = 0.f;
@@ -476,6 +476,14 @@ bool Tensor::is_leaf() const
         std::dynamic_pointer_cast<autograd::AccumulateGrad>(impl_->autograd_meta->edge->function);
 
     return node != nullptr;
+}
+void Tensor::set_data(Tensor t)
+{
+    this->impl_->set_data(*t.impl_);
+}
+Tensor Tensor::round() const
+{
+    return tinytorch::round(*this);
 }
 
 }  // namespace tinytorch
