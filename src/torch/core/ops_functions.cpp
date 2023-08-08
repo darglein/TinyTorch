@@ -186,9 +186,7 @@ struct ToNode : public FunctionNode<ToNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue new_device_)
     {
         NoGradGuard ngg;
-        ctx->saved_data["old_device"] = (int)a.device();
-        Device new_device             = (Device)new_device_.toInt();
-
+        Device new_device             = new_device_.toDevice();
 #ifdef TT_HAS_CUDA
         Tensor contig = a.contiguous();
         Tensor result = empty(contig.sizes(), a.options().device(new_device));
@@ -201,7 +199,7 @@ struct ToNode : public FunctionNode<ToNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        Device old_device = (Device)ctx->saved_data["old_device"].toInt();
+        Device old_device = ctx->next_meta[0].device;
         Tensor grad_a     = empty_like(grad[0], grad[0].options().device(old_device));
         cpu_impl::to_impl_cpu_cuda(grad[0], grad_a);
         return {grad_a, {}};
@@ -241,7 +239,7 @@ Tensor to(Tensor a, Device new_device)
         return a;
     }
 
-    return autograd::ToNode::apply(a.contiguous(), (int)new_device)[0];
+    return autograd::ToNode::apply(a.contiguous(), new_device)[0];
 }
 
 Tensor to(Tensor a, ScalarType other_type)
@@ -261,7 +259,6 @@ struct IndexSelectNode : public FunctionNode<IndexSelectNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor input, IValue dim, Tensor index)
     {
         ctx->saved_data["dim"]        = dim;
-        ctx->data_sizes["input_size"] = input.sizes();
         ctx->save_for_backward({index});
 
 
@@ -287,7 +284,7 @@ struct IndexSelectNode : public FunctionNode<IndexSelectNode>
         int dim          = ctx->saved_data["dim"].toInt();
         auto l           = ctx->get_saved_variables();
         auto index       = l[0];
-        auto input_sizes = ctx->data_sizes["input_size"];
+        auto input_sizes = ctx->next_meta[0].size;
 
         auto g = grad[0];
 
@@ -444,7 +441,7 @@ struct PermuteNode : public FunctionNode<PermuteNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         auto g = grad[0];
-        Tensor grad_a = empty(ctx->next_sizes[0],g.options());
+        Tensor grad_a = empty(ctx->next_meta[0].size,g.options());
         SELECT_DEVICE(grad_a.device(), permute_impl, g, grad_a, ctx->saved_data["reverse_indices"].toSizes());
         return {grad_a, {}};
     }
