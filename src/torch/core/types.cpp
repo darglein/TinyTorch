@@ -13,7 +13,7 @@ std::ostream& operator<<(std::ostream& strm, Device type)
         "kCPU",
         "kCUDA",
     };
-    strm << type_names[(int)type];
+    strm << type_names[(int)type.type];
     return strm;
 }
 

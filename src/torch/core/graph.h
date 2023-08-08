@@ -74,6 +74,7 @@ struct IValue
     IValue(int64_t i) : v_int64(i) {}
     IValue(Tensor t) : v_tensor(t) {}
     IValue(SizeType s) : v_size(s) {}
+    IValue(Device d) : v_device(d) {}
 
     template <typename T>
     IValue(std::shared_ptr<T> i) : custom_class(i)
@@ -93,12 +94,14 @@ struct IValue
     int64_t toInt() { return v_int64; }
     Tensor toTensor() { return v_tensor; }
     SizeType toSizes() { return v_size; }
+    Device toDevice() { return v_device; }
 
     bool v_bool;
     double v_double;
     int64_t v_int64;
     Tensor v_tensor;
     SizeType v_size;
+    Device v_device;
     std::shared_ptr<CustomClassHolder> custom_class;
 };
 
@@ -106,16 +109,20 @@ struct IValue
 namespace autograd
 {
 
+struct TensorMetaData
+{
+    SizeType size;
+    Device device;
+};
+
 struct Context
 {
     // the input tensor dimensions
     // is used to check for the correct gradient size
-    std::vector<SizeType> next_sizes;
+    std::vector<TensorMetaData> next_meta;
 
 
     std::map<std::string, int> data_int;
-    // TODO: besser
-    std::map<std::string, SizeType> data_sizes;
 
     std::map<std::string, IValue> saved_data;
 
@@ -215,17 +222,18 @@ struct FunctionNode : public Node
         {
             if (grad_list[i].defined())
             {
-                if (!(grad_list[i].sizes() == context.next_sizes[i]))
+                if (!(grad_list[i].sizes() == context.next_meta[i].size))
                 {
                     std::cerr << "incorrect gradient size found for node " << typeid(FunctionNode<T>).name()
                               << std::endl;
                     for (int j = 0; j < fwd_output_grad.size(); ++j)
                     {
-                        std::cerr << "fwd_output_grad " << fwd_output_grad[j].sizes() <<  std::endl;
+                        std::cerr << "fwd_output_grad " << fwd_output_grad[j].sizes() << std::endl;
                     }
                     for (int j = 0; j < grad_list.size(); ++j)
                     {
-                        std::cerr << "input " << context.next_sizes[j] << " grad " << grad_list[i].sizes() <<  std::endl;
+                        std::cerr << "input " << context.next_meta[j].size << " grad " << grad_list[i].sizes()
+                                  << std::endl;
                     }
 
                     CHECK(false) << "incorrect gradient size";
@@ -255,7 +263,11 @@ struct FunctionNode : public Node
                 {
                     auto t = input_ivalues[i].toTensor();
                     node->next.push_back(t.getEdge());
-                    node->context.next_sizes.push_back(t.sizes());
+
+                    TensorMetaData meta;
+                    meta.size   = t.sizes();
+                    meta.device = t.device();
+                    node->context.next_meta.push_back(meta);
                     if (t.requires_grad())
                     {
                         need_grad = true;
@@ -264,7 +276,7 @@ struct FunctionNode : public Node
                 else
                 {
                     node->next.push_back({});
-                    node->context.next_sizes.push_back({});
+                    node->context.next_meta.push_back({});
                 }
             }
             CHECK_EQ(node->next.size(), node->num_inputs_of_forward);

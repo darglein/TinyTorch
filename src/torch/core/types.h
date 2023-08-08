@@ -28,11 +28,37 @@ namespace tinytorch
 struct Half
 {
 };
-enum Device
+enum DeviceType
 {
     kCPU,
     kCUDA
 };
+
+
+struct Device
+{
+    DeviceType type  = kCPU;
+    int device_index = 0;
+
+    Device(DeviceType type = kCPU, int index = 0) : type(type), device_index(index)
+    {
+        if (type == kCPU)
+        {
+            CHECK_EQ(index, 0);
+        }
+    }
+};
+
+inline bool operator==(Device device, DeviceType type)
+{
+    return device.type == type;
+}
+inline bool operator==(Device d1, Device d2)
+{
+    return d1.type == d2.type && d1.device_index == d2.device_index;
+}
+
+
 TINYTORCH_API std::ostream& operator<<(std::ostream& strm, Device type);
 
 enum PaddingMode

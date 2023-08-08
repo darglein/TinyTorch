@@ -78,11 +78,11 @@ struct AddNode : public FunctionNode<AddNode>
         auto grad_b = grad[0].clone();
 
         int expand_dim = ctx->saved_data["expand_dim"].toInt();
-        if (expand_dim != -1 && ctx->next_sizes[0][expand_dim] == 1)
+        if (expand_dim != -1 && ctx->next_meta[0].size[expand_dim] == 1)
         {
             grad_a = grad_a.sum(expand_dim, false);
         }
-        if (expand_dim != -1 &&  ctx->next_sizes[1][expand_dim]== 1)
+        if (expand_dim != -1 &&  ctx->next_meta[1].size[expand_dim]== 1)
         {
             grad_b = grad_b.sum(expand_dim, false);
         }
@@ -107,11 +107,11 @@ struct SubNode : public FunctionNode<SubNode>
         auto grad_b = -grad[0].clone();
 
         int expand_dim = ctx->saved_data["expand_dim"].toInt();
-        if (expand_dim != -1 && ctx->next_sizes[0][expand_dim] == 1)
+        if (expand_dim != -1 && ctx->next_meta[0].size[expand_dim] == 1)
         {
             grad_a = grad_a.sum(expand_dim, false);
         }
-        if (expand_dim != -1 &&  ctx->next_sizes[1][expand_dim]== 1)
+        if (expand_dim != -1 &&  ctx->next_meta[1].size[expand_dim]== 1)
         {
             grad_b = grad_b.sum(expand_dim, false);
         }
@@ -144,11 +144,11 @@ struct DivNode : public FunctionNode<DivNode>
 
 
         int expand_dim = ctx->saved_data["expand_dim"].toInt();
-        if (expand_dim != -1 && ctx->next_sizes[0][expand_dim] == 1)
+        if (expand_dim != -1 && ctx->next_meta[0].size[expand_dim] == 1)
         {
             grad_a = grad_a.sum(expand_dim, false);
         }
-        if (expand_dim != -1 &&  ctx->next_sizes[1][expand_dim]== 1)
+        if (expand_dim != -1 &&  ctx->next_meta[1].size[expand_dim]== 1)
         {
             grad_b = grad_b.sum(expand_dim, false);
         }
@@ -178,11 +178,11 @@ struct MultNode : public FunctionNode<MultNode>
         auto grad_b = g * a;
 
         int expand_dim = ctx->saved_data["expand_dim"].toInt();
-        if (expand_dim != -1 && ctx->next_sizes[0][expand_dim] == 1)
+        if (expand_dim != -1 && ctx->next_meta[0].size[expand_dim] == 1)
         {
             grad_a = grad_a.sum(expand_dim, false);
         }
-        if (expand_dim != -1 &&  ctx->next_sizes[1][expand_dim]== 1)
+        if (expand_dim != -1 &&  ctx->next_meta[1].size[expand_dim]== 1)
         {
             grad_b = grad_b.sum(expand_dim, false);
         }
