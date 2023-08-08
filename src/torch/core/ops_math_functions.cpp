@@ -233,11 +233,11 @@ Tensor sum(Tensor a)
     return SumNode::forward_and_build_graph(a)[0];
 }
 
-Tensor sum(Tensor a, int64_t dim, bool squeeze_dim)
+Tensor sum(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK_LT(dim, a.dim());
     auto result = autograd::SumDimNode::apply(a, dim)[0];
-    if (squeeze_dim)
+    if (!keepdim)
     {
         auto dims_before = result.dim();
         result           = result.squeeze(dim);
@@ -259,10 +259,10 @@ Tensor mean(Tensor a)
     return sum(a) / (double)a.numel();  // TODO: This is not safe for small datatypes, which might overflow in the sum.
 }
 
-Tensor mean(Tensor a, int64_t dim, bool squeeze_dim)
+Tensor mean(Tensor a, int64_t dim, bool keepdim)
 {
     auto count  = a.size(dim);
-    auto result = sum(a, dim, squeeze_dim);
+    auto result = sum(a, dim, keepdim);
     return result / (double)count;
 }
 Tensor mean(Tensor a, SizeType s)

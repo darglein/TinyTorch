@@ -55,4 +55,38 @@ inline void load(Tensor&, std::string)
 }
 
 
+TINYTORCH_API Tensor grid_sampler(const Tensor& input, const Tensor& grid, int64_t interpolation_mode,
+                                  int64_t padding_mode, bool align_corners);
+
+namespace nn
+{
+namespace functional
+{
+struct GridSampleFuncOptions
+{
+    GridSampleFuncOptions& padding_mode(PaddingMode p)
+    {
+        pm = p;
+        return *this;
+    }
+    GridSampleFuncOptions& mode(InterpolationType p)
+    {
+        it = p;
+        return *this;
+    }
+    GridSampleFuncOptions& align_corners(bool p)
+    {
+        ac = p;
+        return *this;
+    }
+    PaddingMode pm       = kBorder;
+    InterpolationType it = kBilinear;
+    bool ac   = false;
+};
+
+TINYTORCH_API Tensor grid_sample(Tensor data, Tensor uv, GridSampleFuncOptions options);
+
+}  // namespace functional
+}  // namespace nn
+
 }  // namespace tinytorch

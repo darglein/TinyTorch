@@ -35,6 +35,16 @@ enum Device
 };
 TINYTORCH_API std::ostream& operator<<(std::ostream& strm, Device type);
 
+enum PaddingMode
+{
+    kBorder,
+};
+enum InterpolationType
+{
+    kBilinear,
+};
+
+
 enum ScalarType
 {
     // interger types

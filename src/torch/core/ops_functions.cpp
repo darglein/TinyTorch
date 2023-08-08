@@ -81,7 +81,6 @@ Tensor reshape(Tensor t, SizeType sizes)
 
 Tensor repeat(Tensor t, SizeType sizes)
 {
-    CHECK(!t.requires_grad() || !GradMode::is_enabled());
     CHECK_EQ(t.dim(), sizes.size());
 
     int repeat_dim = -1;
@@ -100,15 +99,13 @@ Tensor repeat(Tensor t, SizeType sizes)
     }
 
 
-    auto new_size        = t.sizes().vec();
-    new_size[repeat_dim] = new_size[repeat_dim] * sizes[repeat_dim];
+
+    auto result = t;
 
 
-    Tensor result = empty(new_size, t.options());
-
-    for (int i = 0; i < sizes[repeat_dim]; ++i)
+    for (int i = 0; i < sizes[repeat_dim] - 1; ++i)
     {
-        result.slice(repeat_dim, i * t.size(repeat_dim), (i + 1) * t.size(repeat_dim)).copy_(t);
+        result = cat({result, t}, repeat_dim);
     }
 
     //     std::cout << "new_size " << new_size << std::endl;
@@ -423,17 +420,16 @@ struct PermuteNode : public FunctionNode<PermuteNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue new_indices)
     {
-
-        auto new_sizes = a.sizes();
+        auto new_sizes       = a.sizes();
         auto reverse_indices = new_indices.toSizes();
         for (int i = 0; i < a.dim(); ++i)
         {
             reverse_indices[new_indices.toSizes()[i]] = a.size(i);
-            new_sizes[i] = a.size(new_indices.toSizes()[i]);
+            new_sizes[i]                              = a.size(new_indices.toSizes()[i]);
 
-            //reverse_indices
+            // reverse_indices
         }
-        ctx->saved_data["new_indices"] = new_indices;
+        ctx->saved_data["new_indices"]     = new_indices;
         ctx->saved_data["reverse_indices"] = reverse_indices;
 
         Tensor result = empty(new_sizes, a.options());
@@ -443,8 +439,8 @@ struct PermuteNode : public FunctionNode<PermuteNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto g = grad[0];
-        Tensor grad_a = empty(ctx->next_sizes[0],g.options());
+        auto g        = grad[0];
+        Tensor grad_a = empty(ctx->next_sizes[0], g.options());
         SELECT_DEVICE(grad_a.device(), permute_impl, g, grad_a, ctx->saved_data["reverse_indices"].toSizes());
         return {grad_a, {}};
     }
@@ -495,6 +491,41 @@ struct Cat2Node : public FunctionNode<Cat2Node>
         return {grad_a, grad_b, {}};
     }
 };
+struct GridsampleNode : public FunctionNode<GridsampleNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor input, Tensor grid, IValue interpolation, IValue padding,
+                                       IValue align_corners)
+    {
+        CHECK(input.dim() == 4 || input.dim() == 5);
+
+        auto size_out = input.sizes();
+        size_out[2]   = grid.size(1);
+        size_out[3]   = grid.size(2);
+        if (input.dim() == 5)
+        {
+            size_out[4] = grid.size(3);
+        }
+        auto result = empty(size_out, input.options());
+
+
+        ctx->save_for_backward({input, grid});
+
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        auto l          = ctx->get_saved_variables();
+        auto input      = l[0];
+        auto grid       = l[1];
+        auto g          = grad[0];
+        auto grad_input = zeros_like(input);
+        auto grad_grid  = zeros_like(grid);
+
+
+        return {grad_input, grad_grid, {}, {}, {}};
+    }
+};
 }  // namespace autograd
 
 Tensor cat(const std::vector<Tensor>& list, int64_t dim)
@@ -506,6 +537,11 @@ Tensor cat(const std::vector<Tensor>& list, int64_t dim)
     }
 
     return result;
+}
+
+Tensor nn::functional::grid_sample(Tensor data, Tensor uv, nn::functional::GridSampleFuncOptions options)
+{
+    return autograd::GridsampleNode::apply(data, uv, options.it, options.pm, options.ac)[0];
 }
 
 }  // namespace tinytorch

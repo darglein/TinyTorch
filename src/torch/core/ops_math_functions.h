@@ -96,11 +96,11 @@ TINYTORCH_API Tensor std(Tensor a);
 TINYTORCH_API Tensor std(Tensor a, int64_t dim);
 
 TINYTORCH_API Tensor sum(Tensor a);
-TINYTORCH_API Tensor sum(Tensor a, int64_t dim, bool squeeze_dim);
+TINYTORCH_API Tensor sum(Tensor a, int64_t dim, bool keepdim);
 TINYTORCH_API Tensor sum(Tensor a, SizeType s);
 
 TINYTORCH_API Tensor mean(Tensor a);
-TINYTORCH_API Tensor mean(Tensor a, int64_t dim, bool squeeze_dim);
+TINYTORCH_API Tensor mean(Tensor a, int64_t dim, bool keepdim);
 TINYTORCH_API Tensor mean(Tensor a, SizeType s);
 
 

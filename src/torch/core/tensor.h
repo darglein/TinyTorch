@@ -236,9 +236,9 @@ struct TINYTORCH_API Tensor
     Tensor std(int64_t index) const;
 
     Tensor sum() const;
-    Tensor sum(int64_t dim, bool squeeze_dim) const;
+    Tensor sum(int64_t dim, bool keepdim) const;
     Tensor mean() const;
-    Tensor mean(int64_t dim, bool squeeze_dim) const;
+    Tensor mean(int64_t dim, bool keepdim) const;
     Tensor mean(const SizeType& sizes) const;
     Tensor std() const;
     Tensor index_select(int64_t i, Tensor index) const;

@@ -192,7 +192,6 @@ Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step)
 
 Tensor Tensor::unsqueeze(int64_t dim) const
 {
-    CHECK(!this->requires_grad() || !GradMode::is_enabled());
     CHECK(dim >= -this->dim() - 1 && dim < this->dim() + 1);
 
     if (dim < 0)
@@ -202,16 +201,7 @@ Tensor Tensor::unsqueeze(int64_t dim) const
 
     std::vector<int64_t> new_sizes = sizes();
     new_sizes.insert(std::next(new_sizes.begin(), dim), 1);
-
-    int64_t stride_to_insert = (dim == 0) ? 1 : stride(dim - 1);
-
-    std::vector<int64_t> new_strides = strides();
-    new_strides.insert(std::next(new_strides.begin(), dim), stride_to_insert);
-
-    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_,
-                                                              std::move(new_sizes), std::move(new_strides), options());
-
-    return Tensor(new_impl);
+    return reshape(new_sizes);
 }
 
 Tensor Tensor::squeeze(int64_t dim) const
@@ -387,13 +377,13 @@ Tensor Tensor::std(int64_t index) const
 {
     return tinytorch::std(*this, index);
 }
-Tensor Tensor::sum(int64_t dim, bool squeeze_dim) const
+Tensor Tensor::sum(int64_t dim, bool keepdim) const
 {
-    return tinytorch::sum(*this, dim, squeeze_dim);
+    return tinytorch::sum(*this, dim, keepdim);
 }
-Tensor Tensor::mean(int64_t dim, bool squeeze_dim) const
+Tensor Tensor::mean(int64_t dim, bool keepdim) const
 {
-    return tinytorch::mean(*this, dim, squeeze_dim);
+    return tinytorch::mean(*this, dim, keepdim);
 }
 Tensor Tensor::mean(const SizeType& sizes) const
 {
