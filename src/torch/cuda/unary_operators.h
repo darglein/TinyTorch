@@ -20,7 +20,7 @@ void sqrt_impl(Tensor a, Tensor& result);
 void log_impl(Tensor a, Tensor& result);
 void exp_impl(Tensor a, Tensor& result);
 void sign_impl(Tensor a, Tensor& result);
-void pow_impl(Tensor a, double b, Tensor& result);
+
 void sin_impl(Tensor a, Tensor& result);
 void cos_impl(Tensor a, Tensor& result);
 void relu_impl(Tensor a, Tensor& result);

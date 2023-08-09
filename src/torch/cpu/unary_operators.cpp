@@ -23,11 +23,11 @@ namespace cpu_impl
 template <typename T>
 static void std_impl(TensorInfo<T> a, double mean, TensorInfo<T> result)
 {
-    T s = T(0);
+    T s = T(0.0);
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         T v = a[i] - T(mean);
-        s += v * v;
+        s = s * v * v;
     }
     result[0] = std::sqrt(s / a.numel());
 }
@@ -126,7 +126,7 @@ static void sign_impl(TensorInfo<T> a, TensorInfo<T> result)
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         T v       = a[i];
-        result[i] = (v < T(0)) ? T(-1) : (v > T(0)) ? T(1) : T(0);
+        result[i] = (v < T(0.0)) ? T(-1.0) : (v > T(0.)) ? T(1.) : T(0.);
     }
 }
 
@@ -135,19 +135,7 @@ void sign_impl(Tensor a, Tensor& result)
     SWITCH_MACRO_FLOAT(a.scalar_type(), sign_impl, a, result);
 }
 
-template <typename T>
-static void pow_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[i] = T(std::pow(a[i], b));
-    }
-}
 
-void pow_impl(Tensor a, double b, Tensor& result)
-{
-    SWITCH_MACRO_FLOAT(a.scalar_type(), pow_impl, a, b, result);
-}
 
 template <typename T>
 static void sin_impl(TensorInfo<T> a, TensorInfo<T> result)

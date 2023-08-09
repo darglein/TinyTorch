@@ -56,8 +56,26 @@ struct SizeType
     SizeType(const SizeType&) = default;
     SizeType(SizeType&&)      = default;
 
-    int64_t& operator[](int64_t i) { return data_[i]; }
-    const int64_t& operator[](int64_t i) const { return data_[i]; }
+    int64_t& operator[](int64_t i)
+    {
+        if (i < 0)
+        {
+            i += size();
+        }
+        CHECK_GE(i, 0);
+        CHECK_LT(i, size());
+        return data_[i];
+    }
+    const int64_t& operator[](int64_t i) const
+    {
+        if (i < 0)
+        {
+            i += size();
+        }
+        CHECK_GE(i, 0);
+        CHECK_LT(i, size());
+        return data_[i];
+    }
     int64_t size() const { return data_.size(); }
     void resize(int64_t s) { data_.resize(s); }
     std::vector<int64_t>& vec() { return data_; }
@@ -97,10 +115,10 @@ inline bool operator==(const SizeType& s1, const SizeType& s2)
 }
 inline std::ostream& operator<<(std::ostream& strm, const SizeType& size)
 {
-    strm << "[ ";
+    strm << "[";
     for (int64_t i = 0; i < size.size(); ++i)
     {
-        strm << size[i] << ((i < size.size() - 1) ? ", " : " ");
+        strm << size[i] << ((i < size.size() - 1) ? ", " : "");
     }
     strm << "]";
     return strm;
@@ -157,17 +175,14 @@ struct TINYTORCH_API Tensor
     Tensor slice(int64_t dim, int64_t start, int64_t end, int64_t step = 1) const;
     // no grad version
     Tensor slice_view(int64_t dim, int64_t start, int64_t end, int64_t step = 1) const;
+    Tensor permute_view(const SizeType& size) const;
 
-    Tensor scatter_add(int64_t dim, Tensor ids, Tensor value) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
-    Tensor& index_copy_(int64_t dim, Tensor ids, Tensor value)
-    {
-        throw std::runtime_error("not implemented");
-        return *this;
-    }
+    // Tensor scatter_add(int64_t dim, Tensor ids, Tensor value) const
+    // {
+    //     throw std::runtime_error("not implemented");
+    //     return {};
+    // }
+    Tensor& index_copy_(int64_t dim, Tensor ids, Tensor value);
     Tensor pow(Tensor a) const;
     void copy_(Tensor a);
 
@@ -192,7 +207,7 @@ struct TINYTORCH_API Tensor
     Tensor square() const;
     Tensor sqrt() const;
     Tensor cuda() const { return to(kCUDA); }
-    bool allclose(Tensor other, double rtol, double atol = 1e-07) const;
+    bool allclose(Tensor other, double rtol = 1e-4, double atol = 1e-07) const;
 
 
     Tensor round() const;
@@ -237,9 +252,10 @@ struct TINYTORCH_API Tensor
 
     Tensor sum() const;
     Tensor sum(int64_t dim, bool keepdim) const;
+    Tensor sum(const SizeType& sizes, bool keepdim = true) const;
     Tensor mean() const;
     Tensor mean(int64_t dim, bool keepdim) const;
-    Tensor mean(const SizeType& sizes) const;
+    Tensor mean(const SizeType& sizes, bool keepdim = true) const;
     Tensor std() const;
     Tensor index_select(int64_t i, Tensor index) const;
     Tensor abs() const;

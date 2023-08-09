@@ -232,7 +232,7 @@ struct FunctionNode : public Node
                     }
                     for (int j = 0; j < grad_list.size(); ++j)
                     {
-                        std::cerr << "input " << context.next_meta[j].size << " grad " << grad_list[i].sizes()
+                        std::cerr << "input " << context.next_meta[j].size << " grad " << grad_list[j].sizes()
                                   << std::endl;
                     }
 

@@ -16,6 +16,9 @@ namespace cpu_impl
 void print_impl(std::ostream& strm, Tensor t);
 void to_impl_cpu_cuda(Tensor a, Tensor b);
 
+
+void sort_impl(Tensor a, int64_t dim, Tensor& out_t, Tensor& out_index);
+
 void range_impl(Tensor a, double start, double end, double step);
 
 void fill_impl(Tensor& a, double value);
@@ -29,7 +32,6 @@ void sum_impl(Tensor a, Tensor& result);
 void sum_impl(Tensor a, int64_t dim, Tensor& result);
 
 
-void pow_impl(Tensor a, double b, Tensor& result);
 
 void prod_impl(Tensor a, int64_t dim, Tensor& result);
 void min_impl(Tensor a, Tensor& result);
@@ -39,6 +41,7 @@ void max_impl(Tensor a, Tensor& result);
 void max_impl(Tensor a, Tensor b, Tensor& result);
 void max_impl(Tensor a, int64_t dim, bool keepdim, Tensor& result, Tensor& indices);
 
+void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value);
 void index_select_impl(Tensor input, int64_t dim, Tensor index, Tensor& result);
 void index_add_impl( int64_t dim, Tensor index, Tensor data, Tensor& result);
 void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result);

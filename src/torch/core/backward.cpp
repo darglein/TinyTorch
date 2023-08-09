@@ -76,7 +76,11 @@ void backward(Tensor loss, Tensor grad)
             {
                 auto next_node = next->function;
                 auto g         = next_gradients[i];
-                CHECK(g.defined());
+                // CHECK(g.defined());
+
+                if(!g.defined()){
+                    continue;
+                }
 
                 // Accumulate gradient
                 grad_map[next_node].resize(next_node->num_input_gradients_of_backward);

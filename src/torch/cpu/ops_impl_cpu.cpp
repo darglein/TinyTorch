@@ -38,6 +38,30 @@ void to_impl_cpu_cuda(Tensor a, Tensor b)
 }
 
 template <typename T>
+static void sort_impl(TensorInfo<T> a, int64_t dim, TensorInfo<T> out_t, TensorInfo<int64_t> out_index)
+{
+    using G = typename CpuComputeFloatType<T>::Type;
+    std::vector<std::pair<G, int64_t>> data;
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        data.push_back({a[i], i});
+    }
+    std::sort(data.begin(), data.end());
+
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        out_t[i]     = data[i].first;
+        out_index[i] = data[i].second;
+    }
+}
+void sort_impl(Tensor a, int64_t dim, Tensor& out_t, Tensor& out_index)
+{
+    CHECK_EQ(a.dim(), 1);
+    SWITCH_MACRO_ALL(a.scalar_type(), sort_impl, a, dim, out_t, out_index);
+}
+
+
+template <typename T>
 static void fill_impl(TensorInfo<T> a, double value)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
@@ -107,7 +131,7 @@ static void range_impl(TensorInfo<T> a, double start, double end, double step)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        a[i] = T(start) + T(i) * T(step);
+        a[i] = T(start + i * step);
     }
 }
 void range_impl(Tensor a, double start, double end, double step)
@@ -146,7 +170,7 @@ static void rand_int_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, int lo
 void uniform_int_impl(Tensor& t, int low, int high)
 {
     static std::mt19937 mersenne_engine{(uint32_t)get_seed()};
-    SWITCH_MACRO_ALL(t.scalar_type(), rand_int_impl, t, mersenne_engine, low, high);
+    SWITCH_MACRO_INT(t.scalar_type(), rand_int_impl, t, mersenne_engine, low, high);
 }
 
 
@@ -156,7 +180,7 @@ static void sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[0] += a[i];
+        result[0] = result[0] + a[i];
     }
 }
 
@@ -170,10 +194,10 @@ static void sum_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
     for (int64_t linear_index_input = 0; linear_index_input < input.numel(); ++linear_index_input)
     {
-        auto index_input  = input.LinearIndexToDimIndex(linear_index_input);
-        auto result_index = index_input;
-        result_index[dim] = 0;
-        result[result_index] += input[index_input];
+        auto index_input     = input.LinearIndexToDimIndex(linear_index_input);
+        auto result_index    = index_input;
+        result_index[dim]    = 0;
+        result[result_index] = result[result_index] + input[index_input];
     }
 }
 
@@ -196,11 +220,11 @@ static void prod_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
     {
         int64_t input_offset = index_along_dim(c, dims, dim, input.sizes, input.strides);
 
-        T prod = T(1);
+        T prod = T(1.0);
 
         for (int64_t p = 0; p < dim_size; ++p)
         {
-            prod *= input[input_offset];
+            prod = prod * input[input_offset];
             input_offset += input.strides[dim];
         }
 
@@ -226,9 +250,10 @@ void prod_impl(Tensor input, int64_t dim, Tensor& result)
 template <typename T>
 static void min_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
+    using G = typename CpuComputeFloatType<T>::Type;
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[i] = std::min(a[i], b[i]);
+        result[i] = std::min(G(a[i]), G(b[i]));
     }
 }
 
@@ -240,10 +265,11 @@ void min_impl(Tensor a, Tensor b, Tensor& result)
 template <typename T>
 static void min_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
+    using G   = typename CpuComputeFloatType<T>::Type;
     result[0] = std::numeric_limits<T>::infinity();
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[0] = std::min(a[i], result[0]);
+        result[0] = std::min(G(a[i]), G(result[0]));
     }
 }
 
@@ -255,9 +281,10 @@ void min_impl(Tensor a, Tensor& result)
 template <typename T>
 static void max_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
+    using G = typename CpuComputeFloatType<T>::Type;
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[i] = std::max(a[i], b[i]);
+        result[i] = std::max(G(a[i]), G(b[i]));
     }
 }
 
@@ -269,10 +296,11 @@ void max_impl(Tensor a, Tensor b, Tensor& result)
 template <typename T>
 static void max_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
+    using G   = typename CpuComputeFloatType<T>::Type;
     result[0] = -std::numeric_limits<T>::infinity();
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[0] = std::max(a[i], result[0]);
+        result[0] = std::max(G(a[i]), G(result[0]));
     }
 }
 
@@ -401,7 +429,7 @@ static void index_add_impl(int64_t dim, TensorInfo<TIndex> index, TensorInfo<T> 
         auto index_result = index_input;
         index_result[dim] = index[index_input[dim]];
 
-        result[index_result] += data[index_input];
+        result[index_result] = result[index_result] + data[index_input];
     }
 }
 
@@ -425,6 +453,45 @@ void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result)
             throw std::runtime_error("invalid type");
     }
 }
+
+
+
+template <typename T, typename TIndex>
+static void index_copy_impl(TensorInfo<T> target, int64_t dim, TensorInfo<TIndex> index, TensorInfo<T> value)
+{
+    for (int64_t input_linear_index = 0; input_linear_index < value.numel(); ++input_linear_index)
+    {
+        auto index_input = value.LinearIndexToDimIndex(input_linear_index);
+
+        auto index_result = index_input;
+        index_result[dim] = index[index_input[dim]];
+
+        target[index_result] = value[index_input];
+    }
+}
+
+template <typename TIndex>
+static void index_copy_helper(Tensor& target, int64_t dim, TensorInfo<TIndex> index, Tensor value)
+{
+    SWITCH_MACRO_ALL(target.scalar_type(), index_copy_impl, target, dim, index, value);
+}
+
+void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value)
+{
+    switch (index.scalar_type())
+    {
+        case kInt32:
+            index_copy_helper<int32_t>(target, dim, index, value);
+            break;
+        case kLong:
+            index_copy_helper<int64_t>(target, dim, index, value);
+            break;
+        default:
+            throw std::runtime_error("invalid type");
+    }
+}
+
+
 
 template <typename T>
 static void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInfo<T> result)
@@ -523,7 +590,7 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
     {
         case kUInt8:
         {
-            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), uint8_t , copy_and_convert_impl_kernel, src, target);
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), uint8_t, copy_and_convert_impl_kernel, src, target);
             break;
         }
         case kInt32:
@@ -554,19 +621,19 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
 template <typename T>
 static void clamp_impl_(TensorInfo<T> src, double low, double high)
 {
+    using G  = typename CpuComputeFloatType<T>::Type;
     T low_t  = std::isfinite(low) ? T(low) : std::numeric_limits<T>::lowest();
     T high_t = std::isfinite(high) ? T(high) : std::numeric_limits<T>::max();
 
     for (int64_t i = 0; i < src.numel(); ++i)
     {
-        src[i] = std::min<T>(high_t, std::max<T>(src[i], low_t));
+        src[i] = std::min(G(high_t), std::max(G(src[i]), G(low_t)));
     }
 }
 void clamp_impl_(Tensor& a, double low, double high)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), clamp_impl_, a, low, high);
 }
-
 
 
 }  // namespace cpu_impl

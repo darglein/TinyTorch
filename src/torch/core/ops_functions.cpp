@@ -183,7 +183,7 @@ struct ToNode : public FunctionNode<ToNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue new_device_)
     {
         NoGradGuard ngg;
-        Device new_device             = new_device_.toDevice();
+        Device new_device = new_device_.toDevice();
 #ifdef TT_HAS_CUDA
         Tensor contig = a.contiguous();
         Tensor result = empty(contig.sizes(), a.options().device(new_device));
@@ -255,7 +255,7 @@ struct IndexSelectNode : public FunctionNode<IndexSelectNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor input, IValue dim, Tensor index)
     {
-        ctx->saved_data["dim"]        = dim;
+        ctx->saved_data["dim"] = dim;
         ctx->save_for_backward({index});
 
 
@@ -341,6 +341,11 @@ Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data)
     return autograd::IndexAddNode::apply(input, dim, index, data)[0];
 }
 
+void index_copy_(Tensor& target, int64_t dim, Tensor index, Tensor value)
+{
+    CHECK(!target.requires_grad() || !GradMode::is_enabled());
+    SELECT_DEVICE(target.device(), index_copy_impl, target, dim, index, value);
+}
 
 namespace autograd
 {
@@ -421,24 +426,20 @@ struct PermuteNode : public FunctionNode<PermuteNode>
         auto reverse_indices = new_indices.toSizes();
         for (int i = 0; i < a.dim(); ++i)
         {
-            reverse_indices[new_indices.toSizes()[i]] = a.size(i);
-            new_sizes[i]                              = a.size(new_indices.toSizes()[i]);
-
-            // reverse_indices
+            reverse_indices[new_indices.toSizes()[i]] = i;
         }
-        ctx->saved_data["new_indices"]     = new_indices;
         ctx->saved_data["reverse_indices"] = reverse_indices;
-
-        Tensor result = empty(new_sizes, a.options());
-        SELECT_DEVICE(result.device(), permute_impl, a, result, new_indices.toSizes());
+        Tensor result = a.permute_view(new_indices.toSizes());
         return {result};
     }
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto g = grad[0];
-        Tensor grad_a = empty(ctx->next_meta[0].size,g.options());
-        SELECT_DEVICE(grad_a.device(), permute_impl, g, grad_a, ctx->saved_data["reverse_indices"].toSizes());
+        auto g        = grad[0];
+
+        auto grad_a = g.permute_view(ctx->saved_data["reverse_indices"].toSizes());
+        // Tensor grad_a = empty(ctx->next_meta[0].size, g.options());
+        // SELECT_DEVICE(grad_a.device(), permute_impl, g, grad_a, ctx->saved_data["reverse_indices"].toSizes());
         return {grad_a, {}};
     }
 };
@@ -490,14 +491,19 @@ struct Cat2Node : public FunctionNode<Cat2Node>
 };
 struct GridsampleNode : public FunctionNode<GridsampleNode>
 {
-    static std::vector<Tensor> forward(Context* ctx, Tensor input, Tensor grid, IValue interpolation, IValue padding,
-                                       IValue align_corners)
+    static std::vector<Tensor> forward(Context* ctx, Tensor input, Tensor grid, IValue _interpolation, IValue _padding,
+                                       IValue _align_corners)
     {
         CHECK(input.dim() == 4 || input.dim() == 5);
 
-        auto size_out = input.sizes();
-        size_out[2]   = grid.size(1);
-        size_out[3]   = grid.size(2);
+        InterpolationType interpolation = (InterpolationType)_interpolation.toInt();
+        PaddingMode padding             = (PaddingMode)_padding.toInt();
+        CHECK_EQ(interpolation, InterpolationType::kBilinear);
+        CHECK_EQ(padding, PaddingMode::kBorder);
+        bool align_corners = _align_corners.toBool();
+        auto size_out      = input.sizes();
+        size_out[2]        = grid.size(1);
+        size_out[3]        = grid.size(2);
         if (input.dim() == 5)
         {
             size_out[4] = grid.size(3);
@@ -505,6 +511,19 @@ struct GridsampleNode : public FunctionNode<GridsampleNode>
         auto result = empty(size_out, input.options());
 
 
+        if (input.dim() == 4)
+        {
+            SELECT_DEVICE(input.device(), grid_sample_2d_impl, input, grid, interpolation, padding, align_corners,
+                          result);
+        }
+        else
+        {
+            SELECT_DEVICE(input.device(), grid_sample_3d_impl, input, grid, interpolation, padding, align_corners,
+                          result);
+        }
+        ctx->saved_data["interpolation"] = _interpolation;
+        ctx->saved_data["padding"]       = _padding;
+        ctx->saved_data["align_corners"] = _align_corners;
         ctx->save_for_backward({input, grid});
 
         return {result};
@@ -519,6 +538,20 @@ struct GridsampleNode : public FunctionNode<GridsampleNode>
         auto grad_input = zeros_like(input);
         auto grad_grid  = zeros_like(grid);
 
+        InterpolationType interpolation = (InterpolationType)ctx->saved_data["interpolation"].toInt();
+        PaddingMode padding             = (PaddingMode)ctx->saved_data["padding"].toInt();
+        bool align_corners              = ctx->saved_data["align_corners"].toBool();
+
+        if (input.dim() == 4)
+        {
+            SELECT_DEVICE(input.device(), grid_sample_2d_backward_impl, input, grid, interpolation, padding,
+                          align_corners, grad_input, grad_grid, g);
+        }
+        else
+        {
+            SELECT_DEVICE(input.device(), grid_sample_3d_backward_impl, input, grid, interpolation, padding,
+                          align_corners, grad_input, grad_grid, g);
+        }
 
         return {grad_input, grad_grid, {}, {}, {}};
     }
@@ -535,6 +568,25 @@ Tensor cat(const std::vector<Tensor>& list, int64_t dim)
 
     return result;
 }
+
+std::pair<Tensor, Tensor> sort(Tensor t, int64_t dim)
+{
+    CHECK(!t.requires_grad() || !GradMode::is_enabled());
+
+    auto initial_device = t.device();
+    t                   = t.cpu();
+
+    auto result_t     = empty_like(t);
+    auto result_index = empty(t.sizes(), TensorOptions().dtype<int64_t>());
+    cpu_impl::sort_impl(t, dim, result_t, result_index);
+
+    result_t     = result_t.to(initial_device);
+    result_index = result_index.to(initial_device);
+
+
+    return {result_t, result_index};
+}
+
 
 Tensor nn::functional::grid_sample(Tensor data, Tensor uv, nn::functional::GridSampleFuncOptions options)
 {

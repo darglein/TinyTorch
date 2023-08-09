@@ -85,7 +85,6 @@ int64_t Tensor::dim() const
 }
 int64_t Tensor::size(int64_t index) const
 {
-    CHECK_LT(index, dim());
     return impl_->sizes_[index];
 }
 int64_t Tensor::stride(int64_t index) const
@@ -171,7 +170,7 @@ Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step)
     int64_t dims = this->dim();
 
     CHECK_LT(dim, dims);
-    CHECK_LT(start, end);
+    CHECK_LE(start, end);
     CHECK_LE(end, this->size(dim));
     CHECK_EQ((end - start) % step, 0);
 
@@ -188,6 +187,23 @@ Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step)
                                                               std::move(new_sizes), std::move(new_strides), options());
 
     return Tensor(new_impl);
+}
+
+Tensor Tensor::permute_view(const SizeType& index) const
+{
+    CHECK_EQ(dim(), index.size());
+    auto new_sizes   = this->sizes();
+    auto new_strides = this->strides();
+
+    for (int i = 0; i < dim(); ++i)
+    {
+        new_sizes[i]   = size(index[i]);
+        new_strides[i] = stride(index[i]);
+    }
+
+    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_,
+                                                              std::move(new_sizes), std::move(new_strides), options());
+    return new_impl;
 }
 
 Tensor Tensor::unsqueeze(int64_t dim) const
@@ -381,13 +397,17 @@ Tensor Tensor::sum(int64_t dim, bool keepdim) const
 {
     return tinytorch::sum(*this, dim, keepdim);
 }
+Tensor Tensor::sum(const SizeType& sizes, bool keepdim) const
+{
+    return tinytorch::sum(*this, sizes, keepdim);
+}
 Tensor Tensor::mean(int64_t dim, bool keepdim) const
 {
     return tinytorch::mean(*this, dim, keepdim);
 }
-Tensor Tensor::mean(const SizeType& sizes) const
+Tensor Tensor::mean(const SizeType& sizes, bool keepdim) const
 {
-    return tinytorch::mean(*this, sizes);
+    return tinytorch::mean(*this, sizes, keepdim);
 }
 Tensor Tensor::index_select(int64_t i, Tensor index) const
 {
@@ -474,6 +494,11 @@ void Tensor::set_data(Tensor t)
 Tensor Tensor::round() const
 {
     return tinytorch::round(*this);
+}
+Tensor& Tensor::index_copy_(int64_t dim, Tensor ids, Tensor value)
+{
+    tinytorch::index_copy_(*this, dim, ids, value);
+    return *this;
 }
 
 }  // namespace tinytorch

@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "tiny_torch.h"
 
 #if __has_include("cuda_runtime.h")
 

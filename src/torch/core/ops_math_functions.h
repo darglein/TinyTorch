@@ -27,26 +27,11 @@ inline Tensor sign(Tensor b)
     throw std::runtime_error("not implemented");
     return {};
 }
-inline Tensor pow(Tensor a, double b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor pow(Tensor a, Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor sin(Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
-inline Tensor cos(Tensor b)
-{
-    throw std::runtime_error("not implemented");
-    return {};
-}
+TINYTORCH_API Tensor pow(Tensor a, double b);
+TINYTORCH_API Tensor pow(Tensor a, Tensor b);
+TINYTORCH_API Tensor sin(Tensor b);
+TINYTORCH_API Tensor cos(Tensor b);
+
 inline Tensor relu(Tensor b)
 {
     throw std::runtime_error("not implemented");
@@ -97,11 +82,11 @@ TINYTORCH_API Tensor std(Tensor a, int64_t dim);
 
 TINYTORCH_API Tensor sum(Tensor a);
 TINYTORCH_API Tensor sum(Tensor a, int64_t dim, bool keepdim);
-TINYTORCH_API Tensor sum(Tensor a, SizeType s);
+TINYTORCH_API Tensor sum(Tensor a, SizeType s, bool keepdim = true);
 
 TINYTORCH_API Tensor mean(Tensor a);
 TINYTORCH_API Tensor mean(Tensor a, int64_t dim, bool keepdim);
-TINYTORCH_API Tensor mean(Tensor a, SizeType s);
+TINYTORCH_API Tensor mean(Tensor a, SizeType s, bool keepdim = true);
 
 
 }  // namespace tinytorch

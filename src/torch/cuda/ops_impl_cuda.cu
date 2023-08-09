@@ -71,7 +71,7 @@ void fill_impl(Tensor& a, Tensor values, int dim)
 
 template <typename T>
 __launch_bounds__(128) static __global__
-    void permute_impl(TensorInfo<T> src, TensorInfo<T> result, DimIndexStruct<25> new_dims)
+    void permute_impl(TensorInfoCuda<T> src, TensorInfoCuda<T> result, DimIndexStruct<25> new_dims)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= src.numel()) return;
@@ -89,6 +89,7 @@ __launch_bounds__(128) static __global__
 
 void permute_impl(Tensor& src, Tensor& result, SizeType new_dims)
 {
+    CUDA_SYNC_CHECK_ERROR();
     CUDA_SWITCH_MACRO_ALL(src.scalar_type(), src.numel(), permute_impl, src, result, new_dims.vec());
 }
 
@@ -229,6 +230,7 @@ void sum_impl(Tensor a, int64_t dim, Tensor& result)
     switch (a.scalar_type())
     {
         CUDA_CASE_MACRO(sum_impl<int32_t>, kInt32, a.numel(), a, dim, result)
+        CUDA_CASE_MACRO(sum_impl<half>, kHalf, a.numel(), a, dim, result)
         CUDA_CASE_MACRO(sum_impl<float>, kFloat, a.numel(), a, dim, result)
         CUDA_CASE_MACRO(sum_impl<double>, kDouble, a.numel(), a, dim, result)
         default:
@@ -293,7 +295,7 @@ __launch_bounds__(128) static __global__ void max_impl(TensorInfoCuda<T> a, Tens
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
-    atomicMax(&result[i], a[i]);
+    atomicMax(&result[0], a[i]);
 }
 
 
@@ -385,6 +387,47 @@ void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result)
         case kLong:
             index_add_helper<int64_t>(data, dim, index, result);
             break;
+    }
+}
+
+
+
+template <typename T, typename TIndex>
+__launch_bounds__(128) static __global__
+    void index_copy_impl(TensorInfoCuda<T> target, int64_t dim, TensorInfoCuda<TIndex> index, TensorInfoCuda<T> value)
+{
+    int64_t input_linear_index = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (input_linear_index >= value.numel()) return;
+
+    auto index_input  = value.LinearIndexToDimIndex(input_linear_index);
+    auto index_result = index_input;
+    CUDA_KERNEL_ASSERT(index_input[dim] < index.sizes[0]);
+    index_result[dim] = index[index_input[dim]];
+    CUDA_KERNEL_ASSERT(index_result[dim] < target.sizes[dim]);
+
+    CUDA_KERNEL_ASSERT(target.index_in_range(index_result));
+    CUDA_KERNEL_ASSERT(value.index_in_range(index_input));
+    target[index_result] = value[index_input];
+}
+
+template <typename TIndex>
+static void index_copy_helper(Tensor& target, int64_t dim, TensorInfoCuda<TIndex> index, Tensor value)
+{
+    CUDA_SWITCH_MACRO_FLOAT(target.scalar_type(), value.numel(), index_copy_impl, target, dim, index, value);
+}
+
+void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value)
+{
+    switch (index.scalar_type())
+    {
+        case kInt32:
+            index_copy_helper<int32_t>(target, dim, index, value);
+            break;
+        case kLong:
+            index_copy_helper<int64_t>(target, dim, index, value);
+            break;
+        default:
+            throw std::runtime_error("invalid type");
     }
 }
 

@@ -150,9 +150,14 @@ struct Module
             b.second->zero_grad();
         }
     }
-    void train(bool on = true) { throw std::runtime_error("not implemented"); }
-
-
+    void train(bool on = true)
+    {
+        is_training_ = true;
+        for (auto& b : modules_)
+        {
+            b.second->train(on);
+        }
+    }
 
     void register_buffer(std::string name, Tensor& t) { buffers_[name] = t; }
     void register_parameter(std::string name, Tensor& t)
@@ -215,6 +220,7 @@ struct Module
     std::map<std::string, Tensor> buffers_;
     std::map<std::string, Tensor> parameters_;
     std::map<std::string, std::shared_ptr<Module>> modules_;
+    bool is_training_ = true;
 };
 
 struct AnyModule

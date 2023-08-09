@@ -19,6 +19,7 @@
 
 #include "tensor_data.h"
 #include "torch/tiny_torch_config.h"
+#include "torch/tiny_torch_cuda.h"
 #include <type_traits>
 
 namespace tinytorch
@@ -41,6 +42,16 @@ struct DimIndexStruct
         for (int i = 0; i < data.size(); ++i)
         {
             indices[i] = data[i];
+        }
+    }
+
+
+    TT_HD DimIndexStruct(std::initializer_list<int64_t> l)
+    {
+        int k = 0;
+        for (auto i : l)
+        {
+            indices[k++] = i;
         }
     }
 
@@ -87,6 +98,7 @@ struct TensorInfoBase
     }
 
     TT_HD int64_t dim() { return dims; }
+    TT_HD int64_t size(int index) { return sizes[index]; }
 
     TT_HD int64_t numel()
     {
@@ -102,6 +114,13 @@ struct TensorInfoBase
     TT_HD T& operator[](int64_t linearId) { return operator[](LinearIndexToDimIndex(linearId)); }
     TT_HD T& operator[](DimIndex index) { return data[IndexToOffset(index)]; }
 
+
+    template <typename... Ts>
+    TT_HD inline T& operator()(Ts... args)
+    {
+        return operator[](IndexToOffset(DimIndex({args...})));
+    }
+
     TT_HD int64_t IndexToOffset(DimIndex index)
     {
         int64_t offset = 0;
@@ -112,6 +131,9 @@ struct TensorInfoBase
 #ifndef __CUDACC__
                 CHECK_GE(index[i], 0);
                 CHECK_LT(index[i], sizes[i]);
+#else
+                CUDA_KERNEL_ASSERT(index[i] >= 0);
+                CUDA_KERNEL_ASSERT(index[i] < sizes[i]);
 #endif
                 offset += index[i] * strides[i];
             }
@@ -123,6 +145,9 @@ struct TensorInfoBase
 #ifndef __CUDACC__
                 CHECK_GE(index[i], 0);
                 CHECK_LT(index[i], sizes[i]);
+#else
+                CUDA_KERNEL_ASSERT(index[i] >= 0);
+                CUDA_KERNEL_ASSERT(index[i] < sizes[i]);
 #endif
                 offset += index[i] * strides[i];
             }

@@ -4,31 +4,25 @@
  * See LICENSE file for more information.
  */
 
-#include "grid_sample.h"
+#pragma once
+#include "torch/core/tensor.h"
 
+#include "torch/core/tensor_options.h"
+#include "torch/tiny_torch_config.h"
 namespace tinytorch
 {
-namespace cpu_impl
+namespace cuda_impl
 {
 
 void grid_sample_2d_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
-                         bool align_corners, Tensor& result)
-{
-    CHECK(false);
-}
+                         bool align_corners, Tensor& result);
 void grid_sample_2d_backward_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
-                                  bool align_corners, Tensor& grad_input, Tensor& grad_grid, Tensor grad_result)
-{
-    CHECK(false);
-}
-void grid_sample_3d_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
-                         bool align_corners, Tensor& result)
-{    CHECK(false);
-}
-void grid_sample_3d_backward_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
-                                  bool align_corners, Tensor& grad_input, Tensor& grad_grid, Tensor grad_result)
-{    CHECK(false);
-}
-}  // namespace cpu_impl
+                         bool align_corners, Tensor& grad_input, Tensor& grad_grid, Tensor grad_result);
 
+void grid_sample_3d_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
+                         bool align_corners, Tensor& result);
+void grid_sample_3d_backward_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
+                                  bool align_corners, Tensor& grad_input, Tensor& grad_grid, Tensor grad_result);
+
+}  // namespace cpu_impl
 }  // namespace tinytorch

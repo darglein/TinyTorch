@@ -7,6 +7,7 @@
 #pragma once
 
 #include "assert.h"
+#include "torch/core/half.h"
 
 #include <algorithm>
 #include <ctime>
@@ -25,9 +26,7 @@
 namespace tinytorch
 {
 
-struct Half
-{
-};
+
 enum DeviceType
 {
     kCPU,

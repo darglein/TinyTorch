@@ -1,8 +1,8 @@
 #pragma once
 
 
+#include "torch/core/tensor_info.h"
 #include "torch/tiny_torch_cuda.h"
-
 
 TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 {
@@ -24,9 +24,9 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 #    undef CUDA_DEBUG
 #endif
 
-#define CHECK_CUDA_ERROR(cudaFunction)                                                                \
-    {                                                                                                 \
-        cudaError_t cudaErrorCode = cudaFunction;                                                     \
+#define CHECK_CUDA_ERROR(cudaFunction)                                                     \
+    {                                                                                      \
+        cudaError_t cudaErrorCode = cudaFunction;                                          \
         CHECK_EQ(cudaErrorCode, cudaSuccess) << ": " << cudaGetErrorString(cudaErrorCode); \
     }
 
@@ -39,12 +39,15 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 #    define CUDA_SYNC_CHECK_ERROR() (static_cast<void>(0))
 #endif
 
-#define CUDA_CASE_MACRO(func, scalar_type, numel, ...)                                   \
-    case scalar_type:                                                                    \
-        CHECK_GT(numel, 0);                                                              \
-        func<<<iDivUp(numel, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(__VA_ARGS__); \
-        CUDA_SYNC_CHECK_ERROR();                                                         \
+#define CUDA_CASE_MACRO(func, scalar_type, numel, ...)                                       \
+    case scalar_type:                                                                        \
+        if (numel > 0)                                                                       \
+        {                                                                                    \
+            func<<<iDivUp(numel, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(__VA_ARGS__); \
+            CUDA_SYNC_CHECK_ERROR();                                                         \
+        }                                                                                    \
         break;
+
 
 #define CUDA_SWITCH_MACRO_FLOAT(real_scalar_type, numel, func, ...)        \
     {                                                                      \
@@ -88,4 +91,3 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
         default:                                                                    \
             CHECK(false) << "invalid input type " << real_scalar_type;              \
     }
-

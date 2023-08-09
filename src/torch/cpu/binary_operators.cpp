@@ -20,6 +20,7 @@
         CASE_MACRO((func<int16_t>), kInt16, op<int16_t>(), __VA_ARGS__) \
         CASE_MACRO((func<int32_t>), kInt32, op<int32_t>(), __VA_ARGS__) \
         CASE_MACRO((func<int64_t>), kLong, op<int64_t>(), __VA_ARGS__)  \
+        CASE_MACRO((func<Half>), kHalf, op<float>(), __VA_ARGS__)       \
         CASE_MACRO((func<float>), kFloat, op<float>(), __VA_ARGS__)     \
         CASE_MACRO((func<double>), kDouble, op<double>(), __VA_ARGS__)  \
         default:                                                        \
@@ -47,9 +48,10 @@ static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, Tenso
 template <typename T, typename Op>
 static void element_wise_operator(Op op, TensorInfo<T> a, T b, TensorInfo<T> result)
 {
+    using G = typename CpuComputeFloatType<T>::Type;
     for (int64_t i = 0; i < result.numel(); ++i)
     {
-        result[i] = op(a[i], b);
+        result[i] = T(G(op(G(a[i]), b)));
     }
 }
 template <typename T, typename Op>
@@ -107,6 +109,38 @@ void greater_impl(Tensor a, double b, Tensor& result)
 {
     SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::greater, element_wise_operator, a, b, result);
 }
+
+template <typename T>
+static void pow_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
+{
+    using G = typename CpuComputeFloatType<T>::Type;
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(std::pow(G(a[i]), G(b)));
+    }
+}
+
+void pow_impl(Tensor a, double b, Tensor& result)
+{
+    SWITCH_MACRO_FLOAT(a.scalar_type(), pow_impl, a, b, result);
+}
+
+template <typename T>
+static void pow_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
+{
+    using G = typename CpuComputeFloatType<T>::Type;
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[i] = T(std::pow(G(a[i]), G(b[i])));
+    }
+}
+
+void pow_impl(Tensor a, Tensor b, Tensor& result)
+{
+    SWITCH_MACRO_FLOAT(a.scalar_type(), pow_impl, a, b, result);
+}
+
+
 
 template <typename T>
 static void print_impl(std::ostream& strm, TensorInfo<T> a)

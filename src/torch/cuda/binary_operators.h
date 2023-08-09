@@ -27,5 +27,9 @@ void div_impl(double a, Tensor b, Tensor& result);
 void equal_impl(Tensor a, double b, Tensor& result);
 void less_impl(Tensor a, double b, Tensor& result);
 void greater_impl(Tensor a, double b, Tensor& result);
+
+// binary functions
+void pow_impl(Tensor a, double b, Tensor& result);
+void pow_impl(Tensor a, Tensor b, Tensor& result);
 }
 }  // namespace tinytorch

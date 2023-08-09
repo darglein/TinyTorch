@@ -110,5 +110,33 @@ void greater_impl(Tensor a, double b, Tensor& result)
 }
 
 
+template <typename T>
+__launch_bounds__(128) static __global__ void pow_impl(TensorInfoCuda<T> a, double b, TensorInfoCuda<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= a.numel()) return;
+
+    result[i] = T(::pow(a[i], b));
+}
+
+void pow_impl(Tensor a, double b, Tensor& result)
+{
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), pow_impl, a, b, result);
+}
+
+template <typename T>
+__launch_bounds__(128) static __global__ void pow_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= a.numel()) return;
+
+    result[i] = T(::pow(a[i], b[i]));
+}
+
+void pow_impl(Tensor a, Tensor b, Tensor& result)
+{
+    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), pow_impl, a, b, result);
+}
+
 }  // namespace cuda_impl
 }  // namespace tinytorch

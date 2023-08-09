@@ -94,7 +94,8 @@ struct AbsNode : public FunctionNode<AbsNode>
 
         auto low    = a < 0;
         auto high   = a > 0;
-        auto grad_a = low * -1 + high;
+        auto grad_a = (low * -1 + high) * g;
+
         return {grad_a};
     }
 };
@@ -103,7 +104,7 @@ struct SumNode : public FunctionNode<SumNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
-        Tensor result            = zeros({1}, a.options());
+        Tensor result = zeros({1}, a.options());
         SELECT_DEVICE(a.device(), sum_impl, a, result);
         return {result};
     }
@@ -122,10 +123,10 @@ struct SumDimNode : public FunctionNode<SumDimNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue dim)
     {
-        ctx->saved_data["dim"]   = dim;
-        auto out_size            = a.sizes();
-        out_size[dim.toInt()]    = 1;
-        Tensor result            = zeros(out_size, a.options());
+        ctx->saved_data["dim"] = dim;
+        auto out_size          = a.sizes();
+        out_size[dim.toInt()]  = 1;
+        Tensor result          = zeros(out_size, a.options());
         SELECT_DEVICE(result.device(), sum_impl, a, dim.toInt(), result);
 
         return {result};
@@ -165,6 +166,36 @@ Tensor exp(Tensor a)
 {
     return ExpNode::forward_and_build_graph(a)[0];
 }
+
+Tensor pow(Tensor a, double b)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    auto result = empty_like(a);
+    SELECT_DEVICE(a.device(), pow_impl, a, b, result);
+    return result;
+}
+Tensor pow(Tensor a, Tensor b)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    auto result = empty_like(a);
+    SELECT_DEVICE(a.device(), pow_impl, a, b, result);
+    return result;
+}
+Tensor sin(Tensor a)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    auto result = empty_like(a);
+    SELECT_DEVICE(a.device(), sin_impl, a, result);
+    return result;
+}
+Tensor cos(Tensor a)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    auto result = empty_like(a);
+    SELECT_DEVICE(a.device(), cos_impl, a, result);
+    return result;
+}
+
 
 Tensor min(Tensor a)
 {
@@ -243,11 +274,11 @@ Tensor sum(Tensor a, int64_t dim, bool keepdim)
     }
     return result;
 }
-Tensor sum(Tensor a, SizeType s)
+Tensor sum(Tensor a, SizeType s, bool keepdim)
 {
     for (auto dim : s.vec())
     {
-        a = sum(a, dim, false);
+        a = sum(a, dim, keepdim);
     }
     return a;
 }
@@ -263,11 +294,11 @@ Tensor mean(Tensor a, int64_t dim, bool keepdim)
     auto result = sum(a, dim, keepdim);
     return result / (double)count;
 }
-Tensor mean(Tensor a, SizeType s)
+Tensor mean(Tensor a, SizeType s, bool keepdim)
 {
     for (auto dim : s.vec())
     {
-        a = mean(a, dim, false);
+        a = mean(a, dim, keepdim);
     }
     return a;
 }
@@ -321,6 +352,5 @@ Tensor round(Tensor a)
     SELECT_DEVICE(a.device(), round_impl, a, result);
     return result;
 }
-
 
 }  // namespace tinytorch

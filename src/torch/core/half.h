@@ -2,10 +2,39 @@
 
 #include "torch/tiny_torch_config.h"
 
-#ifdef TT_HAS_CUDA
-#include <cuda_fp16.h>
 
-#ifdef __CUDACC__
+namespace tinytorch
+{
+
+struct Half
+{
+    uint16_t h;
+
+    Half() {}
+    Half(float f);
+    Half(double d) : Half(float(d)) {}
+    Half(uint16_t i);
+
+    operator float();
+};
+
+template <typename T>
+struct CpuComputeFloatType
+{
+    using Type = T;
+};
+template <>
+struct CpuComputeFloatType<Half>
+{
+    using Type = float;
+};
+
+}  // namespace tinytorch
+
+
+
+#if defined(TT_HAS_CUDA) && defined(__CUDACC__)
+#    include <cuda_fp16.h>
 inline __device__ __half round(__half a)
 {
     return round(float(a));
@@ -47,6 +76,8 @@ inline __device__ __half pow(__half a, double b)
 {
     return __float2half(pow(__half2float(a), b));
 }
-
-#endif
+inline __device__ __half pow(__half a, __half b)
+{
+    return __float2half(pow(__half2float(a), __half2float(b)));
+}
 #endif
