@@ -13,7 +13,6 @@ namespace tinytorch
 {
 namespace cpu_impl
 {
-void print_impl(std::ostream& strm, Tensor t);
 // basic operators
 void add_impl(Tensor a, Tensor b, Tensor& result);
 void add_impl(Tensor a, double b, Tensor& result);

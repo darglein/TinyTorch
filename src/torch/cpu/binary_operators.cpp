@@ -7,24 +7,25 @@
 #include "binary_operators.h"
 
 #include "torch/core/ops.h"
+#include "torch/core/ops_impl_shared.h"
 
 #include "ops_impl_cpu_helper.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cpu/ops_impl_cpu.h"
 
 
-#define SWITCH_MACRO_ALL_OPERATOR(real_scalar_type, op, func, ...)      \
-    switch (real_scalar_type)                                           \
-    {                                                                   \
-        CASE_MACRO((func<uint8_t>), kUInt8, op<uint8_t>(), __VA_ARGS__) \
-        CASE_MACRO((func<int16_t>), kInt16, op<int16_t>(), __VA_ARGS__) \
-        CASE_MACRO((func<int32_t>), kInt32, op<int32_t>(), __VA_ARGS__) \
-        CASE_MACRO((func<int64_t>), kLong, op<int64_t>(), __VA_ARGS__)  \
-        CASE_MACRO((func<Half>), kHalf, op<float>(), __VA_ARGS__)       \
-        CASE_MACRO((func<float>), kFloat, op<float>(), __VA_ARGS__)     \
-        CASE_MACRO((func<double>), kDouble, op<double>(), __VA_ARGS__)  \
-        default:                                                        \
-            CHECK(false) << "invalid input type " << real_scalar_type;  \
+#define SWITCH_MACRO_BINARY_OPERATOR(op, a, b, result)                         \
+    switch (result.scalar_type())                                              \
+    {                                                                          \
+        CASE_MACRO((element_wise_operator<uint8_t>), kUInt8, op, a, b, result) \
+        CASE_MACRO((element_wise_operator<int16_t>), kInt16, op, a, b, result) \
+        CASE_MACRO((element_wise_operator<int32_t>), kInt32, op, a, b, result) \
+        CASE_MACRO((element_wise_operator<int64_t>), kLong, op, a, b, result)  \
+        CASE_MACRO((element_wise_operator<Half>), kHalf, op, a, b, result)     \
+        CASE_MACRO((element_wise_operator<float>), kFloat, op, a, b, result)   \
+        CASE_MACRO((element_wise_operator<double>), kDouble, op, a, b, result) \
+        default:                                                               \
+            CHECK(false) << "invalid input type " << result.scalar_type();     \
     }
 
 
@@ -42,7 +43,7 @@ static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, Tenso
         // the index clamping allows operations when one tensor has a 1-dimension
         auto index_a         = a.clamp_index_to_size(index_result);
         auto index_b         = b.clamp_index_to_size(index_result);
-        result[index_result] = op(a[index_a], b[index_b]);
+        result[index_result] = op.forward(a[index_a], b[index_b]);
     }
 }
 template <typename T, typename Op>
@@ -51,7 +52,7 @@ static void element_wise_operator(Op op, TensorInfo<T> a, T b, TensorInfo<T> res
     using G = typename CpuComputeFloatType<T>::Type;
     for (int64_t i = 0; i < result.numel(); ++i)
     {
-        result[i] = T(G(op(G(a[i]), b)));
+        result[i] = T(G(op.forward(G(a[i]), G(b))));
     }
 }
 template <typename T, typename Op>
@@ -59,103 +60,64 @@ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> res
 {
     for (int64_t i = 0; i < result.numel(); ++i)
     {
-        result[i] = op(a, b[i]);
+        result[i] = op.forward(a, b[i]);
     }
 }
 
+
 void add_impl(Tensor a, Tensor b, Tensor& result)
 {
-    SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::plus, element_wise_operator, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Add(), a, b, result);
 }
 void add_impl(Tensor a, double b, Tensor& result)
 {
-    SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::plus, element_wise_operator, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Add(), a, b, result);
 }
 
 void sub_impl(Tensor a, Tensor b, Tensor& result)
 {
-    SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::minus, element_wise_operator, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Sub(), a, b, result);
 }
 void sub_impl(Tensor a, double b, Tensor& result)
 {
-    SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::minus, element_wise_operator, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Sub(), a, b, result);
 }
-
 void mult_impl(Tensor a, Tensor b, Tensor& result)
 {
-    SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::multiplies, element_wise_operator, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Mult(), a, b, result);
 }
 void mult_impl(Tensor a, double b, Tensor& result)
 {
-    SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::multiplies, element_wise_operator, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Mult(), a, b, result);
 }
 void div_impl(Tensor a, Tensor b, Tensor& result)
 {
-    SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::divides, element_wise_operator, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Div(), a, b, result);
 }
 void div_impl(double a, Tensor b, Tensor& result)
 {
-    SWITCH_MACRO_ALL_OPERATOR(b.scalar_type(), std::divides, element_wise_operator, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Div(), a, b, result);
 }
 void equal_impl(Tensor a, double b, Tensor& result)
 {
-    SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::equal_to, element_wise_operator, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Equal(), a, b, result);
 }
 void less_impl(Tensor a, double b, Tensor& result)
 {
-    SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::less, element_wise_operator, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Less(), a, b, result);
 }
 void greater_impl(Tensor a, double b, Tensor& result)
 {
-    SWITCH_MACRO_ALL_OPERATOR(a.scalar_type(), std::greater, element_wise_operator, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Greater(), a, b, result);
 }
-
-template <typename T>
-static void pow_impl(TensorInfo<T> a, double b, TensorInfo<T> result)
-{
-    using G = typename CpuComputeFloatType<T>::Type;
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[i] = T(std::pow(G(a[i]), G(b)));
-    }
-}
-
 void pow_impl(Tensor a, double b, Tensor& result)
 {
-    SWITCH_MACRO_FLOAT(a.scalar_type(), pow_impl, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Pow(), a, b, result);
 }
-
-template <typename T>
-static void pow_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
-{
-    using G = typename CpuComputeFloatType<T>::Type;
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[i] = T(std::pow(G(a[i]), G(b[i])));
-    }
-}
-
 void pow_impl(Tensor a, Tensor b, Tensor& result)
 {
-    SWITCH_MACRO_FLOAT(a.scalar_type(), pow_impl, a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Pow(), a, b, result);
 }
-
-
-
-template <typename T>
-static void print_impl(std::ostream& strm, TensorInfo<T> a)
-{
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        strm << a[i] << " ";
-    }
-}
-
-void print_impl(std::ostream& strm, Tensor t)
-{
-    print_impl<float>(strm, t);
-}
-
 
 
 }  // namespace cpu_impl

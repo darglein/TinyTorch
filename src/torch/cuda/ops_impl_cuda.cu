@@ -392,6 +392,27 @@ void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result)
 }
 
 
+template <typename T>
+__launch_bounds__(128) static __global__
+ void gather_impl(TensorInfoCuda<T> data, int64_t dim, TensorInfoCuda<int64_t> index, TensorInfoCuda<T> result)
+{
+    int64_t input_linear_index = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (input_linear_index >= result.numel()) return;
+
+    {
+        auto index_result = result.LinearIndexToDimIndex(input_linear_index);
+        auto index_input  = index_result;
+
+        index_input[dim] = index[index_result];
+
+        result[index_result] = data[index_input];
+    }
+}
+void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor& result)
+{
+    CUDA_SWITCH_MACRO_FLOAT(data.scalar_type(), result.numel(), gather_impl, data, dim, index, result);
+}
+
 
 template <typename T, typename TIndex>
 __launch_bounds__(128) static __global__
@@ -470,6 +491,26 @@ __launch_bounds__(128) static __global__
 void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor& result)
 {
     CUDA_SWITCH_MACRO_ALL(result.scalar_type(), result.numel(), transpose_impl, input, dim0, dim1, result);
+}
+
+template <typename T>
+__launch_bounds__(128) static __global__
+void clamp_impl_(TensorInfoCuda<T> src, double low, double high)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= src.numel()) return;
+
+    using G  = typename CpuComputeFloatType<T>::Type;
+    T low_t  = std::isfinite(low) ? T(low) : std::numeric_limits<T>::lowest();
+    T high_t = std::isfinite(high) ? T(high) : std::numeric_limits<T>::max();
+
+    {
+        src[i] = std::min(G(high_t), std::max(G(src[i]), G(low_t)));
+    }
+}
+void clamp_impl_(Tensor& a, double low, double high)
+{
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(),a.numel(), clamp_impl_, a, low, high);
 }
 
 

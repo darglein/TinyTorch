@@ -318,11 +318,11 @@ Tensor std(Tensor a, int64_t dim)
     return Tensor();
 }
 
-
 Tensor abs(Tensor a)
 {
     return autograd::AbsNode::apply(a)[0];
 }
+
 Tensor clamp(Tensor a, double low, double high)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
@@ -333,8 +333,7 @@ Tensor clamp(Tensor a, double low, double high)
 void clamp_(Tensor& a, double low, double high)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    CHECK(a.is_cpu());
-    cpu_impl::clamp_impl_(a, low, high);
+    SELECT_DEVICE(a.device(), clamp_impl_, a, low, high);
 }
 
 Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)

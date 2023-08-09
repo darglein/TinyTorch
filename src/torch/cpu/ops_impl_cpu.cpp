@@ -23,6 +23,20 @@ namespace tinytorch
 namespace cpu_impl
 {
 
+template <typename T>
+static void print_impl(std::ostream& strm, TensorInfo<T> a)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        strm << a[i] << " ";
+    }
+}
+
+void print_impl(std::ostream& strm, Tensor t)
+{
+    print_impl<float>(strm, t);
+}
+
 void to_impl_cpu_cuda(Tensor a, Tensor b)
 {
 #ifdef TT_HAS_CUDA
@@ -61,6 +75,24 @@ void sort_impl(Tensor a, int64_t dim, Tensor& out_t, Tensor& out_index)
 }
 
 
+
+template <typename T>
+static void std_impl(TensorInfo<T> a, double mean, TensorInfo<T> result)
+{
+    T s = T(0.0);
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        T v = a[i] - T(mean);
+        s = s * v * v;
+    }
+    result[0] = std::sqrt(s / a.numel());
+}
+
+void std_impl(Tensor a, Tensor& result)
+{
+    double mean = a.mean().toDouble();
+    SWITCH_MACRO_FLOAT(a.scalar_type(), std_impl, a, mean, result);
+}
 template <typename T>
 static void fill_impl(TensorInfo<T> a, double value)
 {
@@ -85,7 +117,7 @@ static void fill_impl(TensorInfo<T> a, TensorInfo<T> values, int dim)
         auto index_a      = a.LinearIndexToDimIndex(i);
         auto index_values = index_a;
         index_values[dim] = 0;
-        a[index_a]   = values[index_values];
+        a[index_a]        = values[index_values];
     }
 }
 
@@ -209,41 +241,19 @@ void sum_impl(Tensor a, int64_t dim, Tensor& result)
 template <typename T>
 static void prod_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
-    int64_t dims = input.dims;
-
-    int64_t dim_size = input.sizes[dim];
-    int64_t count    = input.numel() / input.sizes[dim];
-    CHECK_EQ(count, result.numel());
-
-    for (int64_t c = 0; c < count; ++c)
+    for (int64_t linear_index_input = 0; linear_index_input < input.numel(); ++linear_index_input)
     {
-        int64_t input_offset = index_along_dim(c, dims, dim, input.sizes, input.strides);
-
-        T prod = T(1.0);
-
-        for (int64_t p = 0; p < dim_size; ++p)
-        {
-            prod = prod * input[input_offset];
-            input_offset += input.strides[dim];
-        }
-
-        result[c] = prod;
+        auto index_input  = input.LinearIndexToDimIndex(linear_index_input);
+        auto index_result = index_input;
+        index_result[dim] = 0;
+        result[index_result] = result[index_result] * input[index_input];
     }
 }
 
 void prod_impl(Tensor input, int64_t dim, Tensor& result)
 {
-    /*
-    CHECK_LT(dim, input.dim());
-
-    auto result_size = input.sizes();
-    result_size[dim] = 1;
-
-    Tensor result = empty(result_size, input.options());
-    */
-
+    fill(result, 1);
     SWITCH_MACRO_ALL(input.scalar_type(), prod_impl, input, dim, result);
-    result = result.squeeze(dim);
 }
 
 template <typename T>
@@ -453,6 +463,23 @@ void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result)
     }
 }
 
+template <typename T>
+static void gather_impl(TensorInfo<T> data, int64_t dim, TensorInfo<int64_t> index, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < result.numel(); ++i)
+    {
+        auto index_result = result.LinearIndexToDimIndex(i);
+        auto index_input  = index_result;
+
+        index_input[dim] = index[index_result];
+
+        result[index_result] = data[index_input];
+    }
+}
+void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor& result)
+{
+    SWITCH_MACRO_ALL(data.scalar_type(), gather_impl, data, dim, index, result);
+}
 
 
 template <typename T, typename TIndex>

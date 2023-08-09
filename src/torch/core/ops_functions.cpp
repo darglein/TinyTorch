@@ -73,7 +73,7 @@ struct ReshapeNode : public FunctionNode<ReshapeNode>
             return {g.view(old_sizes), {}};
         }
 
-        Tensor grad_a      = empty(old_sizes, g.options());
+        Tensor grad_a = empty(old_sizes, g.options());
         tinytorch::copy(g, grad_a);
         return {grad_a, {}};
     }
@@ -356,6 +356,16 @@ void index_copy_(Tensor& target, int64_t dim, Tensor index, Tensor value)
 {
     CHECK(!target.requires_grad() || !GradMode::is_enabled());
     SELECT_DEVICE(target.device(), index_copy_impl, target, dim, index, value);
+}
+
+Tensor gather(Tensor data, int64_t dim, Tensor index)
+{
+    CHECK(!data.requires_grad() || !GradMode::is_enabled());
+    CHECK_EQ(data.dim(), index.dim());
+    auto out_sizes = index.sizes();
+    auto result = empty(out_sizes, data.options());
+    SELECT_DEVICE(result.device(), gather_impl, data, dim, index, result);
+    return result;
 }
 
 namespace autograd

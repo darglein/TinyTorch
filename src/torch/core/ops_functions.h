@@ -38,13 +38,13 @@ TINYTORCH_API Tensor to(Tensor a, ScalarType other_type);
 TINYTORCH_API Tensor to(Tensor a, Device other_type);
 
 
-
 TINYTORCH_API Tensor slice(Tensor a, int64_t dim, int64_t start, int64_t end, int64_t step);
 TINYTORCH_API Tensor stack(const std::vector<Tensor>& a);
 TINYTORCH_API Tensor cat(const std::vector<Tensor>& a, int64_t dim);
 TINYTORCH_API Tensor index_select(Tensor input, int64_t dim, Tensor index);
 TINYTORCH_API Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data);
 TINYTORCH_API void index_copy_(Tensor& target, int64_t dim, Tensor index, Tensor value);
+TINYTORCH_API Tensor gather(Tensor data, int64_t dim, Tensor index);
 
 inline void load(Tensor&, std::string)
 {
@@ -78,7 +78,7 @@ struct GridSampleFuncOptions
     }
     PaddingMode pm       = kBorder;
     InterpolationType it = kBilinear;
-    bool ac   = false;
+    bool ac              = false;
 };
 
 TINYTORCH_API Tensor grid_sample(Tensor data, Tensor uv, GridSampleFuncOptions options);

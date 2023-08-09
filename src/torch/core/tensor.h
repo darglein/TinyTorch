@@ -221,11 +221,7 @@ struct TINYTORCH_API Tensor
     Tensor clamp_max(double m) const;
     void clamp_max_(double m);
 
-    Tensor gather(int64_t dim, Tensor index) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor gather(int64_t dim, Tensor index) const;
     Tensor norm(int64_t norm, int64_t dim, bool keepdim = false) const;
     Tensor unsqueeze(int64_t dim) const;
     Tensor squeeze(int64_t dim) const;

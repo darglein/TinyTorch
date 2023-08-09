@@ -111,7 +111,14 @@ struct TensorInfoBase
     }
 
 
-    TT_HD T& operator[](int64_t linearId) { return operator[](LinearIndexToDimIndex(linearId)); }
+    TT_HD T& operator[](int64_t linearId)
+    {
+        if (contiguous)
+        {
+            return data[linearId];
+        }
+        return operator[](LinearIndexToDimIndex(linearId));
+    }
     TT_HD T& operator[](DimIndex index) { return data[IndexToOffset(index)]; }
 
 
@@ -158,7 +165,7 @@ struct TensorInfoBase
     TT_HD DimIndex LinearIndexToDimIndex(int64_t linearId)
     {
         DimIndex result;
-        result.zero_();
+        // result.zero_();
         if constexpr (is_dynamic)
         {
             for (int64_t i = dims - 1; i > 0; --i)

@@ -21,160 +21,77 @@ namespace tinytorch
 namespace cuda_impl
 {
 
-
-template <typename T>
-__launch_bounds__(128) static __global__ void abs_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
+template <typename T, typename Op>
+__launch_bounds__(128) static __global__
+    void unary_operator_kernel(Op op, TensorInfoCuda<T> a, TensorInfoCuda<T> result)
 {
+    using G   = typename CpuComputeFloatType<T>::Type;
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    result[i] = ::abs(a[i]);
+    if (i >= result.numel()) return;
+    {
+        G input   = G(a[i]);
+        G output  = op.forward(input);
+        result[i] = T(output);
+    }
 }
+
+#define SWITCH_MACRO_UNARY_OPERATOR(op, input, output)                                              \
+    switch (input.scalar_type())                                                                    \
+    {                                                                                               \
+        CUDA_CASE_MACRO((unary_operator_kernel<uint8_t>), kUInt8, input.numel(), op, input, output) \
+        CUDA_CASE_MACRO((unary_operator_kernel<int16_t>), kInt16, input.numel(), op, input, output) \
+        CUDA_CASE_MACRO((unary_operator_kernel<int32_t>), kInt32, input.numel(), op, input, output) \
+        CUDA_CASE_MACRO((unary_operator_kernel<int64_t>), kLong, input.numel(), op, input, output)  \
+        CUDA_CASE_MACRO((unary_operator_kernel<__half>), kHalf, input.numel(), op, input, output)   \
+        CUDA_CASE_MACRO((unary_operator_kernel<float>), kFloat, input.numel(), op, input, output)   \
+        CUDA_CASE_MACRO((unary_operator_kernel<double>), kDouble, input.numel(), op, input, output) \
+        default:                                                                                    \
+            CHECK(false) << "invalid input type " << input.scalar_type();                           \
+    }
 
 void abs_impl(Tensor a, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), abs_impl, a, result);
-}
-template <typename T>
-__launch_bounds__(128) static __global__ void round_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    result[i] = ::round(a[i]);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Abs(), a, result);
 }
 void round_impl(Tensor a, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), round_impl, a, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Round(), a, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void sqrt_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    result[i] = ::sqrt(a[i]);
-}
-
 void sqrt_impl(Tensor a, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), sqrt_impl, a, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sqrt(), a, result);
 }
-
-
-template <typename T>
-__launch_bounds__(128) static __global__ void log_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    result[i] = ::log(a[i]);
-}
-
 void log_impl(Tensor a, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), log_impl, a, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Log(), a, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void exp_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    result[i] = ::exp(a[i]);
-}
-
 void exp_impl(Tensor a, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), exp_impl, a, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Exp(), a, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void sign_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    T v       = a[i];
-    result[i] = (v < T(0)) ? T(-1) : (v > T(0)) ? T(1) : T(0);
-}
-
 void sign_impl(Tensor a, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), sign_impl, a, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sign(), a, result);
 }
-
-
-template <typename T>
-__launch_bounds__(128) static __global__ void sin_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    result[i] = ::sin(a[i]);
-}
-
 void sin_impl(Tensor a, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), sin_impl, a, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sin(), a, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void cos_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    result[i] = ::cos(a[i]);
-}
-
 void cos_impl(Tensor a, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), cos_impl, a, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Cos(), a, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void relu_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    result[i] = relu(a[i]);
-}
-
 void relu_impl(Tensor a, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), relu_impl, a, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Relu(), a, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void sigmoid_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    result[i] = sigmoid(a[i]);
-}
-
 void sigmoid_impl(Tensor a, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), sigmoid_impl, a, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sigmoid(), a, result);
 }
-
-template <typename T>
-__launch_bounds__(128) static __global__ void softplus_impl(TensorInfoCuda<T> a, double beta, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
-
-    result[i] = softplus(a[i], T(beta));
-}
-
 void softplus_impl(Tensor a, double beta, Tensor& result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(a.scalar_type(), a.numel(), softplus_impl, a, beta, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Softplus(beta), a, result);
 }
 
 }  // namespace cuda_impl

@@ -31,13 +31,14 @@ void sum_impl(Tensor a, int64_t dim, Tensor& result);
 
 
 
-
+void clamp_impl_(Tensor& a, double low, double high);
 void min_impl(Tensor a, Tensor& result);
 void min_impl(Tensor a, Tensor b, Tensor& result);
 
 void max_impl(Tensor a,  Tensor& result);
 void max_impl(Tensor a, Tensor b, Tensor& result);
 
+void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor& result);
 void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value);
 void index_select_impl(Tensor input, int64_t dim, Tensor index, Tensor& result);
 void index_add_impl( int64_t dim, Tensor index, Tensor data, Tensor& result);

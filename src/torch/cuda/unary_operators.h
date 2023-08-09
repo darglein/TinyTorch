@@ -15,12 +15,10 @@ namespace cuda_impl
 {
 void abs_impl(Tensor a, Tensor& result);
 void round_impl(Tensor a, Tensor& result);
-
 void sqrt_impl(Tensor a, Tensor& result);
 void log_impl(Tensor a, Tensor& result);
 void exp_impl(Tensor a, Tensor& result);
 void sign_impl(Tensor a, Tensor& result);
-
 void sin_impl(Tensor a, Tensor& result);
 void cos_impl(Tensor a, Tensor& result);
 void relu_impl(Tensor a, Tensor& result);

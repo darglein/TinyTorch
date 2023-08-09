@@ -518,5 +518,10 @@ void Tensor::retain_grad()
     impl_->autograd_meta->edge = intermedieate_edge;
 }
 
+Tensor Tensor::gather(int64_t dim, Tensor index) const
+{
+    return tinytorch::gather(*this, dim, index);
+}
+
 
 }  // namespace tinytorch
