@@ -341,7 +341,7 @@ Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
 {
     CHECK_EQ(norm, 2);
     a = a.square();
-    a = a.sum(dim, !keep);
+    a = a.sum(dim, keep);
     a = a.sqrt();
     return a;
 }

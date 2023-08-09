@@ -53,6 +53,11 @@ struct ReshapeNode : public FunctionNode<ReshapeNode>
         SizeType new_sizes           = new_sizes_.toSizes();
         fill_neg_one_dim(new_sizes, a.numel());
 
+        if (a.is_contiguous())
+        {
+            return {a.view(new_sizes)};
+        }
+
         Tensor result = empty(new_sizes, a.options());
         tinytorch::copy(a, result);
         return {result};
@@ -62,6 +67,12 @@ struct ReshapeNode : public FunctionNode<ReshapeNode>
     {
         SizeType old_sizes = ctx->saved_data["old_sizes"].toSizes();
         auto g             = grad[0];
+
+        if (g.is_contiguous())
+        {
+            return {g.view(old_sizes), {}};
+        }
+
         Tensor grad_a      = empty(old_sizes, g.options());
         tinytorch::copy(g, grad_a);
         return {grad_a, {}};
@@ -429,13 +440,13 @@ struct PermuteNode : public FunctionNode<PermuteNode>
             reverse_indices[new_indices.toSizes()[i]] = i;
         }
         ctx->saved_data["reverse_indices"] = reverse_indices;
-        Tensor result = a.permute_view(new_indices.toSizes());
+        Tensor result                      = a.permute_view(new_indices.toSizes());
         return {result};
     }
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto g        = grad[0];
+        auto g = grad[0];
 
         auto grad_a = g.permute_view(ctx->saved_data["reverse_indices"].toSizes());
         // Tensor grad_a = empty(ctx->next_meta[0].size, g.options());

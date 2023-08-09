@@ -137,26 +137,21 @@ Tensor Tensor::view(const SizeType& sizes) const
     SizeType new_sizes = sizes;
     fill_neg_one_dim(new_sizes, numel());
 
-    if (is_contiguous())
+    CHECK(is_contiguous()) << "Invalid view() call. Use Reshape() instead!";
+
+    SizeType new_strides;
+    new_strides.resize(new_sizes.vec().size());
+    int64_t stride = 1;
+    for (int64_t i = new_strides.vec().size() - 1; i >= 0; --i)
     {
-        SizeType new_strides;
-        new_strides.resize(new_sizes.vec().size());
-        int64_t stride = 1;
-        for (int64_t i = new_strides.vec().size() - 1; i >= 0; --i)
-        {
-            new_strides[i] = stride;
-            stride *= new_sizes[i];
-        }
-
-        std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(
-            impl_->storage_, impl_->storage_offset_, std::move(new_sizes), std::move(new_strides), options());
-
-        return Tensor(new_impl);
+        new_strides[i] = stride;
+        stride *= new_sizes[i];
     }
 
-    throw std::runtime_error("not implemented");
+    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_,
+                                                              std::move(new_sizes), std::move(new_strides), options());
 
-    return {};
+    return Tensor(new_impl);
 }
 
 Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) const
