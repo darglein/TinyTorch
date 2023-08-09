@@ -95,7 +95,7 @@ Tensor repeat(Tensor t, SizeType sizes)
 
     if (repeat_dim == -1)
     {
-        return t;
+        return t.clone();
     }
 
 
