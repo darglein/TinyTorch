@@ -53,8 +53,9 @@ __launch_bounds__(128) static __global__ void fill_impl(TensorInfoCuda<T> a, Ten
     if (i >= a.numel()) return;
 
     auto index_a = a.LinearIndexToDimIndex(i);
-    int d        = index_a[dim];
-    a[index_a]   = values[d];
+    auto index_values = index_a;
+    index_values[dim] = 0;
+    a[index_a]   = values[index_values];
 }
 void fill_impl(Tensor& a, double value)
 {
@@ -265,7 +266,7 @@ __launch_bounds__(128) static __global__ void min_impl(TensorInfoCuda<T> a, Tens
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
-    atomicMin(&result[i], a[i]);
+    atomicMin(&result[0], a[i]);
 }
 
 

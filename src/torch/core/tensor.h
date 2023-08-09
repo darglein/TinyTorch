@@ -164,6 +164,8 @@ struct TINYTORCH_API Tensor
 
     bool defined() const { return impl_ != nullptr; }
 
+
+    void retain_grad();
     void set_requires_grad(bool requires_grad);
 
     bool requires_grad() const;
@@ -194,7 +196,7 @@ struct TINYTORCH_API Tensor
     void to_(Device new_device);
 
     Tensor flip(const SizeType& size) const { throw std::runtime_error("not implemented"); }
-    void resize_(const SizeType& size) { throw std::runtime_error("not implemented"); }
+    void resize_(const SizeType& size);
     Tensor permute(const SizeType& size) const;
     Tensor reshape(const SizeType& size) const;
     Tensor repeat(const SizeType& size) const;

@@ -15,7 +15,7 @@ namespace tinytorch
 
 inline void set_num_threads(int n)
 {
-    std::cerr << "tinytorch::set_num_threads is currently ignored!" << std::endl;
+    // std::cerr << "tinytorch::set_num_threads is currently ignored!" << std::endl;
 }
 
 namespace nn

@@ -50,7 +50,8 @@ StorageImpl::~StorageImpl()
         else
         {
 #ifdef TT_HAS_CUDA
-            CHECK_CUDA_ERROR(cudaFree(data_ptr_));
+            cudaFree(data_ptr_);
+            // CHECK_CUDA_ERROR(cudaFree(data_ptr_));
 #else
             CHECK(false);
 #endif

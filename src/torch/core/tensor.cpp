@@ -206,6 +206,12 @@ Tensor Tensor::permute_view(const SizeType& index) const
     return new_impl;
 }
 
+void Tensor::resize_(const SizeType& size)
+{
+    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(size, options());
+    impl_->set_data(*new_impl);
+}
+
 Tensor Tensor::unsqueeze(int64_t dim) const
 {
     CHECK(dim >= -this->dim() - 1 && dim < this->dim() + 1);
@@ -387,7 +393,7 @@ void Tensor::backward() const
 }
 void Tensor::backward(Tensor t, bool retain_grad) const
 {
-    tinytorch::backward(*this, t);
+    tinytorch::backward(*this, t, retain_grad);
 }
 Tensor Tensor::std(int64_t index) const
 {
@@ -500,5 +506,22 @@ Tensor& Tensor::index_copy_(int64_t dim, Tensor ids, Tensor value)
     tinytorch::index_copy_(*this, dim, ids, value);
     return *this;
 }
+void Tensor::retain_grad()
+{
+    CHECK(requires_grad());
+    CHECK(!is_leaf());
+    CHECK(impl_->autograd_meta->edge);
+    impl_->autograd_meta->_retain_grad = true;
+
+    auto old_edge = impl_->autograd_meta->edge;
+
+    auto accu_node = std::make_shared<autograd::AccumulateGrad>(*this);
+    accu_node->next.push_back(old_edge);
+    accu_node->num_inputs_of_forward = 1;
+
+    auto intermedieate_edge    = std::make_shared<Edge>(accu_node, 0);
+    impl_->autograd_meta->edge = intermedieate_edge;
+}
+
 
 }  // namespace tinytorch

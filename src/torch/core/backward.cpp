@@ -5,7 +5,7 @@ namespace tinytorch
 
 
 
-void backward(Tensor loss, Tensor grad)
+void backward(Tensor loss, Tensor grad, bool retain_grad)
 {
     // for graph traversal
     std::vector<std::shared_ptr<autograd::Node>> node_stack;
@@ -57,10 +57,10 @@ void backward(Tensor loss, Tensor grad)
         node_stack.pop_back();
 
 
-        if (dynamic_cast<autograd::AccumulateGrad*>(current_node.get()))
-        {
-            continue;
-        }
+        // if (dynamic_cast<autograd::AccumulateGrad*>(current_node.get()))
+        // {
+        //     continue;
+        // }
 
         // backpropagate gradients
         auto next_gradients = current_node->node_backward(grad_map[current_node]);
@@ -78,7 +78,8 @@ void backward(Tensor loss, Tensor grad)
                 auto g         = next_gradients[i];
                 // CHECK(g.defined());
 
-                if(!g.defined()){
+                if (!g.defined())
+                {
                     continue;
                 }
 
@@ -103,10 +104,10 @@ void backward(Tensor loss, Tensor grad)
 
     for (auto& it : grad_map)
     {
-        autograd::AccumulateGrad* acc_node =  dynamic_cast<autograd::AccumulateGrad*>(it.first.get());
+        autograd::AccumulateGrad* acc_node = dynamic_cast<autograd::AccumulateGrad*>(it.first.get());
         if (acc_node)
         {
-            acc_node->node_backward(it.second);
+            acc_node->accumulate(it.second);
         }
     }
 }

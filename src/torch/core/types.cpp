@@ -10,23 +10,21 @@ namespace tinytorch
 std::ostream& operator<<(std::ostream& strm, Device type)
 {
     std::vector<std::string> type_names = {
-        "kCPU",
-        "kCUDA",
+        "cpu",
+        "cuda",
     };
     strm << type_names[(int)type.type];
+    if (type.type == kCUDA)
+    {
+        strm << ":" << type.device_index;
+    }
     return strm;
 }
 
 std::ostream& operator<<(std::ostream& strm, ScalarType type)
 {
     std::vector<std::string> type_names = {
-        "kUint8",
-        "kInt16",
-        "kInt32",
-        "kInt64",
-        "kFloat16",
-        "kFloat32",
-        "kFloat64",
+        "kUint8", "kInt16", "kInt32", "kInt64", "kFloat16", "float", "double",
     };
     strm << type_names[(int)type];
     return strm;

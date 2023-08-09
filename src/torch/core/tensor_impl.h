@@ -19,6 +19,7 @@ struct AutogradMeta
     Tensor _grad;
     std::shared_ptr<Edge> edge;
     bool _requires_grad = false;
+    bool _retain_grad   = false;
 
     Tensor& mutable_grad() { return _grad; }
     const Tensor& grad() const { return _grad; }
@@ -38,10 +39,7 @@ struct TensorImpl : public std::enable_shared_from_this<TensorImpl>
         // Not using std::make_shared<Best> because the c'tor is private.
         return std::shared_ptr<TensorImpl>(new TensorImpl(std::forward<Args>(args)...));
     }
-    std::shared_ptr<TensorImpl> getptr()
-    {
-        return shared_from_this();
-    }
+    std::shared_ptr<TensorImpl> getptr() { return shared_from_this(); }
 
 
     void set_requires_grad(bool requires_grad);
@@ -50,8 +48,6 @@ struct TensorImpl : public std::enable_shared_from_this<TensorImpl>
     int64_t dim() const { return sizes_.size(); }
 
     int64_t numel() const { return sizes_.numel(); }
-
-    Tensor reshape(const SizeType& size) const;
 
 
     // overwrite the current data (storage, sizes,...)
