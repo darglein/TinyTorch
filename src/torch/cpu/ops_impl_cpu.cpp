@@ -4,8 +4,10 @@
  * See LICENSE file for more information.
  */
 
-#include "torch/core/ops/ops_impl.h"
+#include "ops_impl_cpu.h"
+
 #include "ops_impl_cpu_helper.h"
+#include "torch/core/ops/ops_impl.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
 
@@ -27,7 +29,7 @@ static void print_impl(std::ostream& strm, TensorInfo<T> a)
 
 void print_impl(std::ostream& strm, Tensor t)
 {
-    print_impl<float>(strm, t);
+    print_impl<double>(strm, t.to(kDouble));
 }
 
 void to_impl_cpu_cuda(Tensor a, Tensor b)
@@ -76,7 +78,7 @@ static void std_impl(TensorInfo<T> a, double mean, TensorInfo<T> result)
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         T v = a[i] - T(mean);
-        s = s * v * v;
+        s   = s * v * v;
     }
     result[0] = std::sqrt(s / a.numel());
 }
@@ -176,8 +178,8 @@ static void rand_float_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, floa
 
 void uniform_impl(Tensor& t, double mi, double ma)
 {
-    static std::mt19937 mersenne_engine{(uint32_t)get_seed()};
-    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl, t, mersenne_engine, (float)mi, (float)ma);
+
+    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl, t, generator(), (float)mi, (float)ma);
 }
 
 template <typename T>
@@ -193,8 +195,7 @@ static void rand_int_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, int lo
 
 void uniform_int_impl(Tensor& t, int low, int high)
 {
-    static std::mt19937 mersenne_engine{(uint32_t)get_seed()};
-    SWITCH_MACRO_INT(t.scalar_type(), rand_int_impl, t, mersenne_engine, low, high);
+    SWITCH_MACRO_INT(t.scalar_type(), rand_int_impl, t, generator(), low, high);
 }
 
 
@@ -236,9 +237,9 @@ static void prod_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
     for (int64_t linear_index_input = 0; linear_index_input < input.numel(); ++linear_index_input)
     {
-        auto index_input  = input.LinearIndexToDimIndex(linear_index_input);
-        auto index_result = index_input;
-        index_result[dim] = 0;
+        auto index_input     = input.LinearIndexToDimIndex(linear_index_input);
+        auto index_result    = index_input;
+        index_result[dim]    = 0;
         result[index_result] = result[index_result] * input[index_input];
     }
 }
@@ -268,7 +269,6 @@ template <typename T>
 static void min_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
     using G   = typename CpuComputeFloatType<T>::Type;
-    result[0] = std::numeric_limits<T>::infinity();
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         result[0] = std::min(G(a[i]), G(result[0]));
@@ -299,7 +299,6 @@ template <typename T>
 static void max_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
     using G   = typename CpuComputeFloatType<T>::Type;
-    result[0] = -std::numeric_limits<T>::infinity();
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         result[0] = std::max(G(a[i]), G(result[0]));
@@ -312,73 +311,40 @@ void max_impl(Tensor a, Tensor& result)
 }
 
 template <typename T>
-static void minmax_impl(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> indices, TensorInfo<T> result,
-                        bool calc_min)
+static void min_max_impl(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> indices, TensorInfo<T> result,
+                         bool calc_min)
 {
-    int64_t dims = input.dims;
+    using G = typename CpuComputeFloatType<T>::Type;
 
-    int64_t size_along_dim   = input.sizes[dim];
-    int64_t stride_along_dim = input.strides[dim];
+    auto op_min = std::less<G>();
+    auto op_max = std::greater<G>();
 
-    for (int64_t i = 0; i < result.numel(); ++i)
+    for (int64_t i = 0; i < input.numel(); ++i)
     {
-        int64_t linearId = i;
-        int64_t offset   = 0;
-        for (int64_t i = dims - 1; i > 0; --i)
-        {
-            if (i != dim)
-            {
-                int64_t curDimIndex  = linearId % input.sizes[i];
-                int64_t curDimOffset = curDimIndex * input.strides[i];
-                offset += curDimOffset;
-                linearId /= input.sizes[i];
-            }
-        }
-        if (0 != dim)
-        {
-            offset += linearId * input.strides[0];
-        }
+        G v               = input[i];
+        auto index_input  = input.LinearIndexToDimIndex(i);
+        auto index_result = index_input;
+        index_result[dim] = 0;
 
-        int64_t minmax_index = 0;
-        T minmax_value       = calc_min ? std::numeric_limits<T>::max() : std::numeric_limits<T>::lowest();
-        for (int64_t d = 0; d < size_along_dim; ++d)
+        auto& result_value = result[index_result];
+        auto& result_index = indices[index_result];
+
+        bool comp = calc_min ? op_min(v, result_value) : op_max(v, result_value);
+        if (comp)
         {
-            T value  = input.data[offset];
-            bool cmp = calc_min ? (value < minmax_value) : (value > minmax_value);
-            if (cmp)
-            {
-                minmax_value = value;
-                minmax_index = d;
-            }
-
-            offset += stride_along_dim;
+            result_value = v;
+            result_index = index_input[dim];
         }
-
-        indices[i] = minmax_index;
-        result[i]  = minmax_value;
     }
 }
-
-void min_impl(Tensor input, int64_t dim, bool keepdim, Tensor& result, Tensor& indices)
+void min_impl(Tensor input, int64_t dim, Tensor& result, Tensor& indices)
 {
-    SWITCH_MACRO_ALL(input.scalar_type(), minmax_impl, input, dim, indices, result, true);
-
-    if (!keepdim)
-    {
-        result  = result.squeeze(dim);
-        indices = indices.squeeze(dim);
-    }
+    SWITCH_MACRO_ALL(input.scalar_type(), min_max_impl, input, dim, indices, result, true);
 }
 
-void max_impl(Tensor input, int64_t dim, bool keepdim, Tensor& result, Tensor& indices)
+void max_impl(Tensor input, int64_t dim, Tensor& result, Tensor& indices)
 {
-    SWITCH_MACRO_ALL(input.scalar_type(), minmax_impl, input, dim, indices, result, false);
-
-    if (!keepdim)
-    {
-        result  = result.squeeze(dim);
-        indices = indices.squeeze(dim);
-    }
+    SWITCH_MACRO_ALL(input.scalar_type(), min_max_impl, input, dim, indices, result, false);
 }
 
 
@@ -386,14 +352,10 @@ template <typename T, typename Indextype>
 static void index_select_impl(TensorInfo<T> input, int64_t dim, TensorInfo<Indextype> index, TensorInfo<T> result)
 {
     for (int64_t result_linear_index = 0; result_linear_index < result.numel(); ++result_linear_index)
-
     {
-        auto index_result = result.LinearIndexToDimIndex(result_linear_index);
-
-        auto index_input = index_result;
-        index_input[dim] = index[index_result[dim]];
-
-
+        auto index_result    = result.LinearIndexToDimIndex(result_linear_index);
+        auto index_input     = index_result;
+        index_input[dim]     = index[index_result[dim]];
         result[index_result] = input[index_input];
     }
 }
@@ -510,23 +472,6 @@ void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value)
     }
 }
 
-
-
-template <typename T>
-static void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < result.numel(); ++i)
-    {
-        auto index_result    = result.LinearIndexToDimIndex(i);
-        auto index_input     = input.LinearIndexToDimIndex(i / count);
-        result[index_result] = input[index_input];
-    }
-}
-
-void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result)
-{
-    SWITCH_MACRO_ALL(input.scalar_type(), repeat_interleave_impl, input, count, result);
-}
 
 
 template <typename T>
@@ -652,6 +597,44 @@ static void clamp_impl_(TensorInfo<T> src, double low, double high)
 void clamp_impl_(Tensor& a, double low, double high)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), clamp_impl_, a, low, high);
+}
+
+
+template <typename T>
+static void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < result.numel(); ++i)
+    {
+        auto index_result    = result.LinearIndexToDimIndex(i);
+        auto index_input     = input.LinearIndexToDimIndex(i / count);
+        result[index_result] = input[index_input];
+    }
+}
+
+void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result)
+{
+    SWITCH_MACRO_ALL(input.scalar_type(), repeat_interleave_impl, input, count, result);
+}
+
+
+
+template <typename T>
+static void repeat_impl(TensorInfo<T> src, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < result.numel(); ++i)
+    {
+        auto index_result = result.LinearIndexToDimIndex(i);
+        auto index_src    = index_result;
+        for (int d = 0; d < src.dim(); ++d)
+        {
+            index_src[d] = index_result[d] % src.size(d);
+        }
+        result[i] = src[index_src];
+    }
+}
+void repeat_impl(Tensor t, SizeType sizes, Tensor& result)
+{
+    SWITCH_MACRO_ALL(t.scalar_type(), repeat_impl, t, result);
 }
 
 

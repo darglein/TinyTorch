@@ -12,7 +12,7 @@
 namespace tinytorch
 {
 TINYTORCH_API void manual_seed(int64_t seed);
-TINYTORCH_API int64_t get_seed();
+TINYTORCH_API std::mt19937& generator();
 
 
 TINYTORCH_API Tensor empty(const SizeType& sizes, TensorOptions options = TensorOptions());

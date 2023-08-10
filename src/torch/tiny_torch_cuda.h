@@ -11,6 +11,8 @@
 
 #    include "cuda_runtime.h"
 
+#include "torch/cuda/cached_memory_allocator.h"
+
 #    ifdef __CUDACC__
 #        define CUDA_KERNEL_ASSERT(cond) \
             if (!(cond))                 \
@@ -29,13 +31,6 @@ inline cudaStream_t getCurrentCUDAStream()
 {
     return 0;
 }
-
-struct CUDACachingAllocator
-{
-    static void emptyCache() { throw std::runtime_error("not implemented"); }
-};
-
-
 
 }  // namespace cuda
 }  // namespace tinytorch

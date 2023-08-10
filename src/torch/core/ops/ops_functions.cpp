@@ -86,37 +86,29 @@ Tensor reshape(Tensor t, SizeType sizes)
     return autograd::ReshapeNode::apply(t, sizes)[0];
 }
 
-Tensor repeat(Tensor t, SizeType sizes)
+Tensor repeat(Tensor t, SizeType repeats)
 {
-    CHECK_EQ(t.dim(), sizes.size());
+    CHECK_EQ(t.dim(), repeats.size());
 
-    int repeat_dim = -1;
-    for (int i = 0; i < sizes.size(); ++i)
+
+
+    auto new_sizes = t.sizes();
+    for (int i = 0; i < t.dim(); ++i)
     {
-        if (sizes[i] > 1)
-        {
-            CHECK_EQ(repeat_dim, -1);
-            repeat_dim = i;
-        }
+        new_sizes[i] *= repeats[i];
     }
 
-    if (repeat_dim == -1)
+    if (t.sizes() == new_sizes)
     {
         return t.clone();
     }
+    CHECK(!t.requires_grad() || !GradMode::is_enabled());
+
+    auto result = empty(new_sizes, t.options());
+    SELECT_DEVICE(t.device(), repeat_impl, t, repeats, result);
 
 
 
-    auto result = t;
-
-
-    for (int i = 0; i < sizes[repeat_dim] - 1; ++i)
-    {
-        result = cat({result, t}, repeat_dim);
-    }
-
-    //     std::cout << "new_size " << new_size << std::endl;
-    // throw std::runtime_error("lsdf");
     return result;
 }
 
@@ -359,7 +351,7 @@ Tensor gather(Tensor data, int64_t dim, Tensor index)
     CHECK(!data.requires_grad() || !GradMode::is_enabled());
     CHECK_EQ(data.dim(), index.dim());
     auto out_sizes = index.sizes();
-    auto result = empty(out_sizes, data.options());
+    auto result    = empty(out_sizes, data.options());
     SELECT_DEVICE(result.device(), gather_impl, data, dim, index, result);
     return result;
 }
@@ -577,6 +569,10 @@ struct GridsampleNode : public FunctionNode<GridsampleNode>
 
 Tensor cat(const std::vector<Tensor>& list, int64_t dim)
 {
+    if (list.empty())
+    {
+        return {};
+    }
     auto result = list.front();
     for (int i = 1; i < list.size(); ++i)
     {

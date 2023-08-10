@@ -96,13 +96,23 @@ struct Sigmoid
 };
 struct Softplus
 {
-    Softplus(float beta) : beta(beta) {}
+    Softplus(float beta) : beta(beta) { threshold = 20.f / beta; }
     template <typename T>
     TT_HD T forward(T x)
     {
-        return T(::log(T(1.f) + ::exp(T(beta) * x)) / T(beta));
+        if (x > T(threshold)) return x;
+        return T(::log(::exp(x * T(beta))  + T(1.f)) / T(beta));
+    }
+    template <typename T>
+    TT_HD T backward(T x)
+    {
+        if(x > T(threshold)) return 1;
+        // T tmp =  expf((float)frag.x[t] * beta);
+        if (x > T(threshold)) return x;
+        return T(::log(::exp(x * T(beta))  + T(1.f)) / T(beta));
     }
     float beta;
+    float threshold;
 };
 }  // namespace UnaryOperators
 
@@ -169,7 +179,7 @@ struct Pow
     template <typename T>
     TT_HD T forward(T a, T b)
     {
-        return ::pow(a,b);
+        return ::pow(a, b);
     }
 };
 }  // namespace BinaryOperators

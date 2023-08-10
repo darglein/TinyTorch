@@ -102,7 +102,7 @@ inline int64_t elementSize(ScalarType type)
             return 2;
         case kInt32:
             return 4;
-        case kLong:
+        case kInt64:
             return 8;
         case kFloat32:
             return 4;

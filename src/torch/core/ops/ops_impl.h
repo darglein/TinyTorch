@@ -1,5 +1,6 @@
 #pragma once
 
+#include "torch/core/ops/all.h"
 #include "torch/cpu/binary_operators.h"
 #include "torch/cpu/ops_impl_cpu.h"
 #include "torch/cpu/unary_operators.h"

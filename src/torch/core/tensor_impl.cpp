@@ -36,13 +36,13 @@ void TensorImpl::recompute_strides()
 
 void TensorImpl::set_requires_grad(bool requires_grad)
 {
+    if (requires_grad == this->requires_grad())
+    {
+        return;
+    }
     if (requires_grad)
     {
-        autograd_meta = std::make_unique<AutogradMeta>();
-
-        auto grad_options = options_;
-        grad_options.requires_grad(false);
-        // autograd_meta->_grad = zeros(sizes_, grad_options);
+        autograd_meta       = std::make_unique<AutogradMeta>();
         autograd_meta->edge = std::make_shared<Edge>(std::make_shared<autograd::AccumulateGrad>(Tensor(getptr())), 0);
     }
     else

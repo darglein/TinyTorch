@@ -14,88 +14,6 @@ namespace tinytorch
 namespace autograd
 {
 
-struct SqrtNode : public FunctionNode<SqrtNode>
-{
-    static std::vector<Tensor> forward(Context* ctx, Tensor a)
-    {
-        ctx->save_for_backward({a});
-        auto result = empty_like(a);
-        SELECT_DEVICE(a.device(), sqrt_impl, a, result);
-        return {result};
-    }
-
-    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
-    {
-        auto l      = ctx->get_saved_variables();
-        auto a      = l[0];
-        auto g      = grad[0];
-        auto grad_a = 1 / (2 * a.sqrt()) * g;
-        return {grad_a};
-    }
-};
-struct LogNode : public FunctionNode<LogNode>
-{
-    static std::vector<Tensor> forward(Context* ctx, Tensor a)
-    {
-        ctx->save_for_backward({a});
-        auto result = empty_like(a);
-        SELECT_DEVICE(a.device(), log_impl, a, result);
-        return {result};
-    }
-
-    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
-    {
-        auto l      = ctx->get_saved_variables();
-        auto a      = l[0];
-        auto g      = grad[0];
-        auto grad_a = 1 / a * g;
-        return {grad_a};
-    }
-};
-struct ExpNode : public FunctionNode<ExpNode>
-{
-    static std::vector<Tensor> forward(Context* ctx, Tensor a)
-    {
-        ctx->save_for_backward({a});
-        auto result = empty_like(a);
-        SELECT_DEVICE(a.device(), exp_impl, a, result);
-        return {result};
-    }
-
-    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
-    {
-        auto l      = ctx->get_saved_variables();
-        auto a      = l[0];
-        auto g      = grad[0];
-        auto grad_a = exp(a) * g;
-        return {grad_a};
-    }
-};
-
-struct AbsNode : public FunctionNode<AbsNode>
-{
-    static std::vector<Tensor> forward(Context* ctx, Tensor a)
-    {
-        ctx->save_for_backward({a});
-        auto result = empty_like(a);
-        SELECT_DEVICE(a.device(), abs_impl, a, result);
-        return {result};
-    }
-
-    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
-    {
-        auto l = ctx->get_saved_variables();
-        auto a = l[0];
-        auto g = grad[0];
-
-        auto low    = a < 0;
-        auto high   = a > 0;
-        auto grad_a = (low * -1 + high) * g;
-
-        return {grad_a};
-    }
-};
-
 struct SumNode : public FunctionNode<SumNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
@@ -142,27 +60,6 @@ struct SumDimNode : public FunctionNode<SumDimNode>
 
 using namespace autograd;
 
-Tensor square(Tensor a)
-{
-    return a * a;
-}
-Tensor sqrt(Tensor a)
-{
-    return SqrtNode::forward_and_build_graph(a)[0];
-}
-Tensor log(Tensor a)
-{
-    return LogNode::forward_and_build_graph(a)[0];
-}
-Tensor log1p(Tensor a)
-{
-    return log(1 + a);
-}
-Tensor exp(Tensor a)
-{
-    return ExpNode::forward_and_build_graph(a)[0];
-}
-
 Tensor pow(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
@@ -177,19 +74,43 @@ Tensor pow(Tensor a, Tensor b)
     SELECT_DEVICE(a.device(), pow_impl, a, b, result);
     return result;
 }
-Tensor sin(Tensor a)
+
+template <typename T>
+static void fill_with_infinite(Tensor& a, bool positive_inf)
 {
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    auto result = empty_like(a);
-    SELECT_DEVICE(a.device(), sin_impl, a, result);
-    return result;
+    double value;
+    if (positive_inf)
+    {
+        value = 1000000; // std::numeric_limits<T>::max();
+    }
+    else
+    {
+        value = -100000; // std::numeric_limits<T>::lowest();
+    }
+    fill(a, value);
 }
-Tensor cos(Tensor a)
+
+
+
+static void fill_with_infinite(Tensor& a, bool positive_inf)
 {
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    auto result = empty_like(a);
-    SELECT_DEVICE(a.device(), cos_impl, a, result);
-    return result;
+    switch (a.scalar_type())
+    {
+        case kFloat32:
+            fill_with_infinite<float>(a, positive_inf);
+            break;
+        case kFloat64:
+            fill_with_infinite<double>(a, positive_inf);
+            break;
+        case kInt32:
+            fill_with_infinite<int>(a, positive_inf);
+            break;
+        case kInt64:
+            fill_with_infinite<int64_t>(a, positive_inf);
+            break;
+        default:
+            CHECK(false);
+    }
 }
 
 
@@ -198,6 +119,7 @@ Tensor min(Tensor a)
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
 
     Tensor result = empty({1}, a.options());
+    fill_with_infinite(result, true);
     SELECT_DEVICE(a.device(), min_impl, a, result);
     return result;
 }
@@ -205,51 +127,62 @@ Tensor max(Tensor a)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     Tensor result = empty({1}, a.options());
+    fill_with_infinite(result, false);
     SELECT_DEVICE(a.device(), max_impl, a, result);
     return result;
 }
 std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    CHECK(a.is_cpu());
 
     auto result_size = a.sizes();
     result_size[dim] = 1;
 
-    Tensor result  = empty(result_size, a.options());
+    Tensor result = empty(result_size, a.options());
+    fill_with_infinite(result, true);
     Tensor indices = empty(result_size, a.options().dtype(kLong));
-    cpu_impl::min_impl(a, dim, keepdim, result, indices);
+    SELECT_DEVICE(a.device(), min_impl, a, dim, result, indices);
+
+    if (!keepdim)
+    {
+        result = result.squeeze(dim);
+        if (indices.defined()) indices = indices.squeeze(dim);
+    }
+
     return {result, indices};
 }
 std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    CHECK(a.is_cpu());
-
     auto result_size = a.sizes();
     result_size[dim] = 1;
 
-    Tensor result  = empty(result_size, a.options());
+    Tensor result = empty(result_size, a.options());
+    fill_with_infinite(result, false);
     Tensor indices = empty(result_size, a.options().dtype(kLong));
-    cpu_impl::max_impl(a, dim, keepdim, result, indices);
+
+    SELECT_DEVICE(a.device(), max_impl, a, dim, result, indices);
+
+    if (!keepdim)
+    {
+        result = result.squeeze(dim);
+        if (indices.defined()) indices = indices.squeeze(dim);
+    }
+
     return {result, indices};
 }
 Tensor min(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    CHECK(a.is_cpu());
-
     Tensor result = empty_like(a);
-    cpu_impl::min_impl(a, b, result);
+    SELECT_DEVICE(a.device(), min_impl, a, b, result);
     return result;
 }
 Tensor max(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    CHECK(a.is_cpu());
-
     Tensor result = empty_like(a);
-    cpu_impl::max_impl(a, b, result);
+    SELECT_DEVICE(a.device(), max_impl, a, b, result);
     return result;
 }
 
@@ -311,12 +244,8 @@ Tensor std(Tensor a)
 
 Tensor std(Tensor a, int64_t dim)
 {
+    CHECK(false);
     return Tensor();
-}
-
-Tensor abs(Tensor a)
-{
-    return autograd::AbsNode::apply(a)[0];
 }
 
 Tensor clamp(Tensor a, double low, double high)
@@ -339,13 +268,6 @@ Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
     a = a.sum(dim, keep);
     a = a.sqrt();
     return a;
-}
-Tensor round(Tensor a)
-{
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    auto result = empty_like(a);
-    SELECT_DEVICE(a.device(), round_impl, a, result);
-    return result;
 }
 
 }  // namespace tinytorch

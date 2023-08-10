@@ -9,3 +9,4 @@
 #include "ops_operators.h"
 #include "ops_functions.h"
 #include "ops_math_functions.h"
+#include "ops_unary_functions.h"

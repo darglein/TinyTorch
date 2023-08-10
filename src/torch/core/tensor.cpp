@@ -7,9 +7,9 @@
 #include "tensor.h"
 
 #include "torch/core/backward.h"
+#include "torch/core/graph.h"
 #include "torch/core/ops/all.h"
 #include "torch/core/tensor.h"
-#include "torch/core/graph.h"
 
 #include "../tiny_torch_cuda.h"
 #include "torch/core/tensor_impl.h"
@@ -226,7 +226,13 @@ Tensor Tensor::unsqueeze(int64_t dim) const
 
 Tensor Tensor::squeeze(int64_t dim) const
 {
+    if (dim < 0)
+    {
+        dim += this->dim();
+    }
+
     CHECK_LT(dim, this->dim());
+    CHECK_GE(dim, 0);
     CHECK_EQ(size(dim), 1);
     if (this->dim() == 1)
     {
@@ -295,11 +301,13 @@ Tensor Tensor::to(Device new_device) const
 void Tensor::to_(ScalarType new_type)
 {
     auto result = to(new_type);
+    result.set_requires_grad(requires_grad());
     impl_->set_data(*result.impl_);
 }
 void Tensor::to_(Device new_device)
 {
     auto result = to(new_device);
+    result.set_requires_grad(requires_grad());
     impl_->set_data(*result.impl_);
 }
 

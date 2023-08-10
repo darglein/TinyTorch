@@ -101,21 +101,15 @@ Tensor ones_like(Tensor t)
 // ================================================================================
 // Rand Tensor Creation
 
-static int64_t& current_seed()
+std::mt19937& generator()
 {
-    static thread_local int64_t s = 9036515235;
-    return s;
+    static thread_local std::mt19937 gen(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()));
+    return gen;
 }
-
 
 void manual_seed(int64_t seed)
 {
-    current_seed() = seed;
-}
-
-int64_t get_seed()
-{
-    return current_seed();
+    generator().seed(seed);
 }
 
 Tensor rand(const SizeType& sizes, TensorOptions options)
