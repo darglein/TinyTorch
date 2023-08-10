@@ -1,9 +1,5 @@
-#include "torch/core/ops.h"
-#include "torch/core/tensor.h"
 
-#include "torch/core/ops_functions.h"
-#include "torch/core/ops_impl_shared.h"
-#include "torch/core/tensor_info.h"
+#include "torch/core/ops/ops_impl.h"
 #include "torch/cuda/atomic_minmax.h"
 #include "torch/cuda/ops_impl_cuda.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
@@ -52,10 +48,10 @@ __launch_bounds__(128) static __global__ void fill_impl(TensorInfoCuda<T> a, Ten
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
 
-    auto index_a = a.LinearIndexToDimIndex(i);
+    auto index_a      = a.LinearIndexToDimIndex(i);
     auto index_values = index_a;
     index_values[dim] = 0;
-    a[index_a]   = values[index_values];
+    a[index_a]        = values[index_values];
 }
 void fill_impl(Tensor& a, double value)
 {
@@ -394,7 +390,7 @@ void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result)
 
 template <typename T>
 __launch_bounds__(128) static __global__
- void gather_impl(TensorInfoCuda<T> data, int64_t dim, TensorInfoCuda<int64_t> index, TensorInfoCuda<T> result)
+    void gather_impl(TensorInfoCuda<T> data, int64_t dim, TensorInfoCuda<int64_t> index, TensorInfoCuda<T> result)
 {
     int64_t input_linear_index = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (input_linear_index >= result.numel()) return;
@@ -494,8 +490,7 @@ void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor& result)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__
-void clamp_impl_(TensorInfoCuda<T> src, double low, double high)
+__launch_bounds__(128) static __global__ void clamp_impl_(TensorInfoCuda<T> src, double low, double high)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= src.numel()) return;
@@ -510,7 +505,7 @@ void clamp_impl_(TensorInfoCuda<T> src, double low, double high)
 }
 void clamp_impl_(Tensor& a, double low, double high)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(),a.numel(), clamp_impl_, a, low, high);
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), clamp_impl_, a, low, high);
 }
 
 

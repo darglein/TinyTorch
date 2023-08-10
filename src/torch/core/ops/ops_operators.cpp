@@ -5,10 +5,7 @@
  */
 
 #include "ops_operators.h"
-
-#include "graph.h"
-
-#include "torch/core/ops_impl.h"
+#include "torch/core/ops/ops_impl.h"
 
 namespace tinytorch
 {

@@ -10,7 +10,7 @@
 
 #include "torch/core/backward.h"
 #include "torch/core/graph.h"
-#include "torch/core/ops.h"
+#include "torch/core/ops/all.h"
 #include "torch/core/optimizer.h"
 #include "torch/core/tensor.h"
 #include "torch/core/module.h"

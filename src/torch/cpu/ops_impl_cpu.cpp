@@ -4,15 +4,8 @@
  * See LICENSE file for more information.
  */
 
-#include "torch/cpu/ops_impl_cpu.h"
-
-#include "torch/core/ops.h"
-#include "torch/core/tensor.h"
-
+#include "torch/core/ops/ops_impl.h"
 #include "ops_impl_cpu_helper.h"
-#include "torch/core/ops_functions.h"
-#include "torch/core/ops_impl_shared.h"
-#include "torch/core/ops_operators.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
 

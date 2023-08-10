@@ -7,8 +7,6 @@
 #pragma once
 #include "torch/core/tensor.h"
 
-#include "tensor_options.h"
-#include "torch/tiny_torch_config.h"
 namespace tinytorch
 {
 

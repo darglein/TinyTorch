@@ -10,6 +10,8 @@
 #include "torch/cuda/grid_sample.h"
 #include "torch/tiny_torch_config.h"
 
+#include "torch/core/ops/ops_impl_shared.h"
+#include "torch/core/graph.h"
 
 #ifdef TT_HAS_CUDA
 #    define SELECT_DEVICE_CUDA(func, ...) \

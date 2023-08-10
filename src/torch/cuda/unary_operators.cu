@@ -4,10 +4,8 @@
  * See LICENSE file for more information.
  */
 
-#include "torch/core/ops.h"
+#include "torch/core/ops/ops_impl.h"
 
-#include "torch/core/ops_impl_shared.h"
-#include "torch/core/tensor_info.h"
 #include "torch/cuda/ops_impl_cuda.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
 #include "unary_operators.h"

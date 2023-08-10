@@ -1,9 +1,5 @@
-#include "torch/core/ops.h"
-#include "torch/core/tensor.h"
+#include "torch/core/ops/ops_impl.h"
 
-#include "torch/core/ops_functions.h"
-#include "torch/core/ops_impl_shared.h"
-#include "torch/core/tensor_info.h"
 #include "torch/cuda/binary_operators.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
 #include <cuda_runtime.h>

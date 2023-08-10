@@ -8,7 +8,6 @@
 #include "torch/core/tensor.h"
 #include "torch/core/tensor_impl.h"
 
-#include "tensor_options.h"
 #include "torch/tiny_torch_config.h"
 namespace tinytorch
 {

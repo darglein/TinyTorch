@@ -1,12 +1,15 @@
-#include "tensor.h"
 /**
  * Copyright (c) 2022 Darius Rückert
  * Licensed under the MIT License.
  * See LICENSE file for more information.
  */
+
+#include "tensor.h"
+
 #include "torch/core/backward.h"
-#include "torch/core/ops.h"
+#include "torch/core/ops/all.h"
 #include "torch/core/tensor.h"
+#include "torch/core/graph.h"
 
 #include "../tiny_torch_cuda.h"
 #include "torch/core/tensor_impl.h"

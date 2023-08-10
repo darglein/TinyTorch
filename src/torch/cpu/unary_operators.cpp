@@ -6,10 +6,9 @@
 
 #include "unary_operators.h"
 
-#include "torch/core/ops.h"
+#include "torch/core/ops/ops_impl.h"
 
 #include "ops_impl_cpu_helper.h"
-#include "torch/core/ops_impl_shared.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cpu/ops_impl_cpu.h"
 

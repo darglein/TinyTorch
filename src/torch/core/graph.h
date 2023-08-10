@@ -5,7 +5,7 @@
  */
 
 #pragma once
-#include "torch/core/ops.h"
+#include "torch/core/ops/all.h"
 #include "torch/core/tensor.h"
 
 #include <map>

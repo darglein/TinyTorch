@@ -4,11 +4,7 @@
  * See LICENSE file for more information.
  */
 
-#include "torch/core/ops_functions.h"
-
-#include "graph.h"
-
-#include "torch/core/ops_impl.h"
+#include "ops_impl.h"
 
 
 namespace tinytorch

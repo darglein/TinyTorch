@@ -6,7 +6,7 @@
 #include "torch/core/tensor_impl.h"
 
 #include "graph.h"
-#include "torch/core/ops.h"
+#include "torch/core/ops/all.h"
 
 namespace tinytorch
 {
