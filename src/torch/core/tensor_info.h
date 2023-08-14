@@ -26,7 +26,7 @@ namespace tinytorch
 {
 
 
-#define MAX_TENSORINFO_DIMS 25
+#define MAX_TENSORINFO_DIMS 10
 
 
 template <int DIM>
@@ -79,8 +79,9 @@ struct TensorInfoBase
     TensorInfoBase(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims]);
     TensorInfoBase(Tensor t)
     {
-        data = t.template data_ptr<T>();
-        dims = t.dim();
+        data  = t.template data_ptr<T>();
+        dims_ = t.dim();
+        CHECK_LE(t.dim(), MAX_TENSORINFO_DIMS);
         for (int i = 0; i < t.dim(); ++i)
         {
             sizes[i]   = t.size(i);
@@ -97,13 +98,23 @@ struct TensorInfoBase
         }
     }
 
-    TT_HD int64_t dim() { return dims; }
+    TT_HD int64_t dim()
+    {
+        if constexpr (is_dynamic)
+        {
+            return dims_;
+        }
+        else
+        {
+            return max_dims;
+        }
+    }
     TT_HD int64_t size(int index) { return sizes[index]; }
 
     TT_HD int64_t numel()
     {
         int64_t result = 1;
-        for (int64_t i = 0; i < dims; ++i)
+        for (int64_t i = 0; i < dim(); ++i)
         {
             result *= sizes[i];
         }
@@ -131,69 +142,42 @@ struct TensorInfoBase
     TT_HD int64_t IndexToOffset(DimIndex index)
     {
         int64_t offset = 0;
-        if constexpr (is_dynamic)
+        for (int64_t i = 0; i < dim(); ++i)
         {
-            for (int64_t i = 0; i < dims; ++i)
-            {
-#ifndef __CUDACC__
-                CHECK_GE(index[i], 0);
-                CHECK_LT(index[i], sizes[i]);
-#else
-                CUDA_KERNEL_ASSERT(index[i] >= 0);
-                CUDA_KERNEL_ASSERT(index[i] < sizes[i]);
+            // bounds check
+#if TT_DEBUG
+#    if defined(__CUDACC__)
+            CUDA_KERNEL_ASSERT(index[i] >= 0);
+            CUDA_KERNEL_ASSERT(index[i] < sizes[i]);
+
+#    else
+            CHECK_GE(index[i], 0);
+            CHECK_LT(index[i], sizes[i]);
+#    endif
 #endif
-                offset += index[i] * strides[i];
-            }
+            offset += index[i] * strides[i];
         }
-        else
-        {
-            for (int64_t i = 0; i < max_dims; ++i)
-            {
-#ifndef __CUDACC__
-                CHECK_GE(index[i], 0);
-                CHECK_LT(index[i], sizes[i]);
-#else
-                CUDA_KERNEL_ASSERT(index[i] >= 0);
-                CUDA_KERNEL_ASSERT(index[i] < sizes[i]);
-#endif
-                offset += index[i] * strides[i];
-            }
-        }
+
         return offset;
     }
 
     TT_HD DimIndex LinearIndexToDimIndex(int64_t linearId)
     {
         DimIndex result;
-        // result.zero_();
-        if constexpr (is_dynamic)
+        for (int64_t i = dim() - 1; i > 0; --i)
         {
-            for (int64_t i = dims - 1; i > 0; --i)
-            {
-                int64_t curDimIndex = linearId % sizes[i];
-                result[i]           = curDimIndex;
-                linearId /= sizes[i];
-            }
+            int64_t curDimIndex = linearId % sizes[i];
+            result[i]           = curDimIndex;
+            linearId /= sizes[i];
+        }
 
-            result[0] = linearId;
-        }
-        else
-        {
-            // Uses static dims
-            for (int64_t i = max_dims - 1; i > 0; --i)
-            {
-                int64_t curDimIndex = linearId % sizes[i];
-                result[i]           = curDimIndex;
-                linearId /= sizes[i];
-            }
-            result[0] = linearId;
-        }
+        result[0] = linearId;
         return result;
     }
     TT_HD bool index_in_range(DimIndex index)
     {
         bool result = true;
-        for (int i = 0; i < dims; ++i)
+        for (int i = 0; i < dim(); ++i)
         {
             if (index[i] < 0 || index[i] > sizes[i])
             {
@@ -216,7 +200,7 @@ struct TensorInfoBase
     T* data;
     int64_t sizes[max_dims];
     int64_t strides[max_dims];
-    int64_t dims;
+    int64_t dims_;
     bool contiguous;
 };
 
@@ -224,15 +208,15 @@ struct TensorInfoBase
 template <typename T, bool TIS_CUDA, int MAX_DIMS>
 TensorInfoBase<T, TIS_CUDA, MAX_DIMS>::TensorInfoBase()
 {
-    data = nullptr;
-    dims = 0;
+    data  = nullptr;
+    dims_ = 0;
 }
 
 template <typename T, bool TIS_CUDA, int MAX_DIMS>
 TensorInfoBase<T, TIS_CUDA, MAX_DIMS>::TensorInfoBase(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims])
 {
-    data = p;
-    dims = dim;
+    data  = p;
+    dims_ = dim;
 
     for (int i = 0; i < dim; ++i)
     {

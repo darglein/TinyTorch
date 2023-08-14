@@ -277,7 +277,7 @@ __launch_bounds__(128) static __global__ void cumprod_impl(TensorInfoCuda<T> inp
         auto index_result = result.LinearIndexToDimIndex(i);
 
         T prod = T(1.f);
-        for (int64_t j = 0; j < index_result[dim]; ++j)
+        for (int64_t j = 0; j <= index_result[dim]; ++j)
         {
             auto index_input = index_result;
             index_input[dim] = j;
@@ -299,7 +299,7 @@ __launch_bounds__(128) static __global__ void cumsum_impl(TensorInfoCuda<T> inpu
         auto index_result = result.LinearIndexToDimIndex(i);
 
         T prod = T(0.f);
-        for (int64_t j = 0; j < index_result[dim]; ++j)
+        for (int64_t j = 0; j <= index_result[dim]; ++j)
         {
             auto index_input = index_result;
             index_input[dim] = j;

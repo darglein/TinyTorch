@@ -30,7 +30,7 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
         CHECK_EQ(cudaErrorCode, cudaSuccess) << ": " << cudaGetErrorString(cudaErrorCode); \
     }
 
-#if defined(CUDA_DEBUG)
+#if defined(CUDA_DEBUG) && TT_DEBUG
 #    define CUDA_SYNC_CHECK_ERROR()                    \
         {                                              \
             CHECK_CUDA_ERROR(cudaDeviceSynchronize()); \

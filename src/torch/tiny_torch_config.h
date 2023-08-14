@@ -43,3 +43,10 @@
 #else
 #    define TT_HD
 #endif
+
+
+#ifdef NDEBUG
+#define TT_DEBUG 0
+#else
+#define TT_DEBUG 1
+#endif

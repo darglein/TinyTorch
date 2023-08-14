@@ -255,7 +255,7 @@ static void cumprod_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
         auto index_result = result.LinearIndexToDimIndex(i);
 
         T prod = T(1.f);
-        for (int64_t j = 0; j < index_result[dim]; ++j)
+        for (int64_t j = 0; j <= index_result[dim]; ++j)
         {
             auto index_input = index_result;
             index_input[dim] = j;
@@ -276,7 +276,7 @@ static void cumsum_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
         auto index_result = result.LinearIndexToDimIndex(i);
 
         T prod = T(0.f);
-        for (int64_t j = 0; j < index_result[dim]; ++j)
+        for (int64_t j = 0; j <= index_result[dim]; ++j)
         {
             auto index_input = index_result;
             index_input[dim] = j;
