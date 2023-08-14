@@ -54,6 +54,10 @@ inline void load(Tensor&, std::string)
 TINYTORCH_API Tensor grid_sampler(const Tensor& input, const Tensor& grid, int64_t interpolation_mode,
                                   int64_t padding_mode, bool align_corners);
 
+
+TINYTORCH_API Tensor conv2d(Tensor input, Tensor weight, Tensor bias = {}, int stride = 1, int padding = 0,
+                            int dilation = 1, int groups = 1);
+
 namespace nn
 {
 namespace functional

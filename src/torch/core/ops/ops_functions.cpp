@@ -4,7 +4,10 @@
  * See LICENSE file for more information.
  */
 
+#include "ops_functions.h"
+
 #include "ops_impl.h"
+
 
 
 namespace tinytorch
@@ -598,6 +601,32 @@ std::pair<Tensor, Tensor> sort(Tensor t, int64_t dim)
 
 
     return {result_t, result_index};
+}
+Tensor conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding, int dilation, int groups)
+{
+    CHECK(!input.requires_grad() || !GradMode::is_enabled());
+    CHECK_EQ(input.dim(), 4);
+    CHECK_EQ(weight.dim(), 4);
+    CHECK_EQ(stride, 1);
+    CHECK_EQ(dilation, 1);
+    CHECK_EQ(groups, 1);
+
+    int in_batch    = input.size(0);
+    int in_channels = input.size(1);
+    int in_height   = input.size(2);
+    int in_width    = input.size(3);
+
+    CHECK_EQ(weight.size(0), 1);
+    int out_batch    = in_batch;
+    int out_channels = weight.size(1);
+    int out_height   = in_height - (weight.size(2) - 1) + padding * 2;
+    int out_width    = in_width - (weight.size(3) - 1) + padding * 2;
+
+    auto result = zeros({out_batch, out_channels, out_height, out_width}, input.options());
+
+    cpu_impl::conv2d(input, weight, bias, stride, padding, dilation, groups, result);
+
+    return result;
 }
 
 

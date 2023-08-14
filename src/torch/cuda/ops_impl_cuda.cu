@@ -244,6 +244,75 @@ void sum_impl(Tensor a, int64_t dim, Tensor& result)
 }
 
 
+
+template <typename T>
+__launch_bounds__(128) static __global__ void prod_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= result.numel()) return;
+    {
+        auto index_result = result.LinearIndexToDimIndex(i);
+
+        T prod = T(1.f);
+        for (int64_t j = 0; j < input.size(dim); ++j)
+        {
+            auto index_input = index_result;
+            index_input[dim] = j;
+            prod             = prod * input[index_input];
+        }
+        result[index_result] = prod;
+    }
+}
+
+void prod_impl(Tensor input, int64_t dim, Tensor& result)
+{
+    CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), prod_impl, input, dim, result);
+}
+template <typename T>
+__launch_bounds__(128) static __global__ void cumprod_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= result.numel()) return;
+    {
+        auto index_result = result.LinearIndexToDimIndex(i);
+
+        T prod = T(1.f);
+        for (int64_t j = 0; j < index_result[dim]; ++j)
+        {
+            auto index_input = index_result;
+            index_input[dim] = j;
+            prod             = prod * input[index_input];
+        }
+        result[index_result] = prod;
+    }
+}
+void cumprod_impl(Tensor input, int64_t dim, Tensor& result)
+{
+    CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), cumprod_impl, input, dim, result);
+}
+template <typename T>
+__launch_bounds__(128) static __global__ void cumsum_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= result.numel()) return;
+    {
+        auto index_result = result.LinearIndexToDimIndex(i);
+
+        T prod = T(0.f);
+        for (int64_t j = 0; j < index_result[dim]; ++j)
+        {
+            auto index_input = index_result;
+            index_input[dim] = j;
+            prod             = prod + input[index_input];
+        }
+        result[index_result] = prod;
+    }
+}
+void cumsum_impl(Tensor input, int64_t dim, Tensor& result)
+{
+    CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), cumsum_impl, input, dim, result);
+}
+
 template <typename T>
 __launch_bounds__(128) static __global__
     void min_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)

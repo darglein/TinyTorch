@@ -81,11 +81,11 @@ static void fill_with_infinite(Tensor& a, bool positive_inf)
     double value;
     if (positive_inf)
     {
-        value = 1000000; // std::numeric_limits<T>::max();
+        value = 1000000;  // std::numeric_limits<T>::max();
     }
     else
     {
-        value = -100000; // std::numeric_limits<T>::lowest();
+        value = -100000;  // std::numeric_limits<T>::lowest();
     }
     fill(a, value);
 }
@@ -205,7 +205,9 @@ Tensor sum(Tensor a, int64_t dim, bool keepdim)
 }
 Tensor sum(Tensor a, SizeType s, bool keepdim)
 {
-    for (auto dim : s.vec())
+    auto sv = s.vec();
+    std::sort(sv.begin(), sv.end(),std::greater<>());
+    for (auto dim : sv)
     {
         a = sum(a, dim, keepdim);
     }
@@ -225,10 +227,14 @@ Tensor mean(Tensor a, int64_t dim, bool keepdim)
 }
 Tensor mean(Tensor a, SizeType s, bool keepdim)
 {
-    for (auto dim : s.vec())
+    auto sv = s.vec();
+    std::sort(sv.begin(), sv.end(),std::greater<>());
+
+    for (auto dim : sv)
     {
         a = mean(a, dim, keepdim);
     }
+
     return a;
 }
 
@@ -268,6 +274,35 @@ Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
     a = a.sum(dim, keep);
     a = a.sqrt();
     return a;
+}
+Tensor prod(Tensor a, int64_t dim, bool keepdim)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    auto new_size = a.sizes();
+    new_size[dim] = 1;
+    auto result   = ones(new_size, a.options());
+    SELECT_DEVICE(a.device(), prod_impl, a, dim, result);
+
+    if (!keepdim)
+    {
+        result = result.squeeze(dim);
+    }
+
+    return result;
+}
+Tensor cumprod(Tensor a, int64_t dim)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    auto result = ones_like(a);
+    SELECT_DEVICE(a.device(), cumprod_impl, a, dim, result);
+    return result;
+}
+Tensor cumsum(Tensor a, int64_t dim)
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    auto result = ones_like(a);
+    SELECT_DEVICE(a.device(), cumsum_impl, a, dim, result);
+    return result;
 }
 
 }  // namespace tinytorch

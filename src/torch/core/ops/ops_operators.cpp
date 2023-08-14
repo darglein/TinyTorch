@@ -5,6 +5,7 @@
  */
 
 #include "ops_operators.h"
+
 #include "torch/core/ops/ops_impl.h"
 
 namespace tinytorch
@@ -251,8 +252,21 @@ struct AddTensorScalarNode : public FunctionNode<AddTensorScalarNode>
 
 using namespace autograd;
 
+inline void MatchTensorSize(Tensor& a, Tensor& b)
+{
+    if (b.dim() == 1 && b.size(0) == 1 && a.dim() > 1)
+    {
+        // expand b with enough dims to match a
+        for (int i = 0; i < a.dim() - 1; ++i)
+        {
+            b = b.unsqueeze(0);
+        }
+    }
+}
+
 Tensor operator/(Tensor a, Tensor b)
 {
+    MatchTensorSize(a, b);
     return DivNode::apply(a, b)[0];
 }
 
@@ -266,9 +280,9 @@ Tensor operator/(double a, Tensor b)
     return DivScalarTensorNode::apply(a, b)[0];
 }
 
-
 Tensor operator-(Tensor a, Tensor b)
 {
+    MatchTensorSize(a, b);
     return SubNode::forward_and_build_graph(a, b)[0];
 }
 Tensor operator-(Tensor b)
@@ -287,11 +301,13 @@ Tensor operator-(double a, Tensor b)
 
 Tensor operator+(Tensor a, Tensor b)
 {
+    MatchTensorSize(a, b);
     return AddNode::forward_and_build_graph(a, b)[0];
 }
 
 Tensor operator*(Tensor a, Tensor b)
 {
+    MatchTensorSize(a, b);
     return MultNode::forward_and_build_graph(a, b)[0];
 }
 
@@ -354,6 +370,7 @@ Tensor operator+=(Tensor a, double b)
 Tensor operator-=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    MatchTensorSize(a, b);
     SELECT_DEVICE(a.device(), sub_impl, a, b, a);
     return a;
 }
@@ -366,6 +383,7 @@ Tensor operator-=(Tensor a, double b)
 Tensor operator*=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    MatchTensorSize(a, b);
     SELECT_DEVICE(a.device(), mult_impl, a, b, a);
     return a;
 }
@@ -378,6 +396,7 @@ Tensor operator*=(Tensor a, double b)
 Tensor operator/=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    MatchTensorSize(a, b);
     SELECT_DEVICE(a.device(), div_impl, a, b, a);
     return a;
 }

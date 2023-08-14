@@ -29,7 +29,9 @@ void uniform_int_impl(Tensor& t, int low, int high);
 void sum_impl(Tensor a, Tensor& result);
 void sum_impl(Tensor a, int64_t dim, Tensor& result);
 
-
+void prod_impl(Tensor a, int64_t dim, Tensor& result);
+void cumprod_impl(Tensor a, int64_t dim, Tensor& result);
+void cumsum_impl(Tensor a, int64_t dim, Tensor& result);
 
 void clamp_impl_(Tensor& a, double low, double high);
 

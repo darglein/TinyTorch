@@ -178,7 +178,6 @@ static void rand_float_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, floa
 
 void uniform_impl(Tensor& t, double mi, double ma)
 {
-
     SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl, t, generator(), (float)mi, (float)ma);
 }
 
@@ -246,10 +245,50 @@ static void prod_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 
 void prod_impl(Tensor input, int64_t dim, Tensor& result)
 {
-    fill(result, 1);
     SWITCH_MACRO_ALL(input.scalar_type(), prod_impl, input, dim, result);
 }
+template <typename T>
+static void cumprod_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < result.numel(); ++i)
+    {
+        auto index_result = result.LinearIndexToDimIndex(i);
 
+        T prod = T(1.f);
+        for (int64_t j = 0; j < index_result[dim]; ++j)
+        {
+            auto index_input = index_result;
+            index_input[dim] = j;
+            prod             = prod * input[index_input];
+        }
+        result[index_result] = prod;
+    }
+}
+void cumprod_impl(Tensor input, int64_t dim, Tensor& result)
+{
+    SWITCH_MACRO_ALL(input.scalar_type(), cumprod_impl, input, dim, result);
+}
+template <typename T>
+static void cumsum_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < result.numel(); ++i)
+    {
+        auto index_result = result.LinearIndexToDimIndex(i);
+
+        T prod = T(0.f);
+        for (int64_t j = 0; j < index_result[dim]; ++j)
+        {
+            auto index_input = index_result;
+            index_input[dim] = j;
+            prod             = prod + input[index_input];
+        }
+        result[index_result] = prod;
+    }
+}
+void cumsum_impl(Tensor input, int64_t dim, Tensor& result)
+{
+    SWITCH_MACRO_ALL(input.scalar_type(), cumsum_impl, input, dim, result);
+}
 template <typename T>
 static void min_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
@@ -268,7 +307,7 @@ void min_impl(Tensor a, Tensor b, Tensor& result)
 template <typename T>
 static void min_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    using G   = typename CpuComputeFloatType<T>::Type;
+    using G = typename CpuComputeFloatType<T>::Type;
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         result[0] = std::min(G(a[i]), G(result[0]));
@@ -298,7 +337,7 @@ void max_impl(Tensor a, Tensor b, Tensor& result)
 template <typename T>
 static void max_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    using G   = typename CpuComputeFloatType<T>::Type;
+    using G = typename CpuComputeFloatType<T>::Type;
     for (int64_t i = 0; i < a.numel(); ++i)
     {
         result[0] = std::max(G(a[i]), G(result[0]));

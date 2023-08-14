@@ -167,6 +167,12 @@ Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step)
     CHECK(!this->requires_grad() || !GradMode::is_enabled());
     int64_t dims = this->dim();
 
+    if (dim < 0)
+    {
+        dim += this->dim();
+    }
+
+    CHECK_GE(dim, 0);
     CHECK_LT(dim, dims);
     CHECK_LE(start, end);
     CHECK_LE(end, this->size(dim));

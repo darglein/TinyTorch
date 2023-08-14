@@ -206,7 +206,7 @@ struct TensorInfoBase
     TT_HD DimIndex clamp_index_to_size(DimIndex index)
     {
         DimIndex result;
-        for (int i = 0; i < max_dims; ++i)
+        for (int i = 0; i < dim(); ++i)
         {
             result[i] = std::clamp(index[i], int64_t(0), sizes[i] - 1);
         }

@@ -13,7 +13,7 @@ struct Abs
     template <typename T>
     TT_HD T forward(T v)
     {
-        return ::abs(v);
+        return v > T(0) ? v : -v;
     }
 
     template <typename T>

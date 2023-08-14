@@ -143,7 +143,10 @@ struct Module
     {
         for (auto& b : parameters_)
         {
-            b.second.mutable_grad().zero_();
+            if(b.second.grad().defined())
+            {
+                b.second.mutable_grad().zero_();
+            }
         }
         for (auto& b : modules_)
         {
