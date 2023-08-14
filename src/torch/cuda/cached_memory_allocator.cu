@@ -29,7 +29,7 @@ constexpr T iAlignUp(T a, U b)
 
 std::mutex mu;
 
-#if 0
+#if 1
 void* cuda_cached_malloc(int64_t size)
 {
     std::unique_lock l(mu);

@@ -96,6 +96,9 @@ static void fill_with_infinite(Tensor& a, bool positive_inf)
 {
     switch (a.scalar_type())
     {
+        case kFloat16:
+            fill_with_infinite<Half>(a, positive_inf);
+            break;
         case kFloat32:
             fill_with_infinite<float>(a, positive_inf);
             break;

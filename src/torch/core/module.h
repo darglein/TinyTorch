@@ -143,7 +143,7 @@ struct Module
     {
         for (auto& b : parameters_)
         {
-            if(b.second.grad().defined())
+            if (b.second.grad().defined())
             {
                 b.second.mutable_grad().zero_();
             }
@@ -161,6 +161,8 @@ struct Module
             b.second->train(on);
         }
     }
+
+    bool is_training() const { return is_training_; }
 
     void register_buffer(std::string name, Tensor& t) { buffers_[name] = t; }
     void register_parameter(std::string name, Tensor& t)

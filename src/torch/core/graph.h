@@ -15,6 +15,8 @@
 namespace tinytorch
 {
 
+template<typename T>
+using intrusive_ptr = std::shared_ptr<T>;
 
 struct TINYTORCH_API GradMode
 {
@@ -130,7 +132,9 @@ struct Context
 
     bool requires_grad = true;
 
-    void set_materialize_grads(bool b) { throw std::runtime_error("not implemented"); }
+    // Sets whether undefined output grad tensors should be expanded to tensors
+    // full of zeros before calling backward function. Default value is true.
+    void set_materialize_grads(bool b) {  }
 
     std::vector<Tensor> get_saved_variables() { return saved_tensors; }
     void save_for_backward(const std::vector<Tensor>& l) { saved_tensors = l; }
