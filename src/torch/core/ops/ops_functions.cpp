@@ -257,8 +257,11 @@ struct IndexSelectNode : public FunctionNode<IndexSelectNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor input, IValue dim, Tensor index)
     {
-        ctx->saved_data["dim"] = dim;
-        ctx->save_for_backward({index});
+        if(ctx->requires_grad)
+        {
+            ctx->saved_data["dim"] = dim;
+            ctx->save_for_backward({index});
+        }
 
 
         CHECK_LT(dim.toInt(), input.dim());
@@ -605,6 +608,8 @@ std::pair<Tensor, Tensor> sort(Tensor t, int64_t dim)
 Tensor conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding, int dilation, int groups)
 {
     CHECK(!input.requires_grad() || !GradMode::is_enabled());
+    CHECK(input.is_cpu());
+    CHECK(!bias.defined());
     CHECK_EQ(input.dim(), 4);
     CHECK_EQ(weight.dim(), 4);
     CHECK_EQ(stride, 1);

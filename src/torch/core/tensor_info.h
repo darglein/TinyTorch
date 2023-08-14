@@ -79,6 +79,11 @@ struct TensorInfoBase
     TensorInfoBase(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims]);
     TensorInfoBase(Tensor t)
     {
+        if (!t.defined())
+        {
+            data = nullptr;
+            return;
+        }
         data  = t.template data_ptr<T>();
         dims_ = t.dim();
         CHECK_LE(t.dim(), MAX_TENSORINFO_DIMS);

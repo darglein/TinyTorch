@@ -128,6 +128,8 @@ struct TINYTORCH_API Context
 
     std::vector<Tensor> saved_tensors;
 
+    bool requires_grad = true;
+
     void set_materialize_grads(bool b) { throw std::runtime_error("not implemented"); }
 
     std::vector<Tensor> get_saved_variables() { return saved_tensors; }
@@ -282,8 +284,9 @@ struct FunctionNode : public Node
             CHECK_EQ(node->next.size(), node->num_inputs_of_forward);
         }
 
-        // Forward
+        node->context.requires_grad = need_grad;
 
+        // Forward
         NoGradGuard ngg;
         auto result                           = T::forward(&node->context, std::forward<Args>(args)...);
         node->num_input_gradients_of_backward = result.size();

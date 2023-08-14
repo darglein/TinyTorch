@@ -55,6 +55,12 @@ __launch_bounds__(128) static __global__ void fill_impl(TensorInfoCuda<T> a, Ten
 }
 void fill_impl(Tensor& a, double value)
 {
+    if (value == 0 && a.is_contiguous())
+    {
+        cudaMemset(a.data_ptr(), 0, a.numel() * a.element_size());
+        return;
+    }
+
     CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), fill_impl, a, value);
 }
 void fill_impl(Tensor& a, Tensor value)
@@ -269,7 +275,8 @@ void prod_impl(Tensor input, int64_t dim, Tensor& result)
     CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), prod_impl, input, dim, result);
 }
 template <typename T>
-__launch_bounds__(128) static __global__ void cumprod_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<T> result)
+__launch_bounds__(128) static __global__
+    void cumprod_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
@@ -291,7 +298,8 @@ void cumprod_impl(Tensor input, int64_t dim, Tensor& result)
     CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), cumprod_impl, input, dim, result);
 }
 template <typename T>
-__launch_bounds__(128) static __global__ void cumsum_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<T> result)
+__launch_bounds__(128) static __global__
+    void cumsum_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<T> result)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
@@ -416,7 +424,8 @@ void max_impl(Tensor input, int64_t dim, Tensor& result, Tensor& indices)
 
 template <typename T, typename TIndex>
 __launch_bounds__(128) static __global__
-    void index_select_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<TIndex> index, TensorInfoCuda<T> result)
+    void index_select_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<TIndex, 1> index,
+                           TensorInfoCuda<T> result)
 {
     int64_t result_linear_index = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (result_linear_index >= result.numel()) return;
@@ -428,7 +437,7 @@ __launch_bounds__(128) static __global__
 }
 
 template <typename TIndex>
-static void index_select_helper(Tensor input, int64_t dim, TensorInfoCuda<TIndex> index, Tensor result)
+static void index_select_helper(Tensor input, int64_t dim, TensorInfoCuda<TIndex, 1> index, Tensor result)
 {
     CUDA_SWITCH_MACRO_ALL(result.scalar_type(), result.numel(), index_select_impl, input, dim, index, result);
 }

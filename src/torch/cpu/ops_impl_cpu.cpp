@@ -118,6 +118,11 @@ static void fill_impl(TensorInfo<T> a, TensorInfo<T> values, int dim)
 
 void fill_impl(Tensor& a, double value)
 {
+    if (value == 0 && a.is_contiguous())
+    {
+        memset(a.data_ptr(), 0, a.numel() * a.element_size());
+        return;
+    }
     SWITCH_MACRO_ALL(a.scalar_type(), fill_impl, a, value);
 }
 void fill_impl(Tensor& a, Tensor value)
