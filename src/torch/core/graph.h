@@ -15,7 +15,7 @@
 namespace tinytorch
 {
 
-template<typename T>
+template <typename T>
 using intrusive_ptr = std::shared_ptr<T>;
 
 struct TINYTORCH_API GradMode
@@ -134,7 +134,7 @@ struct TINYTORCH_API Context
 
     // Sets whether undefined output grad tensors should be expanded to tensors
     // full of zeros before calling backward function. Default value is true.
-    void set_materialize_grads(bool b) {  }
+    void set_materialize_grads(bool b) {}
 
     std::vector<Tensor> get_saved_variables() { return saved_tensors; }
     void save_for_backward(const std::vector<Tensor>& l) { saved_tensors = l; }
@@ -187,6 +187,11 @@ struct TINYTORCH_API Node
     Node() : sequence_nr(current_seq_nr++) {}
     virtual ~Node() {}
 
+    void clear()
+    {
+        next.clear();
+        context = Context();
+    }
     // Computes and returns the gradients of the input tensor of the forward operator.
     // The input is the gradient of the forward output
     virtual std::vector<Tensor> node_backward(const std::vector<Tensor>& fwd_output_grad) = 0;

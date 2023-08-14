@@ -1,4 +1,5 @@
 #include "backward.h"
+
 #include "torch/core/graph.h"
 namespace tinytorch
 {
@@ -108,6 +109,15 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
         if (acc_node)
         {
             acc_node->accumulate(it.second);
+        }
+    }
+
+    if (!retain_grad)
+    {
+        for (auto& it : grad_map)
+        {
+            std::shared_ptr<autograd::Node> node = it.first;
+            node->clear();
         }
     }
 }
