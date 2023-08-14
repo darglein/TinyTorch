@@ -33,6 +33,7 @@ namespace std
 // warning C4251: 'tinytorch::Tensor::impl_': class 'std::shared_ptr<tinytorch::TensorImpl>'
 // needs to have dll-interface to be used by clients of struct 'tinytorch::Tensor'
 template class TINYTORCH_API shared_ptr<tinytorch::TensorImpl>;
+template class TINYTORCH_API vector<int64_t>;
 }  // namespace std
 
 namespace tinytorch
@@ -47,7 +48,7 @@ struct CustomClassHolder
     virtual ~CustomClassHolder() {}
 };
 
-struct SizeType
+struct TINYTORCH_API SizeType
 {
     SizeType() {}
     SizeType(const std::vector<int64_t>& v) : data_(v) {}
@@ -124,6 +125,9 @@ inline std::ostream& operator<<(std::ostream& strm, const SizeType& size)
     return strm;
 }
 
+
+#undef min
+#undef max
 
 
 struct TINYTORCH_API Tensor

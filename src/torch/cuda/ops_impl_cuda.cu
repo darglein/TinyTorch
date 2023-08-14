@@ -587,8 +587,8 @@ __launch_bounds__(128) static __global__ void clamp_impl_(TensorInfoCuda<T> src,
     if (i >= src.numel()) return;
 
     using G  = typename CpuComputeFloatType<T>::Type;
-    T low_t  = std::isfinite(low) ? T(low) : std::numeric_limits<T>::lowest();
-    T high_t = std::isfinite(high) ? T(high) : std::numeric_limits<T>::max();
+    T low_t  = ::isfinite(low) ? T(low) : std::numeric_limits<T>::lowest();
+    T high_t = ::isfinite(high) ? T(high) : std::numeric_limits<T>::max();
 
     {
         src[i] = std::min(G(high_t), std::max(G(src[i]), G(low_t)));

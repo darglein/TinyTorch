@@ -34,7 +34,7 @@ enum DeviceType
 };
 
 
-struct Device
+struct TINYTORCH_API Device
 {
     DeviceType type  = kCPU;
     int device_index = 0;
