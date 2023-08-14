@@ -19,14 +19,18 @@ StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(dev
     if (device_ == kCPU)
     {
         data_ptr_     = malloc(size);
+#if TT_DEBUG
         memset(data_ptr_,0xabababab,size);
+#endif
         has_ownership = true;
     }
     else
     {
 #ifdef TT_HAS_CUDA
         data_ptr_ = cuda::cuda_cached_malloc(size);
+#if TT_DEBUG
         cudaMemset(data_ptr_,0xabababab,size);
+#endif
         has_ownership = true;
 #else
         CHECK(false);

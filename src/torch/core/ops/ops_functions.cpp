@@ -257,8 +257,11 @@ struct IndexSelectNode : public FunctionNode<IndexSelectNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor input, IValue dim, Tensor index)
     {
-        ctx->saved_data["dim"] = dim;
-        ctx->save_for_backward({index});
+        if(ctx->requires_grad)
+        {
+            ctx->saved_data["dim"] = dim;
+            ctx->save_for_backward({index});
+        }
 
 
         CHECK_LT(dim.toInt(), input.dim());
