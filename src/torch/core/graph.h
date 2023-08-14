@@ -49,7 +49,7 @@ struct Node;
 }
 
 // exact copy paste from pytorch
-struct Edge
+struct TINYTORCH_API Edge
 {
     Edge(std::shared_ptr<autograd::Node> function_, uint32_t input_nr_) noexcept
         : function(std::move(function_)), input_nr(input_nr_)
@@ -64,7 +64,7 @@ struct Edge
 };
 
 
-struct IValue
+struct TINYTORCH_API IValue
 {
     IValue() {}
 
@@ -115,7 +115,7 @@ struct TensorMetaData
     Device device;
 };
 
-struct Context
+struct TINYTORCH_API Context
 {
     // the input tensor dimensions
     // is used to check for the correct gradient size
