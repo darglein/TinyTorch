@@ -464,7 +464,7 @@ Tensor Tensor::clamp(double mi, double ma) const
 }
 void Tensor::clamp_(double mi, double ma)
 {
-    tinytorch::clamp(*this, mi, ma);
+    tinytorch::clamp_(*this, mi, ma);
 }
 Tensor Tensor::clamp_min(double m) const
 {
