@@ -26,7 +26,7 @@ namespace tinytorch
 {
 
 
-#define MAX_TENSORINFO_DIMS 10
+#define MAX_TENSORINFO_DIMS 8
 
 
 template <int DIM>
@@ -55,10 +55,68 @@ struct DimIndexStruct
         }
     }
 
-    TT_HD int64_t& operator[](int64_t i) { return indices[i]; }
+    constexpr TT_HD void set_index(int64_t dim, int64_t value)
+    {
+#pragma unroll
+        for (int i = 0; i < DIM; ++i)
+        {
+            if (i == dim)
+            {
+                indices[i] = value;
+            }
+        }
+    }
+
+    constexpr TT_HD int64_t get_index(int64_t dim)
+    {
+#pragma unroll
+        for (int i = 0; i < DIM; ++i)
+        {
+            if (i == dim)
+            {
+                return indices[i];
+            }
+        }
+        return 0;
+    }
+
+    constexpr TT_HD int64_t& operator[](int64_t dim)
+    {
+#if 1 || defined(__CUDACC__)
+#pragma unroll
+        for (int i = 0; i < DIM; ++i)
+        {
+            if (i == dim)
+            {
+                return indices[i];
+            }
+        }
+        return indices[0];
+#else
+        return indices[dim];
+#endif
+    }
+
+    constexpr TT_HD int64_t operator[](int64_t dim) const
+    {
+#if 1 || defined(__CUDACC__)
+#pragma unroll
+        for (int i = 0; i < DIM; ++i)
+        {
+            if (i == dim)
+            {
+                return indices[i];
+            }
+        }
+        return 0;
+#else
+        return indices[dim];
+#endif
+    }
 
     TT_HD void zero_()
     {
+#pragma unroll
         for (int i = 0; i < DIM; ++i)
         {
             indices[i] = 0;
@@ -119,9 +177,13 @@ struct TensorInfoBase
     TT_HD int64_t numel()
     {
         int64_t result = 1;
-        for (int64_t i = 0; i < dim(); ++i)
+#pragma unroll
+        for (int64_t i = 0; i < max_dims; ++i)
         {
-            result *= sizes[i];
+            if (i < dim())
+            {
+                result *= sizes[i];
+            }
         }
         return result;
     }
@@ -147,20 +209,24 @@ struct TensorInfoBase
     TT_HD int64_t IndexToOffset(DimIndex index)
     {
         int64_t offset = 0;
-        for (int64_t i = 0; i < dim(); ++i)
+
+#pragma unroll
+        for (int64_t i = 0; i < max_dims; ++i)
         {
-            // bounds check
+            if (i < dim())
+            {
 #if TT_DEBUG
 #    if defined(__CUDACC__)
-            CUDA_KERNEL_ASSERT(index[i] >= 0);
-            CUDA_KERNEL_ASSERT(index[i] < sizes[i]);
+                CUDA_KERNEL_ASSERT(index[i] >= 0);
+                CUDA_KERNEL_ASSERT(index[i] < sizes[i]);
 
 #    else
-            CHECK_GE(index[i], 0);
-            CHECK_LT(index[i], sizes[i]);
+                CHECK_GE(index[i], 0);
+                CHECK_LT(index[i], sizes[i]);
 #    endif
 #endif
-            offset += index[i] * strides[i];
+                offset += index[i] * strides[i];
+            }
         }
 
         return offset;
@@ -169,11 +235,16 @@ struct TensorInfoBase
     TT_HD DimIndex LinearIndexToDimIndex(int64_t linearId)
     {
         DimIndex result;
-        for (int64_t i = dim() - 1; i > 0; --i)
+
+#pragma unroll
+        for (int64_t i = max_dims - 1; i > 0; --i)
         {
-            int64_t curDimIndex = linearId % sizes[i];
-            result[i]           = curDimIndex;
-            linearId /= sizes[i];
+            if (i < dim())
+            {
+                int64_t curDimIndex = linearId % sizes[i];
+                result[i]           = curDimIndex;
+                linearId /= sizes[i];
+            }
         }
 
         result[0] = linearId;
@@ -182,9 +253,10 @@ struct TensorInfoBase
     TT_HD bool index_in_range(DimIndex index)
     {
         bool result = true;
-        for (int i = 0; i < dim(); ++i)
+#pragma unroll
+        for (int64_t i = 0; i < max_dims; ++i)
         {
-            if (index[i] < 0 || index[i] > sizes[i])
+            if (i < dim() && (index[i] < 0 || index[i] > sizes[i]))
             {
                 result = false;
             }
@@ -195,9 +267,14 @@ struct TensorInfoBase
     TT_HD DimIndex clamp_index_to_size(DimIndex index)
     {
         DimIndex result;
-        for (int i = 0; i < dim(); ++i)
+
+#pragma unroll
+        for (int64_t i = 0; i < max_dims; ++i)
         {
-            result[i] = std::clamp(index[i], int64_t(0), sizes[i] - 1);
+            if (i < dim())
+            {
+                result[i] = std::clamp(index[i], int64_t(0), sizes[i] - 1);
+            }
         }
         return result;
     }

@@ -4,11 +4,12 @@
  * See LICENSE file for more information.
  */
 #include "tensor_data.h"
+
 #include "torch/cuda/cached_memory_allocator.h"
 
 #ifdef TT_HAS_CUDA
+#    include "torch/cuda/ops_impl_cuda_helper.h"
 #    include <cuda_runtime.h>
-#include "torch/cuda/ops_impl_cuda_helper.h"
 #endif
 
 
@@ -18,9 +19,13 @@ StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(dev
 {
     if (device_ == kCPU)
     {
-        data_ptr_     = malloc(size);
+#ifdef TT_HAS_CUDA3465
+        cudaMallocHost(&data_ptr_, size);
+#else
+        data_ptr_ = malloc(size);
+#endif
 #if TT_DEBUG
-        memset(data_ptr_,0xabababab,size);
+        memset(data_ptr_, 0xabababab, size);
 #endif
         has_ownership = true;
     }
@@ -28,9 +33,9 @@ StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(dev
     {
 #ifdef TT_HAS_CUDA
         data_ptr_ = cuda::cuda_cached_malloc(size);
-#if TT_DEBUG
-        cudaMemset(data_ptr_,0xabababab,size);
-#endif
+#    if TT_DEBUG
+        cudaMemset(data_ptr_, 0xabababab, size);
+#    endif
         has_ownership = true;
 #else
         CHECK(false);
@@ -52,7 +57,11 @@ StorageImpl::~StorageImpl()
     {
         if (device_ == kCPU)
         {
+#ifdef TT_HAS_CUDA456
+            cudaFreeHost(data_ptr_);
+#else
             free(data_ptr_);
+#endif
         }
         else
         {

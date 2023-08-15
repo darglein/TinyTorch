@@ -424,15 +424,15 @@ void max_impl(Tensor input, int64_t dim, Tensor& result, Tensor& indices)
 
 template <typename T, typename TIndex>
 __launch_bounds__(128) static __global__
-    void index_select_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<TIndex, 1> index,
-                           TensorInfoCuda<T> result)
+    void index_select_impl(TensorInfoCuda<T> input, int dim, TensorInfoCuda<TIndex, 1> index, TensorInfoCuda<T> result)
 {
     int64_t result_linear_index = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (result_linear_index >= result.numel()) return;
 
-    auto index_result    = result.LinearIndexToDimIndex(result_linear_index);
-    auto index_input     = index_result;
-    index_input[dim]     = index[index_result[dim]];
+    auto index_result = result.LinearIndexToDimIndex(result_linear_index);
+    auto index_input  = index_result;
+
+     index_input.set_index(dim, index[index_result.get_index(dim)]);
     result[index_result] = input[index_input];
 }
 
@@ -466,12 +466,16 @@ __launch_bounds__(128) static __global__
 
     auto index_input  = data.LinearIndexToDimIndex(input_linear_index);
     auto index_result = index_input;
-    CUDA_KERNEL_ASSERT(index_input[dim] < index.sizes[0]);
-    index_result[dim] = index[index_input[dim]];
-    CUDA_KERNEL_ASSERT(index_result[dim] < result.sizes[dim]);
+    index_result.set_index(dim, index[index_input.get_index(dim)]);
 
+
+#if TT_DEBUG
+    CUDA_KERNEL_ASSERT(index_input[dim] < index.sizes[0]);
+    CUDA_KERNEL_ASSERT(index_result[dim] < result.sizes[dim]);
     CUDA_KERNEL_ASSERT(result.index_in_range(index_result));
     CUDA_KERNEL_ASSERT(data.index_in_range(index_input));
+#endif
+
     atomicAdd(&result[index_result], data[index_input]);
 }
 
@@ -506,7 +510,8 @@ __launch_bounds__(128) static __global__
         auto index_result = result.LinearIndexToDimIndex(input_linear_index);
         auto index_input  = index_result;
 
-        index_input[dim] = index[index_result];
+        // index_input[dim] = index[index_result];
+        index_input.set_index(dim,index[index_result]);
 
         result[index_result] = data[index_input];
     }
@@ -526,12 +531,16 @@ __launch_bounds__(128) static __global__
 
     auto index_input  = value.LinearIndexToDimIndex(input_linear_index);
     auto index_result = index_input;
-    CUDA_KERNEL_ASSERT(index_input[dim] < index.sizes[0]);
-    index_result[dim] = index[index_input[dim]];
-    CUDA_KERNEL_ASSERT(index_result[dim] < target.sizes[dim]);
 
+    // index_result[dim] = index[index_input[dim]];
+    index_result.set_index(dim, index[index_input.get_index(dim)]);
+
+#if TT_DEBUG
+    CUDA_KERNEL_ASSERT(index_input[dim] < index.sizes[0]);
+    CUDA_KERNEL_ASSERT(index_result[dim] < target.sizes[dim]);
     CUDA_KERNEL_ASSERT(target.index_in_range(index_result));
     CUDA_KERNEL_ASSERT(value.index_in_range(index_input));
+#endif
     target[index_result] = value[index_input];
 }
 

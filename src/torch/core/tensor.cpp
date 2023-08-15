@@ -212,8 +212,12 @@ Tensor Tensor::permute_view(const SizeType& index) const
 
 void Tensor::resize_(const SizeType& size)
 {
-    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(size, options());
-    impl_->set_data(*new_impl);
+    auto new_tensor = empty(size, options());
+    new_tensor.view({-1}).slice(0,0,this->numel()).copy_(this->view({-1}));
+
+    this->set_data(new_tensor);
+    // std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(size, options());
+    // impl_->set_data(*new_impl);
 }
 
 Tensor Tensor::unsqueeze(int64_t dim) const

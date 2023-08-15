@@ -31,10 +31,11 @@ __launch_bounds__(128) __global__
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
+
     auto index_result = result.LinearIndexToDimIndex(i);
     // the index clamping allows operations when one tensor has a 1-dimension
-    auto index_a         = a.clamp_index_to_size(index_result);
-    auto index_b         = b.clamp_index_to_size(index_result);
+     auto index_a         = a.clamp_index_to_size(index_result);
+     auto index_b         = b.clamp_index_to_size(index_result);
     result[index_result] = op.forward(a[index_a], b[index_b]);
 }
 
