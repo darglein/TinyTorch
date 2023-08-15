@@ -252,6 +252,10 @@ struct FunctionNode : public Node
             }
         }
 
+        // This is important, because if the node would store the output tensor here then
+        // we get a shared_ptr cycle and leak memory.
+        context.saved_tensors.clear();
+
         return grad_list;
     }
 

@@ -389,7 +389,8 @@ struct SliceNode : public FunctionNode<SliceNode>
         auto g      = grad[0];
         auto grad_a = zeros_like(a);
 
-        grad_a.slice_view(dim, start, end, step) += g;
+        // grad_a.slice_view(dim, start, end, step) += g;
+        grad_a.slice_view(dim, start, end, step).copy_(g);
 
         return {grad_a, {}, {}, {}, {}};
     }

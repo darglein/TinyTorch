@@ -89,8 +89,8 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
 
                 if (!grad_map[next_node][next->input_nr].defined())
                 {
-                    // grad_map[next_node][next->input_nr] = zeros_like(next_gradients[next->input_nr]);
-                    grad_map[next_node][next->input_nr] = g.clone();
+//                    grad_map[next_node][next->input_nr] = g.clone();
+                    grad_map[next_node][next->input_nr] = g;
                 }
                 else
                 {
@@ -109,15 +109,6 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
         if (acc_node)
         {
             acc_node->accumulate(it.second);
-        }
-    }
-
-    if (!retain_grad)
-    {
-        for (auto& it : grad_map)
-        {
-            std::shared_ptr<autograd::Node> node = it.first;
-            node->clear();
         }
     }
 }

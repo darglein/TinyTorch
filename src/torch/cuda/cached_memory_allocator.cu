@@ -60,11 +60,28 @@ struct MemoryAllocation
 static std::vector<MemoryAllocation> all_allocations;
 
 
+void CheckValidMemory()
+{
+    for (int i = 0; i < all_allocations.size(); ++i)
+    {
+        for (int j = i + 1; j < all_allocations.size(); ++j)
+        {
+            CHECK(all_allocations[i].ptr != all_allocations[j].ptr);
+        }
+    }
+}
+
 
 void* cuda_cached_malloc(int64_t size)
 {
+    if (size == 0)
+    {
+        return nullptr;
+    }
+
     auto padded_size = iAlignUp(size, 1024 * 1024);
     std::unique_lock l(mu);
+    CheckValidMemory();
     for (auto& a : all_allocations)
     {
         if (a.size > padded_size + padded_size / 2)
@@ -126,12 +143,19 @@ void* cuda_cached_malloc(int64_t size)
     // sort by size (smallest size first) -> we get best fit allocation
     std::sort(all_allocations.begin(), all_allocations.end(), [](auto a, auto b) { return a.size < b.size; });
 
+    CheckValidMemory();
+
     return new_alloc.ptr;
 }
 
 void cuda_cached_free(void* ptr)
 {
+    if (ptr == nullptr)
+    {
+        return;
+    }
     std::unique_lock l(mu);
+    CheckValidMemory();
     for (auto& a : all_allocations)
     {
         if (a.ptr == ptr)
@@ -155,6 +179,7 @@ void CUDACachingAllocator::emptyCache()
     }
     all_allocations.erase(std::remove_if(all_allocations.begin(), all_allocations.end(), [](auto a) { return a.free; }),
                           all_allocations.end());
+    CheckValidMemory();
 }
 
 #endif
