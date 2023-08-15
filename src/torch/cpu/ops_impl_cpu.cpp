@@ -40,7 +40,8 @@ void to_impl_cpu_cuda(Tensor a, Tensor b)
     int64_t bytes = a.element_size() * a.numel();
     auto type     = (b.device() == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
 
-    CHECK_CUDA_ERROR(cudaMemcpy(b.data_ptr(), a.data_ptr(), bytes, type));
+     CHECK_CUDA_ERROR(cudaMemcpy(b.data_ptr(), a.data_ptr(), bytes, type));
+//    CHECK_CUDA_ERROR(cudaMemcpyAsync(b.data_ptr(), a.data_ptr(), bytes, type));
 #else
     CHECK(false);
 #endif

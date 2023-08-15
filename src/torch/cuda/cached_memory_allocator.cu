@@ -29,18 +29,18 @@ constexpr T iAlignUp(T a, U b)
 
 std::mutex mu;
 
-#if 0
+#if 1
 void* cuda_cached_malloc(int64_t size)
 {
     std::unique_lock l(mu);
     void* ptr;
-    cudaMalloc(&ptr, size);
+    cudaMallocAsync(&ptr, size, 0);
     return ptr;
 }
 void cuda_cached_free(void* ptr)
 {
     std::unique_lock l(mu);
-    cudaFree(ptr);
+    cudaFreeAsync(ptr, 0);
     return;
 }
 void CUDACachingAllocator::emptyCache()
