@@ -230,11 +230,7 @@ struct TINYTORCH_API Tensor
     Tensor unsqueeze(int64_t dim) const;
     Tensor squeeze(int64_t dim) const;
     Tensor squeeze() const;
-    Tensor prod(int64_t dim) const
-    {
-        throw std::runtime_error("not implemented");
-        return {};
-    }
+    Tensor prod(int64_t dim, bool keepdim = false) const;
     Tensor cumprod(int64_t dim) const;
     Tensor cumsum(int64_t dim) const;
     void fill_(double a);

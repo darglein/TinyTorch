@@ -18,7 +18,8 @@ struct SumNode : public FunctionNode<SumNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
-        Tensor result = zeros({1}, a.options());
+         Tensor result = zeros({1}, a.options());
+//        Tensor result = empty({1}, a.options());
         SELECT_DEVICE(a.device(), sum_impl, a, result);
         return {result};
     }
@@ -115,7 +116,6 @@ static void fill_with_infinite(Tensor& a, bool positive_inf)
             CHECK(false);
     }
 }
-
 
 Tensor min(Tensor a)
 {

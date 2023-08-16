@@ -83,7 +83,7 @@ struct DimIndexStruct
     constexpr TT_HD int64_t& operator[](int64_t dim)
     {
 #if 1 || defined(__CUDACC__)
-#pragma unroll
+#    pragma unroll
         for (int i = 0; i < DIM; ++i)
         {
             if (i == dim)
@@ -100,7 +100,7 @@ struct DimIndexStruct
     constexpr TT_HD int64_t operator[](int64_t dim) const
     {
 #if 1 || defined(__CUDACC__)
-#pragma unroll
+#    pragma unroll
         for (int i = 0; i < DIM; ++i)
         {
             if (i == dim)
@@ -241,6 +241,30 @@ struct TensorInfoBase
         {
             if (i < dim())
             {
+                int64_t curDimIndex = linearId % sizes[i];
+                result[i]           = curDimIndex;
+                linearId /= sizes[i];
+            }
+        }
+
+        result[0] = linearId;
+        return result;
+    }
+
+    TT_HD DimIndex LinearIndexToDimIndexSkipDim(int64_t linearId, int64_t dim_to_skip)
+    {
+        DimIndex result;
+
+#pragma unroll
+        for (int64_t i = max_dims - 1; i > 0; --i)
+        {
+            if (i < dim())
+            {
+                if (i == dim_to_skip)
+                {
+                    result[i] = 0;
+                    continue;
+                }
                 int64_t curDimIndex = linearId % sizes[i];
                 result[i]           = curDimIndex;
                 linearId /= sizes[i];

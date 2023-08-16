@@ -31,5 +31,8 @@ void greater_impl(Tensor a, double b, Tensor& result);
 // binary functions
 void pow_impl(Tensor a, double b, Tensor& result);
 void pow_impl(Tensor a, Tensor b, Tensor& result);
+
+void min_impl(Tensor a, Tensor b, Tensor& result);
+void max_impl(Tensor a, Tensor b, Tensor& result);
 }
 }  // namespace tinytorch

@@ -13,8 +13,8 @@
 #include "torch/tiny_torch_cuda.h"
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
-namespace tinytorch
-{
+
+
 __device__ static half atomicMin(half* address, half val)
 {
     CUDA_KERNEL_ASSERT(false);
@@ -88,5 +88,3 @@ __device__ static double atomicMax(double* address, double val)
     return old_value;
 }
 
-
-}  // namespace tinytorch

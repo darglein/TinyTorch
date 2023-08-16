@@ -4,9 +4,8 @@
  * See LICENSE file for more information.
  */
 
-#include "torch/core/ops/ops_impl.h"
-
 #include "ops_impl_cpu_helper.h"
+#include "torch/core/ops/ops_impl.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cpu/ops_impl_cpu.h"
 
@@ -114,6 +113,14 @@ void pow_impl(Tensor a, double b, Tensor& result)
 void pow_impl(Tensor a, Tensor b, Tensor& result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Pow(), a, b, result);
+}
+void min_impl(Tensor a, Tensor b, Tensor& result)
+{
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Min(), a, b, result);
+}
+void max_impl(Tensor a, Tensor b, Tensor& result)
+{
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Max(), a, b, result);
 }
 
 

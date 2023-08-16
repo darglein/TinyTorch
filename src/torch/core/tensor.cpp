@@ -543,6 +543,10 @@ Tensor Tensor::gather(int64_t dim, Tensor index) const
 {
     return tinytorch::gather(*this, dim, index);
 }
+Tensor Tensor::prod(int64_t dim, bool keepdim) const
+{
+    return tinytorch::prod(*this,dim,keepdim);
+}
 
 
 }  // namespace tinytorch

@@ -101,15 +101,15 @@ struct Softplus
     TT_HD T forward(T x)
     {
         if (x > T(threshold)) return x;
-        return T(::log(::exp(x * T(beta))  + T(1.f)) / T(beta));
+        return T(::log(::exp(x * T(beta)) + T(1.f)) / T(beta));
     }
     template <typename T>
     TT_HD T backward(T x)
     {
-        if(x > T(threshold)) return 1;
+        if (x > T(threshold)) return 1;
         // T tmp =  expf((float)frag.x[t] * beta);
         if (x > T(threshold)) return x;
-        return T(::log(::exp(x * T(beta))  + T(1.f)) / T(beta));
+        return T(::log(::exp(x * T(beta)) + T(1.f)) / T(beta));
     }
     float beta;
     float threshold;
@@ -180,6 +180,22 @@ struct Pow
     TT_HD T forward(T a, T b)
     {
         return ::pow(a, b);
+    }
+};
+struct Min
+{
+    template <typename T>
+    TT_HD T forward(T a, T b)
+    {
+        return a < b ? a : b;
+    }
+};
+struct Max
+{
+    template <typename T>
+    TT_HD T forward(T a, T b)
+    {
+        return a > b ? a : b;
     }
 };
 }  // namespace BinaryOperators

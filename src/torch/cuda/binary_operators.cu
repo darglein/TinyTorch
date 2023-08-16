@@ -109,6 +109,14 @@ void pow_impl(Tensor a, Tensor b, Tensor& result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Pow(), a, b, result);
 }
+void min_impl(Tensor a, Tensor b, Tensor& result)
+{
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Min(), a, b, result);
+}
+void max_impl(Tensor a, Tensor b, Tensor& result)
+{
+    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Max(), a, b, result);
+}
 
 }  // namespace cuda_impl
 }  // namespace tinytorch

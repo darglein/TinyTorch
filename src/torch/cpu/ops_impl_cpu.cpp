@@ -295,20 +295,6 @@ void cumsum_impl(Tensor input, int64_t dim, Tensor& result)
 {
     SWITCH_MACRO_ALL(input.scalar_type(), cumsum_impl, input, dim, result);
 }
-template <typename T>
-static void min_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
-{
-    using G = typename CpuComputeFloatType<T>::Type;
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[i] = std::min(G(a[i]), G(b[i]));
-    }
-}
-
-void min_impl(Tensor a, Tensor b, Tensor& result)
-{
-    SWITCH_MACRO_ALL(a.scalar_type(), min_impl, a, b, result);
-}
 
 template <typename T>
 static void min_impl(TensorInfo<T> a, TensorInfo<T> result)
@@ -325,20 +311,6 @@ void min_impl(Tensor a, Tensor& result)
     SWITCH_MACRO_ALL(a.scalar_type(), min_impl, a, result);
 }
 
-template <typename T>
-static void max_impl(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
-{
-    using G = typename CpuComputeFloatType<T>::Type;
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        result[i] = std::max(G(a[i]), G(b[i]));
-    }
-}
-
-void max_impl(Tensor a, Tensor b, Tensor& result)
-{
-    SWITCH_MACRO_ALL(a.scalar_type(), max_impl, a, b, result);
-}
 
 template <typename T>
 static void max_impl(TensorInfo<T> a, TensorInfo<T> result)

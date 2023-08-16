@@ -39,15 +39,17 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 #    define CUDA_SYNC_CHECK_ERROR() (static_cast<void>(0))
 #endif
 
-#define CUDA_CASE_MACRO(func, scalar_type, numel, ...)                                       \
-    case scalar_type:                                                                        \
-        if (numel > 0)                                                                       \
-        {                                                                                    \
-            func<<<iDivUp(numel, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(__VA_ARGS__); \
-            CUDA_SYNC_CHECK_ERROR();                                                         \
-        }                                                                                    \
+#define CUDA_CASE_MACRO_REFINED(block_size, func, scalar_type, numel, ...)                                 \
+    case scalar_type:                                                                                      \
+        if (numel > 0)                                                                                     \
+        {                                                                                                  \
+            func<<<iDivUp(numel, block_size), block_size, 0, cuda::getCurrentCUDAStream()>>>(__VA_ARGS__); \
+            CUDA_SYNC_CHECK_ERROR();                                                                       \
+        }                                                                                                  \
         break;
 
+
+#define CUDA_CASE_MACRO(...) CUDA_CASE_MACRO_REFINED(128, __VA_ARGS__)
 
 #define CUDA_SWITCH_MACRO_FLOAT(real_scalar_type, numel, func, ...)        \
     {                                                                      \

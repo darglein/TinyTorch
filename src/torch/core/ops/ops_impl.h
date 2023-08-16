@@ -10,6 +10,7 @@
 #include "torch/cuda/binary_operators.h"
 #include "torch/cuda/ops_impl_cuda.h"
 #include "torch/cuda/unary_operators.h"
+#include "torch/cuda/reduce_operators.h"
 #include "torch/cuda/grid_sample.h"
 
 #include "torch/tiny_torch_config.h"
