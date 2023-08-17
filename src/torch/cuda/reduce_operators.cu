@@ -197,21 +197,33 @@ static __global__ void global_reduce(TensorInfoCuda<InputType> a, TensorInfoCuda
 }
 
 template <typename Op>
-void global_reduce_helper(Tensor a, Tensor& result)
+void global_reduce_helper(Tensor a, Tensor result)
 {
+    auto kernel_result = result;
+    if (a.scalar_type() == kHalf)
+    {
+        kernel_result = result.to(kFloat);
+    }
+
+
     int64_t num_threads = std::min(a.numel(), int64_t(1024) * 1024);
     switch (a.scalar_type())
     {
-        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<int, int>), kInt32, num_threads, a, result, Op(),
+        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<int, int>), kInt32, num_threads, a, kernel_result, Op(),
                                 Op::template default_value<int>())
-        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<__half, __half>), kFloat16, num_threads, a, result,
-                                Op(), Op::template default_value<__half>())
-        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<float, float>), kFloat, num_threads, a, result, Op(),
+        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<__half, float>), kFloat16, num_threads, a, kernel_result,
+                                Op(), Op::template default_value<float>())
+        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<float, float>), kFloat, num_threads, a, kernel_result, Op(),
                                 Op::template default_value<float>())
-        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<double, double>), kDouble, num_threads, a, result,
+        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<double, double>), kDouble, num_threads, a, kernel_result,
                                 Op(), Op::template default_value<double>())
         default:
             CHECK(false) << "invalid input type " << a.scalar_type();
+    }
+
+    if (a.scalar_type() == kHalf)
+    {
+        result.copy_(kernel_result);
     }
 }
 
@@ -239,7 +251,7 @@ static __global__ void dimensional_reduce(TensorInfoCuda<InputType> a, int64_t d
 {
     int64_t size_to_reduce       = a.size(dim);
     int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
-    int64_t num_steps = iDivUp(size_to_reduce,REDUCE_BLOCK_SIZE);
+    int64_t num_steps            = iDivUp(size_to_reduce, REDUCE_BLOCK_SIZE);
 
     // each reduction is computed by a separate block
     for (int64_t block_id = blockIdx.x; block_id < num_blocks_to_reduce; block_id += gridDim.x)
@@ -250,15 +262,15 @@ static __global__ void dimensional_reduce(TensorInfoCuda<InputType> a, int64_t d
 
         for (int64_t k = 0; k < num_steps; ++k)
         {
-            int64_t i              = k * REDUCE_BLOCK_SIZE + threadIdx.x;
-            index_input.set_index(dim,i);
+            int64_t i = k * REDUCE_BLOCK_SIZE + threadIdx.x;
+            index_input.set_index(dim, i);
             OutputType local_value = i < size_to_reduce ? OutputType(a[index_input]) : default_value;
             local_value            = blockReduce<REDUCE_BLOCK_SIZE, OutputType>(local_value, op, default_value);
             value                  = op(value, local_value);
         }
         if (threadIdx.x == 0)
         {
-           result[block_id] = value;
+            result[block_id] = value;
         }
     }
 }
@@ -278,7 +290,7 @@ void dimensional_reduce_helper(Tensor a, int64_t dim, Tensor& result)
         default:
             CHECK(false) << "invalid input type " << a.scalar_type();
     }
-//    cudaDeviceSynchronize();
+    //    cudaDeviceSynchronize();
 }
 
 template <typename T>
@@ -295,7 +307,7 @@ __launch_bounds__(128) static __global__ void sum_impl(TensorInfoCuda<T> input, 
 
 void sum_impl(Tensor a, int64_t dim, Tensor& result)
 {
-    dimensional_reduce_helper<ReduceAdd>(a,dim,result);
+    dimensional_reduce_helper<ReduceAdd>(a, dim, result);
     return;
     auto stream = cuda::getCurrentCUDAStream();
     switch (a.scalar_type())
@@ -332,9 +344,9 @@ __launch_bounds__(128) static __global__ void prod_impl(TensorInfoCuda<T> input,
 
 void prod_impl(Tensor input, int64_t dim, Tensor& result)
 {
-    dimensional_reduce_helper<ReduceProd>(input,dim,result);
+    dimensional_reduce_helper<ReduceProd>(input, dim, result);
     return;
-//    CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), prod_impl, input, dim, result);
+    //    CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), prod_impl, input, dim, result);
 }
 template <typename T>
 __launch_bounds__(128) static __global__

@@ -18,8 +18,8 @@ struct SumNode : public FunctionNode<SumNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
-         Tensor result = zeros({1}, a.options());
-//        Tensor result = empty({1}, a.options());
+        Tensor result = zeros({1}, a.options());
+        //        Tensor result = empty({1}, a.options());
         SELECT_DEVICE(a.device(), sum_impl, a, result);
         return {result};
     }
@@ -209,7 +209,7 @@ Tensor sum(Tensor a, int64_t dim, bool keepdim)
 Tensor sum(Tensor a, SizeType s, bool keepdim)
 {
     auto sv = s.vec();
-    std::sort(sv.begin(), sv.end(),std::greater<>());
+    std::sort(sv.begin(), sv.end(), std::greater<>());
     for (auto dim : sv)
     {
         a = sum(a, dim, keepdim);
@@ -231,7 +231,7 @@ Tensor mean(Tensor a, int64_t dim, bool keepdim)
 Tensor mean(Tensor a, SizeType s, bool keepdim)
 {
     auto sv = s.vec();
-    std::sort(sv.begin(), sv.end(),std::greater<>());
+    std::sort(sv.begin(), sv.end(), std::greater<>());
 
     for (auto dim : sv)
     {
@@ -243,11 +243,12 @@ Tensor mean(Tensor a, SizeType s, bool keepdim)
 
 Tensor std(Tensor a)
 {
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
-
-    Tensor result = empty({1}, a.options());
-    cpu_impl::std_impl(a, result);
-    return result;
+    auto mean = a.mean();
+    a         = a - mean;
+    a         = a.square();
+    a         = a.mean();
+    a         = a.sqrt();
+    return a;
 }
 
 

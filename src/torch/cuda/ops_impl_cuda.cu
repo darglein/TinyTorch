@@ -152,32 +152,44 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
     }
 }
 
-inline TT_HD uint64_t xorshift64(uint64_t x)
+inline TT_HD unsigned int xorshift64(unsigned int x)
 {
+    //    x ^= x << 13;
+    //    x ^= x >> 7;
+    //    x ^= x << 17;
     x ^= x << 13;
-    x ^= x >> 7;
-    x ^= x << 17;
+    x ^= x >> 17;
+    x ^= x << 5;
     return x;
 }
 
 template <typename T>
 __launch_bounds__(128) static __global__ void rand_float_impl(TensorInfoCuda<T> a, float low, float high, uint64_t seed)
 {
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
+    int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    int64_t grid_size = blockDim.x * gridDim.x;
+    //    if (i >= a.numel()) return;
 
-    auto seed2 = seed + i;
-    uint64_t x = xorshift64(seed2);
-    double xf  = double(x) / std::numeric_limits<uint64_t>::max();
+    for (; i < a.numel(); i += grid_size)
+    {
+        unsigned int seed2 = seed + i;
+        unsigned int x     = xorshift64(seed2);
+        float xf           = float(x) * (1.0 / std::numeric_limits<unsigned int>::max());
 
-    a[i] = T(xf * (high - low) + low);
+        a[i] = T(xf * (high - low) + low);
+    }
+    //    a[i] = T(float(i));
 }
 
 void uniform_impl(Tensor& a, double mi, double ma)
 {
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
     uint64_t seed = dist(generator());
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), rand_float_impl, a, (float)mi, (float)ma, seed);
+
+    int64_t max_threads = std::min<int64_t>(a.numel(), 1024 * 1);
+    max_threads         = a.numel();
+
+    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), max_threads, rand_float_impl, a, (float)mi, (float)ma, seed);
 }
 
 template <typename T>
@@ -210,7 +222,7 @@ __launch_bounds__(128) static __global__
     auto index_result = result.LinearIndexToDimIndex(result_linear_index);
     auto index_input  = index_result;
 
-     index_input.set_index(dim, index[index_result.get_index(dim)]);
+    index_input.set_index(dim, index[index_result.get_index(dim)]);
     result[index_result] = input[index_input];
 }
 
@@ -289,7 +301,7 @@ __launch_bounds__(128) static __global__
         auto index_input  = index_result;
 
         // index_input[dim] = index[index_result];
-        index_input.set_index(dim,index[index_result]);
+        index_input.set_index(dim, index[index_result]);
 
         result[index_result] = data[index_input];
     }
