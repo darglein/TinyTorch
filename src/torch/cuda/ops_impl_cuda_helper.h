@@ -39,6 +39,8 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 #    define CUDA_SYNC_CHECK_ERROR() (static_cast<void>(0))
 #endif
 
+#define EXPAND(x) x // https://stackoverflow.com/questions/32399191/va-args-expansion-using-msvc
+
 #define CUDA_CASE_MACRO_REFINED(block_size, func, scalar_type, numel, ...)                                 \
     case scalar_type:                                                                                      \
         if (numel > 0)                                                                                     \
@@ -49,7 +51,7 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
         break;
 
 
-#define CUDA_CASE_MACRO(...) CUDA_CASE_MACRO_REFINED(128, __VA_ARGS__)
+#define CUDA_CASE_MACRO(...) EXPAND(CUDA_CASE_MACRO_REFINED(128, __VA_ARGS__))
 
 #define CUDA_SWITCH_MACRO_FLOAT(real_scalar_type, numel, func, ...)        \
     {                                                                      \

@@ -8,13 +8,13 @@
 #define SWITCH_MACRO_BINARY_OPERATOR(op, a, b, result)                                              \
     switch (result.scalar_type())                                                                   \
     {                                                                                               \
-        CUDA_CASE_MACRO((element_wise_operator<uint8_t>), kUInt8, result.numel(), op, a, b, result) \
-        CUDA_CASE_MACRO((element_wise_operator<int16_t>), kInt16, result.numel(), op, a, b, result) \
-        CUDA_CASE_MACRO((element_wise_operator<int32_t>), kInt32, result.numel(), op, a, b, result) \
-        CUDA_CASE_MACRO((element_wise_operator<int64_t>), kInt64, result.numel(), op, a, b, result) \
-        CUDA_CASE_MACRO((element_wise_operator<half>), kHalf, result.numel(), op, a, b, result)     \
-        CUDA_CASE_MACRO((element_wise_operator<float>), kFloat, result.numel(), op, a, b, result)   \
-        CUDA_CASE_MACRO((element_wise_operator<double>), kDouble, result.numel(), op, a, b, result) \
+        CUDA_CASE_MACRO(element_wise_operator<uint8_t>, kUInt8, result.numel(), op, a, b, result) \
+        CUDA_CASE_MACRO(element_wise_operator<int16_t>, kInt16, result.numel(), op, a, b, result) \
+        CUDA_CASE_MACRO(element_wise_operator<int32_t>, kInt32, result.numel(), op, a, b, result) \
+        CUDA_CASE_MACRO(element_wise_operator<int64_t>, kInt64, result.numel(), op, a, b, result) \
+        CUDA_CASE_MACRO(element_wise_operator<half>, kHalf, result.numel(), op, a, b, result)     \
+        CUDA_CASE_MACRO(element_wise_operator<float>, kFloat, result.numel(), op, a, b, result)   \
+        CUDA_CASE_MACRO(element_wise_operator<double>, kDouble, result.numel(), op, a, b, result) \
         default:                                                                                    \
             CHECK(false) << "invalid input type " << result.scalar_type();                          \
     }

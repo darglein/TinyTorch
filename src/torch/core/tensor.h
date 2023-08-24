@@ -33,7 +33,6 @@ namespace std
 // warning C4251: 'tinytorch::Tensor::impl_': class 'std::shared_ptr<tinytorch::TensorImpl>'
 // needs to have dll-interface to be used by clients of struct 'tinytorch::Tensor'
 template class TINYTORCH_API shared_ptr<tinytorch::TensorImpl>;
-template class TINYTORCH_API vector<int64_t>;
 }  // namespace std
 
 namespace tinytorch
