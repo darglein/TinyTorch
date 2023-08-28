@@ -18,6 +18,7 @@ namespace tinytorch
 {
 int64_t Tensor::numel() const
 {
+    CHECK(defined());
     return impl_->numel();
 }
 

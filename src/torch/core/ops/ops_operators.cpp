@@ -47,11 +47,11 @@ inline std::pair<SizeType, SizeType> CheckOperatorSizeMatchOneDim(const Tensor& 
 
 inline void BackwardExpand(Tensor& grad_a, Tensor& grad_b, SizeType expand_a, SizeType expand_b)
 {
-    if (expand_a.size() > 0)
+    if (grad_a.defined() && expand_a.size() > 0)
     {
         grad_a = grad_a.sum(expand_a, true);
     }
-    if (expand_b.size() > 0)
+    if (grad_b.defined() && expand_b.size() > 0)
     {
         grad_b = grad_b.sum(expand_b, true);
     }
@@ -92,8 +92,8 @@ struct AddNode : public FunctionNode<AddNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto grad_a = grad[0].clone();
-        auto grad_b = grad[0].clone();
+        auto grad_a = grad[0]; //.clone();
+        auto grad_b = grad[0]; //.clone();
 
         BackwardExpand(grad_a, grad_b, ctx->saved_data["expand_a"].toSizes(), ctx->saved_data["expand_b"].toSizes());
 
@@ -115,8 +115,13 @@ struct SubNode : public FunctionNode<SubNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto grad_a = grad[0].clone();
-        auto grad_b = -grad[0].clone();
+        Tensor grad_a, grad_b;
+
+        grad_a = grad[0];
+        if(ctx->requires_grad_for_input(1))
+        {
+            grad_b = -grad[0];
+        }
 
         BackwardExpand(grad_a, grad_b, ctx->saved_data["expand_a"].toSizes(), ctx->saved_data["expand_b"].toSizes());
         return {grad_a, grad_b};
@@ -244,7 +249,7 @@ struct AddTensorScalarNode : public FunctionNode<AddTensorScalarNode>
     {
         double b    = ctx->saved_data["b"].toDouble();
         auto l      = ctx->get_saved_variables();
-        auto grad_a = grad[0].clone();
+        auto grad_a = grad[0];//.clone();
         return {grad_a, {}};
     }
 };

@@ -115,6 +115,7 @@ struct TensorMetaData
 {
     SizeType size;
     Device device;
+    bool requires_grad = false;
 };
 
 struct TINYTORCH_API Context
@@ -131,6 +132,12 @@ struct TINYTORCH_API Context
     std::vector<Tensor> saved_tensors;
 
     bool requires_grad = true;
+
+    bool requires_grad_for_input(int id) const
+    {
+        CHECK_LT(id, next_meta.size());
+        return next_meta[id].requires_grad;
+    }
 
     // Sets whether undefined output grad tensors should be expanded to tensors
     // full of zeros before calling backward function. Default value is true.
@@ -223,9 +230,11 @@ struct FunctionNode : public Node
         NoGradGuard ngg;
         CHECK_EQ(fwd_output_grad.size(), num_input_gradients_of_backward);
 
+        CHECK(context.requires_grad);
         // backward
         auto grad_list = T::backward(&context, fwd_output_grad);
         CHECK_EQ(grad_list.size(), num_inputs_of_forward);
+        CHECK_EQ(context.next_meta.size(), num_inputs_of_forward);
 
         // the gradient produced by the backward function must be either undefined
         // or have the same dimensions as the input tensor
@@ -282,11 +291,12 @@ struct FunctionNode : public Node
                     TensorMetaData meta;
                     meta.size   = t.sizes();
                     meta.device = t.device();
-                    node->context.next_meta.push_back(meta);
                     if (t.requires_grad())
                     {
-                        need_grad = true;
+                        need_grad          = true;
+                        meta.requires_grad = true;
                     }
+                    node->context.next_meta.push_back(meta);
                 }
                 else
                 {
