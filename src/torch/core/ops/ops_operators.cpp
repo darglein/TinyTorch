@@ -410,7 +410,8 @@ Tensor operator/=(Tensor a, Tensor b)
 }
 Tensor operator/=(Tensor a, double b)
 {
-    return a * (1.0 / b);
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    return a *= (1.0 / b);
 }
 
 }  // namespace tinytorch
