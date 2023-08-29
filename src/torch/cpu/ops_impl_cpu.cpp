@@ -135,7 +135,7 @@ static void permute_impl(TensorInfo<T> src, TensorInfo<T> result, SizeType new_d
 }
 
 
-void permute_impl(Tensor& src, Tensor& result, SizeType new_dims)
+void permute_impl(Tensor& src, Tensor result, SizeType new_dims)
 {
     SWITCH_MACRO_ALL(src.scalar_type(), permute_impl, src, result, new_dims);
 }
@@ -196,7 +196,7 @@ static void sum_impl(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-void sum_impl(Tensor a, Tensor& result)
+void sum_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), sum_impl, a, result);
 }
@@ -213,7 +213,7 @@ static void sum_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
     }
 }
 
-void sum_impl(Tensor a, int64_t dim, Tensor& result)
+void sum_impl(Tensor a, int64_t dim, Tensor result)
 {
     SWITCH_MACRO_FLOAT(a.scalar_type(), sum_impl, a, dim, result);
 }
@@ -231,7 +231,7 @@ static void prod_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
     }
 }
 
-void prod_impl(Tensor input, int64_t dim, Tensor& result)
+void prod_impl(Tensor input, int64_t dim, Tensor result)
 {
     SWITCH_MACRO_ALL(input.scalar_type(), prod_impl, input, dim, result);
 }
@@ -252,7 +252,7 @@ static void cumprod_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
         result[index_result] = prod;
     }
 }
-void cumprod_impl(Tensor input, int64_t dim, Tensor& result)
+void cumprod_impl(Tensor input, int64_t dim, Tensor result)
 {
     SWITCH_MACRO_ALL(input.scalar_type(), cumprod_impl, input, dim, result);
 }
@@ -273,7 +273,7 @@ static void cumsum_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
         result[index_result] = prod;
     }
 }
-void cumsum_impl(Tensor input, int64_t dim, Tensor& result)
+void cumsum_impl(Tensor input, int64_t dim, Tensor result)
 {
     SWITCH_MACRO_ALL(input.scalar_type(), cumsum_impl, input, dim, result);
 }
@@ -288,7 +288,7 @@ static void min_impl(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-void min_impl(Tensor a, Tensor& result)
+void min_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), min_impl, a, result);
 }
@@ -304,7 +304,7 @@ static void max_impl(TensorInfo<T> a, TensorInfo<T> result)
     }
 }
 
-void max_impl(Tensor a, Tensor& result)
+void max_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), max_impl, a, result);
 }
@@ -336,12 +336,12 @@ static void min_max_impl(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> i
         }
     }
 }
-void min_impl(Tensor input, int64_t dim, Tensor& result, Tensor& indices)
+void min_impl(Tensor input, int64_t dim, Tensor result, Tensor& indices)
 {
     SWITCH_MACRO_ALL(input.scalar_type(), min_max_impl, input, dim, indices, result, true);
 }
 
-void max_impl(Tensor input, int64_t dim, Tensor& result, Tensor& indices)
+void max_impl(Tensor input, int64_t dim, Tensor result, Tensor& indices)
 {
     SWITCH_MACRO_ALL(input.scalar_type(), min_max_impl, input, dim, indices, result, false);
 }
@@ -359,7 +359,7 @@ static void index_select_impl(TensorInfo<T> input, int64_t dim, TensorInfo<Index
     }
 }
 
-void index_select_impl(Tensor input, int64_t dim, Tensor index, Tensor& result)
+void index_select_impl(Tensor input, int64_t dim, Tensor index, Tensor result)
 {
     CHECK(input.is_cpu());
     CHECK_LT(dim, input.dim());
@@ -402,7 +402,7 @@ static void index_add_helper(int64_t dim, TensorInfo<TIndex> index, Tensor data,
     SWITCH_MACRO_ALL(data.scalar_type(), index_add_impl, dim, index, data, result);
 }
 
-void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result)
+void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor result)
 {
     switch (index.scalar_type())
     {
@@ -430,7 +430,7 @@ static void gather_impl(TensorInfo<T> data, int64_t dim, TensorInfo<int64_t> ind
         result[index_result] = data[index_input];
     }
 }
-void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor& result)
+void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor result)
 {
     SWITCH_MACRO_ALL(data.scalar_type(), gather_impl, data, dim, index, result);
 }
@@ -485,7 +485,7 @@ static void transpose_impl(TensorInfo<T> input, int64_t dim0, int64_t dim1, Tens
     }
 }
 
-void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor& result)
+void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor result)
 {
     SWITCH_MACRO_ALL(input.scalar_type(), transpose_impl, input, dim0, dim1, result);
 }
@@ -610,7 +610,7 @@ static void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInf
     }
 }
 
-void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result)
+void repeat_interleave_impl(Tensor input, int64_t count, Tensor result)
 {
     SWITCH_MACRO_ALL(input.scalar_type(), repeat_interleave_impl, input, count, result);
 }
@@ -631,7 +631,7 @@ static void repeat_impl(TensorInfo<T> src, TensorInfo<T> result)
         result[i] = src[index_src];
     }
 }
-void repeat_impl(Tensor t, SizeType sizes, Tensor& result)
+void repeat_impl(Tensor t, SizeType sizes, Tensor result)
 {
     SWITCH_MACRO_ALL(t.scalar_type(), repeat_impl, t, result);
 }

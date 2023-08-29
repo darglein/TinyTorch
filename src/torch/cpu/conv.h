@@ -15,6 +15,6 @@ namespace cpu_impl
 {
 
 void conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding, int dilation, int groups,
-              Tensor& result);
+              Tensor result);
 }  // namespace cpu_impl
 }  // namespace tinytorch

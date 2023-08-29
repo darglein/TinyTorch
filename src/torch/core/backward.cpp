@@ -89,7 +89,6 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
 
                 if (!grad_map[next_node][next->input_nr].defined())
                 {
-//                    grad_map[next_node][next->input_nr] = g.clone();
                     grad_map[next_node][next->input_nr] = g;
                 }
                 else

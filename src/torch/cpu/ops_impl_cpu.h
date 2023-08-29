@@ -16,7 +16,7 @@ namespace cpu_impl
 void print_impl(std::ostream& strm, Tensor t);
 void to_impl_cpu_cuda(Tensor a, Tensor b);
 
-void std_impl(Tensor a, Tensor& result);
+void std_impl(Tensor a, Tensor result);
 
 void sort_impl(Tensor a, int64_t dim, Tensor& out_t, Tensor& out_index);
 
@@ -25,33 +25,33 @@ void range_impl(Tensor a, double start, double end, double step);
 void fill_impl(Tensor& a, double value);
 void fill_impl(Tensor& a, Tensor value);
 void fill_impl(Tensor& a, Tensor values, int dim);
-void permute_impl(Tensor& src, Tensor& result, SizeType new_dims);
+void permute_impl(Tensor& src, Tensor result, SizeType new_dims);
 
 void uniform_impl(Tensor& t, double mi, double ma);
 void uniform_int_impl(Tensor& t, int low, int high);
-void sum_impl(Tensor a, Tensor& result);
-void sum_impl(Tensor a, int64_t dim, Tensor& result);
+void sum_impl(Tensor a, Tensor result);
+void sum_impl(Tensor a, int64_t dim, Tensor result);
 
-void prod_impl(Tensor a, int64_t dim, Tensor& result);
-void cumprod_impl(Tensor a, int64_t dim, Tensor& result);
-void cumsum_impl(Tensor a, int64_t dim, Tensor& result);
+void prod_impl(Tensor a, int64_t dim, Tensor result);
+void cumprod_impl(Tensor a, int64_t dim, Tensor result);
+void cumsum_impl(Tensor a, int64_t dim, Tensor result);
 
-void min_impl(Tensor a, Tensor& result);
-void min_impl(Tensor a, Tensor b, Tensor& result);
-void min_impl(Tensor a, int64_t dim, Tensor& result, Tensor& indices);
-void max_impl(Tensor a, Tensor& result);
-void max_impl(Tensor a, Tensor b, Tensor& result);
-void max_impl(Tensor a, int64_t dim, Tensor& result, Tensor& indices);
+void min_impl(Tensor a, Tensor result);
+void min_impl(Tensor a, Tensor b, Tensor result);
+void min_impl(Tensor a, int64_t dim, Tensor result, Tensor& indices);
+void max_impl(Tensor a, Tensor result);
+void max_impl(Tensor a, Tensor b, Tensor result);
+void max_impl(Tensor a, int64_t dim, Tensor result, Tensor& indices);
 
-void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor& result);
+void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor result);
 void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value);
-void index_select_impl(Tensor input, int64_t dim, Tensor index, Tensor& result);
-void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result);
-void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor& result);
+void index_select_impl(Tensor input, int64_t dim, Tensor index, Tensor result);
+void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor result);
+void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor result);
 void copy_and_convert_impl(Tensor src, Tensor& target);
 void clamp_impl_(Tensor& a, double low, double high);
-void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result);
-void repeat_impl(Tensor t, SizeType sizes, Tensor& result);
+void repeat_interleave_impl(Tensor input, int64_t count, Tensor result);
+void repeat_impl(Tensor t, SizeType sizes, Tensor result);
 
 void sum_backward_impl(Tensor grad_output, Tensor& grad_a);
 

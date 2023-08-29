@@ -484,8 +484,6 @@ struct Cat2Node : public FunctionNode<Cat2Node>
         auto result = empty(output_size, a.options());
         result.slice_view(dim.toInt(), 0, 0 + a.size(dim.toInt())).copy_(a);
         result.slice_view(dim.toInt(), a.size(dim.toInt()), a.size(dim.toInt()) + b.size(dim.toInt())).copy_(b);
-
-        ctx->save_for_backward({a, b});
         return {result};
     }
 
@@ -493,14 +491,23 @@ struct Cat2Node : public FunctionNode<Cat2Node>
     {
         int dim     = ctx->saved_data["dim"].toInt();
         auto l      = ctx->get_saved_variables();
-        auto a      = l[0];
-        auto b      = l[1];
-        auto g      = grad[0];
-        auto grad_a = zeros_like(a);
-        auto grad_b = zeros_like(b);
+        // auto a      = l[0];
+        // auto b      = l[1];
 
+        auto a_size = ctx->next_meta[0].size;
+        auto b_size = ctx->next_meta[1].size;
+        auto g      = grad[0];
+
+#if 0
+        auto grad_a = empty_like(a);
+        auto grad_b = empty_like(b);
         grad_a.copy_(g.slice_view(dim, 0, 0 + a.size(dim)));
         grad_b.copy_(g.slice_view(dim, a.size(dim), a.size(dim) + b.size(dim)));
+#else
+      auto grad_a = g.slice_view(dim, 0, 0 + a_size[dim]);
+      auto grad_b = g.slice_view(dim, a_size[dim], a_size[dim] + b_size[dim]);
+
+#endif
 
         return {grad_a, grad_b, {}};
     }

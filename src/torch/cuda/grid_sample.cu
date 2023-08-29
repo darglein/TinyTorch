@@ -512,7 +512,7 @@ static __global__ void grid_sample_3d_backward_impl_kernel(TensorInfoCuda<T, 5> 
 }
 
 void grid_sample_2d_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
-                         bool align_corners, Tensor& result)
+                         bool align_corners, Tensor result)
 {
     auto num_batches = input.size(0);
     auto num_samples = grid.size(1) * grid.size(2);
@@ -532,7 +532,7 @@ void grid_sample_2d_backward_impl(Tensor input, Tensor grid, InterpolationType i
     CUDA_SYNC_CHECK_ERROR();
 }
 void grid_sample_3d_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
-                         bool align_corners, Tensor& result)
+                         bool align_corners, Tensor result)
 {
     auto num_batches = input.size(0);
     auto num_samples = grid.size(1) * grid.size(2) * grid.size(3);

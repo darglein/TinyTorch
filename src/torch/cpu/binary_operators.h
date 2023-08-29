@@ -14,27 +14,27 @@ namespace tinytorch
 namespace cpu_impl
 {
 // basic operators
-void add_impl(Tensor a, Tensor b, Tensor& result);
-void add_impl(Tensor a, double b, Tensor& result);
-void sub_impl(Tensor a, Tensor b, Tensor& result);
-void sub_impl(Tensor a, double b, Tensor& result);
-void mult_impl(Tensor a, Tensor b, Tensor& result);
-void mult_impl(Tensor a, double b, Tensor& result);
-void div_impl(Tensor a, Tensor b, Tensor& result);
-void div_impl(double a, Tensor b, Tensor& result);
+void add_impl(Tensor a, Tensor b, Tensor result);
+void add_impl(Tensor a, double b, Tensor result);
+void sub_impl(Tensor a, Tensor b, Tensor result);
+void sub_impl(Tensor a, double b, Tensor result);
+void mult_impl(Tensor a, Tensor b, Tensor result);
+void mult_impl(Tensor a, double b, Tensor result);
+void div_impl(Tensor a, Tensor b, Tensor result);
+void div_impl(double a, Tensor b, Tensor result);
 
 
 // comparison operators (no grad needed)
-void equal_impl(Tensor a, double b, Tensor& result);
-void less_impl(Tensor a, double b, Tensor& result);
-void greater_impl(Tensor a, double b, Tensor& result);
+void equal_impl(Tensor a, double b, Tensor result);
+void less_impl(Tensor a, double b, Tensor result);
+void greater_impl(Tensor a, double b, Tensor result);
 
 // binary functions
-void pow_impl(Tensor a, double b, Tensor& result);
-void pow_impl(Tensor a, Tensor b, Tensor& result);
+void pow_impl(Tensor a, double b, Tensor result);
+void pow_impl(Tensor a, Tensor b, Tensor result);
 
 
-void min_impl(Tensor a, Tensor b, Tensor& result);
-void max_impl(Tensor a, Tensor b, Tensor& result);
+void min_impl(Tensor a, Tensor b, Tensor result);
+void max_impl(Tensor a, Tensor b, Tensor result);
 }
 }  // namespace tinytorch

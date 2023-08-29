@@ -24,10 +24,11 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 #    undef CUDA_DEBUG
 #endif
 
-#define CHECK_CUDA_ERROR(cudaFunction)                                                     \
-    {                                                                                      \
-        cudaError_t cudaErrorCode = cudaFunction;                                          \
-        CHECK_EQ(cudaErrorCode, cudaSuccess) << ": " << cudaGetErrorString(cudaErrorCode); \
+#define CHECK_CUDA_ERROR(cudaFunction)                                                        \
+    {                                                                                         \
+        cudaError_t cudaErrorCode = cudaFunction;                                             \
+        CHECK_EQ(cudaErrorCode, cudaSuccess)                                                  \
+            << ": " << cudaGetErrorString(cudaErrorCode) << " in function " << #cudaFunction; \
     }
 
 #if defined(CUDA_DEBUG) && TT_DEBUG
@@ -39,7 +40,7 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 #    define CUDA_SYNC_CHECK_ERROR() (static_cast<void>(0))
 #endif
 
-#define EXPAND(x) x // https://stackoverflow.com/questions/32399191/va-args-expansion-using-msvc
+#define EXPAND(x) x  // https://stackoverflow.com/questions/32399191/va-args-expansion-using-msvc
 
 #define CUDA_CASE_MACRO_REFINED(block_size, func, scalar_type, numel, ...)                                 \
     case scalar_type:                                                                                      \

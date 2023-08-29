@@ -28,6 +28,82 @@ namespace tinytorch
 
 #define MAX_TENSORINFO_DIMS 8
 
+template <typename T>
+inline std::pair<int64_t, int64_t> collapse_dims(T* sizes, T* strides, int64_t dims, const int excludeDim = -1)
+{
+    CHECK(excludeDim >= -1 && excludeDim < dims) << "expected excluded dim between -1 and dims - 1";
+
+    int64_t stopDim             = (excludeDim == -1) ? dims : excludeDim;
+    int64_t newIndex            = -1;
+    int64_t oldIndex            = 0;
+    int64_t remappedExcludedDim = -1;
+
+    while (oldIndex < dims)
+    {
+        // Finds a dimension to collapse into
+        for (; oldIndex < stopDim; ++oldIndex)
+        {
+            if (sizes[oldIndex] == 1)
+            {
+                continue;
+            }
+
+            ++newIndex;
+            sizes[newIndex]   = sizes[oldIndex];
+            strides[newIndex] = strides[oldIndex];
+            ++oldIndex;
+            break;
+        }
+
+        // Collapses dims
+        for (; oldIndex < stopDim; ++oldIndex)
+        {
+            if (sizes[oldIndex] == 1)
+            {
+                continue;
+            }
+
+            if (strides[newIndex] == sizes[oldIndex] * strides[oldIndex])
+            {
+                sizes[newIndex] *= sizes[oldIndex];
+                strides[newIndex] = strides[oldIndex];
+            }
+            else
+            {
+                ++newIndex;
+                sizes[newIndex]   = sizes[oldIndex];
+                strides[newIndex] = strides[oldIndex];
+            }
+        }
+
+        // Handles excludeDim being set (oldIndex == excludeDim)
+        if (oldIndex != dims)
+        {
+            // Preserves excluded dimension
+            ++newIndex;
+            sizes[newIndex]     = sizes[oldIndex];
+            strides[newIndex]   = strides[oldIndex];
+            remappedExcludedDim = newIndex;
+
+            // Restarts iteration after excludeDim
+            ++oldIndex;
+            stopDim = dims;
+        }
+    }
+
+    // Handles special case of all dims size 1
+    if (newIndex == -1 || (newIndex == 0 && sizes[0] == 1))
+    {
+        dims       = 1;
+        sizes[0]   = 1;
+        strides[0] = 1;
+
+        return std::pair<int64_t, int64_t>(0, 1);
+    }
+
+    dims = newIndex + 1;
+    return std::pair<int64_t, int64_t>(remappedExcludedDim, dims);
+}
 
 template <int DIM>
 struct DimIndexStruct
@@ -133,8 +209,12 @@ struct TensorInfoBase
     static constexpr int max_dims    = is_dynamic ? MAX_TENSORINFO_DIMS : MAX_DIMS;
     using DimIndex                   = DimIndexStruct<max_dims>;
 
-    TensorInfoBase();
-    TensorInfoBase(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims]);
+    TensorInfoBase()
+    {
+        data  = nullptr;
+        dims_ = 0;
+    }
+    // TensorInfoBase(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims]);
     TensorInfoBase(Tensor t)
     {
         if (!t.defined())
@@ -145,10 +225,18 @@ struct TensorInfoBase
         data  = t.template data_ptr<T>();
         dims_ = t.dim();
         CHECK_LE(t.dim(), MAX_TENSORINFO_DIMS);
-        for (int i = 0; i < t.dim(); ++i)
+        for (int i = 0; i < max_dims; ++i)
         {
-            sizes[i]   = t.size(i);
-            strides[i] = t.stride(i);
+            if (i < t.dim())
+            {
+                sizes[i]   = t.size(i);
+                strides[i] = t.stride(i);
+            }
+            else
+            {
+                sizes[i]   = 1;
+                strides[i] = 1;
+            }
         }
         contiguous = t.is_contiguous();
         if (TIS_CUDA)
@@ -237,8 +325,11 @@ struct TensorInfoBase
         DimIndex result;
 
 #pragma unroll
-        for (int64_t i = max_dims - 1; i > 0; --i)
+        // for (int64_t i = max_dims - 1; i > 0; --i)
+        for (int64_t j = 0; j < max_dims - 1; ++j)
         {
+            auto i = max_dims - j - 1;
+            // if(i==dim()) break;
             if (i < dim())
             {
                 int64_t curDimIndex = linearId % sizes[i];
@@ -256,18 +347,23 @@ struct TensorInfoBase
         DimIndex result;
 
 #pragma unroll
-        for (int64_t i = max_dims - 1; i > 0; --i)
+        // for (int64_t i = max_dims - 1; i > 0; --i)
+        for (int64_t j = 0; j < max_dims - 1; ++j)
         {
+            auto i = max_dims - j - 1;
             if (i < dim())
             {
+                int64_t curDimIndex = linearId % sizes[i];
+                int64_t siz         = sizes[i];
+
                 if (i == dim_to_skip)
                 {
-                    result[i] = 0;
-                    continue;
+                    curDimIndex = 0;
+                    siz         = 1;
                 }
-                int64_t curDimIndex = linearId % sizes[i];
-                result[i]           = curDimIndex;
-                linearId /= sizes[i];
+
+                result[i] = curDimIndex;
+                linearId /= siz;
             }
         }
 
@@ -303,45 +399,38 @@ struct TensorInfoBase
         return result;
     }
 
-    T* data;
+
+    T* data       = nullptr;
+    int64_t dims_ = 0;
     int64_t sizes[max_dims];
     int64_t strides[max_dims];
-    int64_t dims_;
-    bool contiguous;
+    bool contiguous = false;
 };
 
-
-template <typename T, bool TIS_CUDA, int MAX_DIMS>
-TensorInfoBase<T, TIS_CUDA, MAX_DIMS>::TensorInfoBase()
-{
-    data  = nullptr;
-    dims_ = 0;
-}
-
-template <typename T, bool TIS_CUDA, int MAX_DIMS>
-TensorInfoBase<T, TIS_CUDA, MAX_DIMS>::TensorInfoBase(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims])
-{
-    data  = p;
-    dims_ = dim;
-
-    for (int i = 0; i < dim; ++i)
-    {
-        sizes[i]   = sz[i];
-        strides[i] = st[i];
-    }
-
-    contiguous              = true;
-    int64_t expected_stride = 1;
-    for (int64_t i = dim - 1; i >= 0; --i)
-    {
-        if (strides[i] != expected_stride)
-        {
-            contiguous = false;
-            break;
-        }
-        expected_stride *= sizes[i];
-    }
-}
+// template <typename T, bool TIS_CUDA, int MAX_DIMS>
+// TensorInfoBase<T, TIS_CUDA, MAX_DIMS>::TensorInfoBase(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims])
+//{
+//     data  = p;
+//     dims_ = dim;
+//
+//     for (int i = 0; i < dim; ++i)
+//     {
+//         sizes[i]   = sz[i];
+//         strides[i] = st[i];
+//     }
+//
+//     contiguous              = true;
+//     int64_t expected_stride = 1;
+//     for (int64_t i = dim - 1; i >= 0; --i)
+//     {
+//         if (strides[i] != expected_stride)
+//         {
+//             contiguous = false;
+//             break;
+//         }
+//         expected_stride *= sizes[i];
+//     }
+// }
 
 template <typename T, int MAX_DIMS = -1>
 using TensorInfo = TensorInfoBase<T, false, MAX_DIMS>;

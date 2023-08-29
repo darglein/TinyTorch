@@ -195,6 +195,16 @@ static __global__ void global_reduce(TensorInfoCuda<InputType> a, TensorInfoCuda
         op.atomic_reduce(&result[0], value);
     }
 }
+template <typename InputType, typename OutputType, typename Op>
+void global_reduce_launcher(TensorInfoCuda<InputType> a, TensorInfoCuda<OutputType> result)
+{
+    int64_t num_threads = std::min(a.numel(), int64_t(1024) * 1024);
+    global_reduce<InputType, OutputType, Op>
+        <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
+            a, result, Op(), Op::template default_value<OutputType>());
+    CUDA_SYNC_CHECK_ERROR();
+}
+
 
 template <typename Op>
 void global_reduce_helper(Tensor a, Tensor result)
@@ -205,18 +215,20 @@ void global_reduce_helper(Tensor a, Tensor result)
         kernel_result = result.to(kFloat);
     }
 
-
-    int64_t num_threads = std::min(a.numel(), int64_t(1024) * 1024);
     switch (a.scalar_type())
     {
-        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<int, int>), kInt32, num_threads, a, kernel_result, Op(),
-                                Op::template default_value<int>())
-        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<__half, float>), kFloat16, num_threads, a, kernel_result,
-                                Op(), Op::template default_value<float>())
-        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<float, float>), kFloat, num_threads, a, kernel_result, Op(),
-                                Op::template default_value<float>())
-        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (global_reduce<double, double>), kDouble, num_threads, a, kernel_result,
-                                Op(), Op::template default_value<double>())
+        case kInt32:
+            global_reduce_launcher<int, int, Op>(a, kernel_result);
+            break;
+        case kFloat16:
+            global_reduce_launcher<__half, float, Op>(a, kernel_result);
+            break;
+        case kFloat:
+            global_reduce_launcher<float, float, Op>(a, kernel_result);
+            break;
+        case kDouble:
+            global_reduce_launcher<double, double, Op>(a, kernel_result);
+            break;
         default:
             CHECK(false) << "invalid input type " << a.scalar_type();
     }
@@ -227,15 +239,15 @@ void global_reduce_helper(Tensor a, Tensor result)
     }
 }
 
-void sum_impl(Tensor a, Tensor& result)
+void sum_impl(Tensor a, Tensor result)
 {
     global_reduce_helper<ReduceAdd>(a, result);
 }
-void min_impl(Tensor a, Tensor& result)
+void min_impl(Tensor a, Tensor result)
 {
     global_reduce_helper<ReduceMin>(a, result);
 }
-void max_impl(Tensor a, Tensor& result)
+void max_impl(Tensor a, Tensor result)
 {
     global_reduce_helper<ReduceMax>(a, result);
 }
@@ -275,22 +287,36 @@ static __global__ void dimensional_reduce(TensorInfoCuda<InputType> a, int64_t d
     }
 }
 
-template <typename Op>
-void dimensional_reduce_helper(Tensor a, int64_t dim, Tensor& result)
+template <typename InputType, typename OutputType, typename Op>
+void dimensional_reduce_launcher(TensorInfoCuda<InputType> a, int64_t dim, TensorInfoCuda<OutputType> result)
 {
-    int64_t num_threads = std::min(a.numel(), int64_t(1024) * 1024);
+    int64_t size_to_reduce       = a.size(dim);
+    int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
+    int64_t num_threads = std::min(num_blocks_to_reduce * REDUCE_BLOCK_SIZE, int64_t(1024) * 1024);
+
+    dimensional_reduce<InputType, OutputType, Op>
+        <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
+            a, dim, result, Op(), Op::template default_value<OutputType>());
+    CUDA_SYNC_CHECK_ERROR();
+}
+
+template <typename Op>
+void dimensional_reduce_helper(Tensor a, int64_t dim, Tensor result)
+{
     switch (a.scalar_type())
     {
-        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (dimensional_reduce<__half, __half>), kHalf, num_threads, a, dim,
-                                result, Op(), Op::template default_value<__half>())
-        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (dimensional_reduce<float, float>), kFloat, num_threads, a, dim,
-                                result, Op(), Op::template default_value<float>())
-        CUDA_CASE_MACRO_REFINED(REDUCE_BLOCK_SIZE, (dimensional_reduce<double, double>), kDouble, num_threads, a, dim,
-                                result, Op(), Op::template default_value<double>())
+        case kHalf:
+            dimensional_reduce_launcher<__half, __half, Op>(a, dim, result);
+            break;
+        case kFloat:
+            dimensional_reduce_launcher<float, float, Op>(a, dim, result);
+            break;
+        case kDouble:
+            dimensional_reduce_launcher<double, double, Op>(a, dim, result);
+            break;
         default:
             CHECK(false) << "invalid input type " << a.scalar_type();
     }
-    //    cudaDeviceSynchronize();
 }
 
 template <typename T>
@@ -305,20 +331,9 @@ __launch_bounds__(128) static __global__ void sum_impl(TensorInfoCuda<T> input, 
     atomicAdd(&result[result_index], input[index_input]);
 }
 
-void sum_impl(Tensor a, int64_t dim, Tensor& result)
+void sum_impl(Tensor a, int64_t dim, Tensor result)
 {
     dimensional_reduce_helper<ReduceAdd>(a, dim, result);
-    return;
-    auto stream = cuda::getCurrentCUDAStream();
-    switch (a.scalar_type())
-    {
-        CUDA_CASE_MACRO(sum_impl<int32_t>, kInt32, a.numel(), a, dim, result)
-        CUDA_CASE_MACRO(sum_impl<half>, kHalf, a.numel(), a, dim, result)
-        CUDA_CASE_MACRO(sum_impl<float>, kFloat, a.numel(), a, dim, result)
-        CUDA_CASE_MACRO(sum_impl<double>, kDouble, a.numel(), a, dim, result)
-        default:
-            CHECK(false) << "invalid input type " << a.scalar_type();
-    }
 }
 
 
@@ -342,7 +357,7 @@ __launch_bounds__(128) static __global__ void prod_impl(TensorInfoCuda<T> input,
     }
 }
 
-void prod_impl(Tensor input, int64_t dim, Tensor& result)
+void prod_impl(Tensor input, int64_t dim, Tensor result)
 {
     dimensional_reduce_helper<ReduceProd>(input, dim, result);
     return;
@@ -367,7 +382,7 @@ __launch_bounds__(128) static __global__
         result[index_result] = prod;
     }
 }
-void cumprod_impl(Tensor input, int64_t dim, Tensor& result)
+void cumprod_impl(Tensor input, int64_t dim, Tensor result)
 {
     CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), cumprod_impl, input, dim, result);
 }
@@ -390,7 +405,7 @@ __launch_bounds__(128) static __global__
         result[index_result] = prod;
     }
 }
-void cumsum_impl(Tensor input, int64_t dim, Tensor& result)
+void cumsum_impl(Tensor input, int64_t dim, Tensor result)
 {
     CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), cumsum_impl, input, dim, result);
 }
@@ -428,13 +443,13 @@ __launch_bounds__(128) static __global__
         }
     }
 }
-void min_impl(Tensor input, int64_t dim, Tensor& result, Tensor& indices)
+void min_impl(Tensor input, int64_t dim, Tensor result, Tensor& indices)
 {
     CUDA_SWITCH_MACRO_FLOAT(input.scalar_type(), input.numel(), min_max_impl, input, dim, indices, result, true);
     indices = Tensor();
 }
 
-void max_impl(Tensor input, int64_t dim, Tensor& result, Tensor& indices)
+void max_impl(Tensor input, int64_t dim, Tensor result, Tensor& indices)
 {
     CUDA_SWITCH_MACRO_FLOAT(input.scalar_type(), input.numel(), min_max_impl, input, dim, indices, result, false);
     indices = Tensor();

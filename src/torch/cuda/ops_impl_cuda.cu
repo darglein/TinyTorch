@@ -56,7 +56,7 @@ void fill_impl(Tensor& a, double value)
 {
     if (value == 0 && a.is_contiguous())
     {
-        cudaMemset(a.data_ptr(), 0, a.numel() * a.element_size());
+        CHECK_CUDA_ERROR(cudaMemsetAsync(a.data_ptr(), 0, a.numel() * a.element_size(), cuda::getCurrentCUDAStream()));
         return;
     }
 
@@ -89,7 +89,7 @@ __launch_bounds__(128) static __global__
     result[index_result] = src[index_src];
 }
 
-void permute_impl(Tensor& src, Tensor& result, SizeType new_dims)
+void permute_impl(Tensor& src, Tensor result, SizeType new_dims)
 {
     CUDA_SYNC_CHECK_ERROR();
     CUDA_SWITCH_MACRO_ALL(src.scalar_type(), src.numel(), permute_impl, src, result, new_dims.vec());
@@ -119,6 +119,14 @@ __launch_bounds__(128) static __global__
 
 void copy_and_convert_impl(Tensor src, Tensor& target)
 {
+    if (src.dtype() == target.dtype() && src.is_contiguous() && target.is_contiguous())
+    {
+        // trivial copy without conversion
+        CHECK_CUDA_ERROR(cudaMemcpyAsync(target.data_ptr(), src.data_ptr(), src.numel() * src.element_size(),
+                                         cudaMemcpyDeviceToDevice, cuda::getCurrentCUDAStream()));
+        return;
+    }
+
     CHECK_EQ(src.numel(), target.numel());
     switch (target.dtype())
     {
@@ -232,7 +240,7 @@ static void index_select_helper(Tensor input, int64_t dim, TensorInfoCuda<TIndex
     CUDA_SWITCH_MACRO_ALL(result.scalar_type(), result.numel(), index_select_impl, input, dim, index, result);
 }
 
-void index_select_impl(Tensor input, int64_t dim, Tensor index, Tensor& result)
+void index_select_impl(Tensor input, int64_t dim, Tensor index, Tensor result)
 {
     switch (index.scalar_type())
     {
@@ -275,7 +283,7 @@ static void index_add_helper(Tensor data, int64_t dim, TensorInfoCuda<TIndex> in
     CUDA_SWITCH_MACRO_FLOAT(result.scalar_type(), data.numel(), index_add_impl, dim, index, data, result);
 }
 
-void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor& result)
+void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor result)
 {
     switch (index.scalar_type())
     {
@@ -306,7 +314,7 @@ __launch_bounds__(128) static __global__
         result[index_result] = data[index_input];
     }
 }
-void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor& result)
+void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor result)
 {
     CUDA_SWITCH_MACRO_ALL(data.scalar_type(), result.numel(), gather_impl, data, dim, index, result);
 }
@@ -374,7 +382,7 @@ __launch_bounds__(128) static __global__
 
     result[index_result] = input[index_input];
 }
-void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor& result)
+void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor result)
 {
     CUDA_SWITCH_MACRO_ALL(result.scalar_type(), result.numel(), transpose_impl, input, dim0, dim1, result);
 }
@@ -409,7 +417,7 @@ __launch_bounds__(128) static __global__
     auto index_input     = input.LinearIndexToDimIndex(i / count);
     result[index_result] = input[index_input];
 }
-void repeat_interleave_impl(Tensor input, int64_t count, Tensor& result)
+void repeat_interleave_impl(Tensor input, int64_t count, Tensor result)
 {
     CUDA_SWITCH_MACRO_ALL(result.scalar_type(), result.numel(), repeat_interleave_impl, input, count, result);
 }
@@ -430,7 +438,7 @@ __launch_bounds__(128) static __global__ void repeat_impl(TensorInfoCuda<T> src,
         result[i] = src[index_src];
     }
 }
-void repeat_impl(Tensor t, SizeType sizes, Tensor& result)
+void repeat_impl(Tensor t, SizeType sizes, Tensor result)
 {
     CUDA_SWITCH_MACRO_ALL(t.scalar_type(), result.numel(), repeat_impl, t, result);
 }

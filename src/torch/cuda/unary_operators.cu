@@ -47,47 +47,47 @@ __launch_bounds__(128) static __global__
             CHECK(false) << "invalid input type " << input.scalar_type();                           \
     }
 
-void abs_impl(Tensor a, Tensor& result)
+void abs_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Abs(), a, result);
 }
-void round_impl(Tensor a, Tensor& result)
+void round_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Round(), a, result);
 }
-void sqrt_impl(Tensor a, Tensor& result)
+void sqrt_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sqrt(), a, result);
 }
-void log_impl(Tensor a, Tensor& result)
+void log_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Log(), a, result);
 }
-void exp_impl(Tensor a, Tensor& result)
+void exp_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Exp(), a, result);
 }
-void sign_impl(Tensor a, Tensor& result)
+void sign_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sign(), a, result);
 }
-void sin_impl(Tensor a, Tensor& result)
+void sin_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sin(), a, result);
 }
-void cos_impl(Tensor a, Tensor& result)
+void cos_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Cos(), a, result);
 }
-void relu_impl(Tensor a, Tensor& result)
+void relu_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Relu(), a, result);
 }
-void sigmoid_impl(Tensor a, Tensor& result)
+void sigmoid_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sigmoid(), a, result);
 }
-void softplus_impl(Tensor a, double beta, Tensor& result)
+void softplus_impl(Tensor a, double beta, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Softplus(beta), a, result);
 }

@@ -14,6 +14,43 @@
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 
+__device__ static half atomicMult(half* address, half val)
+{
+    CUDA_KERNEL_ASSERT(false);
+    return val;
+}
+__device__ static float atomicMult(float* address, float val)
+{
+    int* address_as_i = (int*)address;
+    int old           = *address_as_i, assumed;
+    do
+    {
+        assumed = old;
+        old     = ::atomicCAS(address_as_i, assumed, __float_as_int((val* __int_as_float(assumed))));
+    } while (assumed != old);
+    return __int_as_float(old);
+}
+__device__ static double atomicMult(double* address, double val)
+{
+    using T = unsigned long long int;
+    static_assert(sizeof(T) == sizeof(double), "match");
+    T* address_as_i = (T*)address;
+    T old           = *address_as_i, assumed;
+    do
+    {
+        assumed = old;
+
+        double assumed_float = ((double*)&assumed)[0];
+        double new_value     = (val * assumed_float);
+        T new_value_int      = ((T*)&new_value)[0];
+
+        old = ::atomicCAS(address_as_i, assumed, new_value_int);
+    } while (assumed != old);
+    double old_value = ((double*)&old)[0];
+    return old_value;
+}
+
+
 
 __device__ static half atomicMin(half* address, half val)
 {

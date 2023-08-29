@@ -61,64 +61,64 @@ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> res
 }
 
 
-void add_impl(Tensor a, Tensor b, Tensor& result)
+void add_impl(Tensor a, Tensor b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Add(), a, b, result);
 }
-void add_impl(Tensor a, double b, Tensor& result)
+void add_impl(Tensor a, double b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Add(), a, b, result);
 }
 
-void sub_impl(Tensor a, Tensor b, Tensor& result)
+void sub_impl(Tensor a, Tensor b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Sub(), a, b, result);
 }
-void sub_impl(Tensor a, double b, Tensor& result)
+void sub_impl(Tensor a, double b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Sub(), a, b, result);
 }
-void mult_impl(Tensor a, Tensor b, Tensor& result)
+void mult_impl(Tensor a, Tensor b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Mult(), a, b, result);
 }
-void mult_impl(Tensor a, double b, Tensor& result)
+void mult_impl(Tensor a, double b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Mult(), a, b, result);
 }
-void div_impl(Tensor a, Tensor b, Tensor& result)
+void div_impl(Tensor a, Tensor b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Div(), a, b, result);
 }
-void div_impl(double a, Tensor b, Tensor& result)
+void div_impl(double a, Tensor b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Div(), a, b, result);
 }
-void equal_impl(Tensor a, double b, Tensor& result)
+void equal_impl(Tensor a, double b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Equal(), a, b, result);
 }
-void less_impl(Tensor a, double b, Tensor& result)
+void less_impl(Tensor a, double b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Less(), a, b, result);
 }
-void greater_impl(Tensor a, double b, Tensor& result)
+void greater_impl(Tensor a, double b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Greater(), a, b, result);
 }
-void pow_impl(Tensor a, double b, Tensor& result)
+void pow_impl(Tensor a, double b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Pow(), a, b, result);
 }
-void pow_impl(Tensor a, Tensor b, Tensor& result)
+void pow_impl(Tensor a, Tensor b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Pow(), a, b, result);
 }
-void min_impl(Tensor a, Tensor b, Tensor& result)
+void min_impl(Tensor a, Tensor b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Min(), a, b, result);
 }
-void max_impl(Tensor a, Tensor b, Tensor& result)
+void max_impl(Tensor a, Tensor b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Max(), a, b, result);
 }

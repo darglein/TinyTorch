@@ -34,18 +34,30 @@ void* cuda_cached_malloc(int64_t size)
 {
     std::unique_lock l(mu);
     void* ptr;
-    cudaMallocAsync(&ptr, size, 0);
+    auto cuda_error = cudaMallocAsync(&ptr, size, cuda::getCurrentCUDAStream());
+//    auto cuda_error = cudaMalloc(&ptr, size);
+
+    if (cuda_error == cudaErrorMemoryAllocation)
+    {
+        size_t mem_free, mem_total;
+        cudaMemGetInfo(&mem_free, &mem_total);
+        CHECK_NE(cuda_error, cudaErrorMemoryAllocation)
+            << " CUDA out of memory!\n"
+            << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB\n"
+            << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
+            << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n";
+    }
+
+    CHECK_NOTNULL(ptr);
     return ptr;
 }
 void cuda_cached_free(void* ptr)
 {
     std::unique_lock l(mu);
-    cudaFreeAsync(ptr, 0);
-    return;
+    cudaFreeAsync(ptr, cuda::getCurrentCUDAStream());
+//    cudaFree(ptr);
 }
-void CUDACachingAllocator::emptyCache()
-{
-}
+void CUDACachingAllocator::emptyCache() {}
 
 #else
 struct MemoryAllocation

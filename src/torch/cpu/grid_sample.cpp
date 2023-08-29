@@ -12,7 +12,7 @@ namespace cpu_impl
 {
 
 void grid_sample_2d_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
-                         bool align_corners, Tensor& result)
+                         bool align_corners, Tensor result)
 {
     CHECK(false);
 }
@@ -22,7 +22,7 @@ void grid_sample_2d_backward_impl(Tensor input, Tensor grid, InterpolationType i
     CHECK(false);
 }
 void grid_sample_3d_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
-                         bool align_corners, Tensor& result)
+                         bool align_corners, Tensor result)
 {    CHECK(false);
 }
 void grid_sample_3d_backward_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,

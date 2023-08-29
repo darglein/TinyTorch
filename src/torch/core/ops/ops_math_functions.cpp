@@ -19,7 +19,6 @@ struct SumNode : public FunctionNode<SumNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
         Tensor result = zeros({1}, a.options());
-        //        Tensor result = empty({1}, a.options());
         SELECT_DEVICE(a.device(), sum_impl, a, result);
         return {result};
     }
@@ -41,8 +40,25 @@ struct SumDimNode : public FunctionNode<SumDimNode>
         ctx->saved_data["dim"] = dim;
         auto out_size          = a.sizes();
         out_size[dim.toInt()]  = 1;
-        Tensor result          = zeros(out_size, a.options());
-        SELECT_DEVICE(result.device(), sum_impl, a, dim.toInt(), result);
+
+        Tensor result = zeros(out_size, a.options());
+
+        auto [a_collapsed, new_dim] = a.collapse_view(dim.toInt());
+        auto out_size_collapsed     = a_collapsed.sizes();
+        out_size_collapsed[new_dim] = 1;
+
+
+        // CHECK(a_collapsed.dim() > 1) << a.sizes() << " " << a_collapsed.sizes();
+        // SELECT_DEVICE(result.device(), sum_impl, a, dim.toInt(), result);
+        if (a_collapsed.dim() == 1)
+        {
+            // global reduce
+            SELECT_DEVICE(result.device(), sum_impl, a_collapsed, result.view(out_size_collapsed));
+        }
+        else
+        {
+            SELECT_DEVICE(result.device(), sum_impl, a_collapsed, new_dim, result.view(out_size_collapsed));
+        }
 
         return {result};
     }
@@ -197,12 +213,18 @@ Tensor sum(Tensor a)
 Tensor sum(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK_LT(dim, a.dim());
-    auto result = autograd::SumDimNode::apply(a, dim)[0];
+    Tensor result;
+    if (a.size(dim) > 1)
+    {
+        result = autograd::SumDimNode::apply(a, dim)[0];
+    }
+    else
+    {
+        result = a;
+    }
     if (!keepdim)
     {
-        auto dims_before = result.dim();
-        result           = result.squeeze(dim);
-        CHECK_EQ(result.dim(), dims_before - 1);
+        result = result.squeeze(dim);
     }
     return result;
 }

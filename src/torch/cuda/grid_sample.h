@@ -15,12 +15,12 @@ namespace cuda_impl
 {
 
 void grid_sample_2d_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
-                         bool align_corners, Tensor& result);
+                         bool align_corners, Tensor result);
 void grid_sample_2d_backward_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
                          bool align_corners, Tensor& grad_input, Tensor& grad_grid, Tensor grad_result);
 
 void grid_sample_3d_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
-                         bool align_corners, Tensor& result);
+                         bool align_corners, Tensor result);
 void grid_sample_3d_backward_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
                                   bool align_corners, Tensor& grad_input, Tensor& grad_grid, Tensor grad_result);
 

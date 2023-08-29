@@ -54,7 +54,7 @@ static void conv2d_impl(TensorInfo<T, 4> input, TensorInfo<T, 4> weight, TensorI
     }
 }
 
-void conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding, int dilation, int groups, Tensor& result)
+void conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding, int dilation, int groups, Tensor result)
 {
 //    std::cout << "conv" << std::endl;
 //    std::cout << input.sizes() << std::endl;

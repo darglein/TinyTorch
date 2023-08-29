@@ -135,6 +135,91 @@ static void fill_neg_one_dim(SizeType& new_sizes, int64_t old_numel)
     CHECK_EQ(old_numel, new_numel);
 }
 
+
+std::pair<Tensor, int> Tensor::collapse_view(int excludeDim) const
+{
+    auto sizes   = this->sizes();
+    auto strides = this->strides();
+
+    int64_t stopDim             = (excludeDim == -1) ? dim() : excludeDim;
+    int64_t newIndex            = -1;
+    int64_t oldIndex            = 0;
+    int64_t remappedExcludedDim = -1;
+
+    while (oldIndex < dim())
+    {
+        // Finds a dimension to collapse into
+        for (; oldIndex < stopDim; ++oldIndex)
+        {
+            if (sizes[oldIndex] == 1)
+            {
+                continue;
+            }
+
+            ++newIndex;
+            sizes[newIndex]   = sizes[oldIndex];
+            strides[newIndex] = strides[oldIndex];
+            ++oldIndex;
+            break;
+        }
+
+        // Collapses dims
+        for (; oldIndex < stopDim; ++oldIndex)
+        {
+            if (sizes[oldIndex] == 1)
+            {
+                continue;
+            }
+
+            if (strides[newIndex] == sizes[oldIndex] * strides[oldIndex])
+            {
+                sizes[newIndex] *= sizes[oldIndex];
+                strides[newIndex] = strides[oldIndex];
+            }
+            else
+            {
+                ++newIndex;
+                sizes[newIndex]   = sizes[oldIndex];
+                strides[newIndex] = strides[oldIndex];
+            }
+        }
+
+        // Handles excludeDim being set (oldIndex == excludeDim)
+        if (oldIndex != dim())
+        {
+            // Preserves excluded dimension
+            ++newIndex;
+            sizes[newIndex]     = sizes[oldIndex];
+            strides[newIndex]   = strides[oldIndex];
+            remappedExcludedDim = newIndex;
+
+            // Restarts iteration after excludeDim
+            ++oldIndex;
+            stopDim = dim();
+        }
+    }
+
+    // Handles special case of all dims size 1
+    if (newIndex == -1 || (newIndex == 0 && sizes[0] == 1))
+    {
+        remappedExcludedDim = 0;
+        sizes[0]   = 1;
+        strides[0] = 1;
+        sizes.resize(1);
+        strides.resize(1);
+    }
+    else
+    {
+        sizes.resize(newIndex + 1);
+        strides.resize(newIndex + 1);
+    }
+
+    std::shared_ptr<TensorImpl> new_impl =
+        TensorImpl::create(impl_->storage_, impl_->storage_offset_, std::move(sizes), std::move(strides), options());
+
+    return {Tensor(new_impl), remappedExcludedDim};
+}
+
 Tensor Tensor::view(const SizeType& sizes) const
 {
     CHECK(!this->requires_grad() || !GradMode::is_enabled());
@@ -214,7 +299,7 @@ Tensor Tensor::permute_view(const SizeType& index) const
 void Tensor::resize_(const SizeType& size)
 {
     auto new_tensor = empty(size, options());
-    new_tensor.view({-1}).slice(0,0,this->numel()).copy_(this->view({-1}));
+    new_tensor.view({-1}).slice(0, 0, this->numel()).copy_(this->view({-1}));
 
     this->set_data(new_tensor);
     // std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(size, options());
@@ -546,7 +631,7 @@ Tensor Tensor::gather(int64_t dim, Tensor index) const
 }
 Tensor Tensor::prod(int64_t dim, bool keepdim) const
 {
-    return tinytorch::prod(*this,dim,keepdim);
+    return tinytorch::prod(*this, dim, keepdim);
 }
 
 
