@@ -170,26 +170,34 @@ void uniform_int(Tensor& t, int low, int high)
     SELECT_DEVICE(t.device(), uniform_int_impl, t, low, high);
 }
 
-void copy(Tensor src, Tensor target)
+void copy(Tensor src, Tensor target, bool async)
 {
     CHECK(!src.requires_grad() || !GradMode::is_enabled());
-    SELECT_DEVICE(src.device(), copy_and_convert_impl, src, target);
+
+    if (src.device() == target.device())
+    {
+        SELECT_DEVICE(src.device(), copy_and_convert_impl, src, target);
+    }
+    else
+    {
+        cpu_impl::to_impl_cpu_cuda(src, target, async);
+    }
 }
 
 
 
 namespace autograd
 {
-struct ToNode : public FunctionNode<ToNode>
+struct ToDeviceNode : public FunctionNode<ToDeviceNode>
 {
-    static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue new_device_)
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue new_device_, IValue non_blocking)
     {
         NoGradGuard ngg;
         Device new_device = new_device_.toDevice();
 #ifdef TT_HAS_CUDA
         Tensor contig = a.contiguous();
         Tensor result = empty(contig.sizes(), a.options().device(new_device));
-        cpu_impl::to_impl_cpu_cuda(contig, result);
+        cpu_impl::to_impl_cpu_cuda(contig, result, non_blocking.toBool());
         return {result};
 #else
         CHECK(false);
@@ -200,8 +208,8 @@ struct ToNode : public FunctionNode<ToNode>
     {
         Device old_device = ctx->next_meta[0].device;
         Tensor grad_a     = empty_like(grad[0], grad[0].options().device(old_device));
-        cpu_impl::to_impl_cpu_cuda(grad[0], grad_a);
-        return {grad_a, {}};
+        cpu_impl::to_impl_cpu_cuda(grad[0], grad_a, false);
+        return {grad_a, {}, {}};
     }
 };
 
@@ -231,17 +239,17 @@ struct ToScalarTypeNode : public FunctionNode<ToScalarTypeNode>
 }  // namespace autograd
 
 
-Tensor to(Tensor a, Device new_device)
+Tensor to(Tensor a, Device new_device, bool non_blocking)
 {
     if (a.device() == new_device)
     {
         return a;
     }
 
-    return autograd::ToNode::apply(a.contiguous(), new_device)[0];
+    return autograd::ToDeviceNode::apply(a.contiguous(), new_device, non_blocking)[0];
 }
 
-Tensor to(Tensor a, ScalarType other_type)
+Tensor to(Tensor a, ScalarType other_type, bool non_blocking)
 {
     if (a.dtype() == other_type)
     {
@@ -257,7 +265,7 @@ struct IndexSelectNode : public FunctionNode<IndexSelectNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor input, IValue dim, Tensor index)
     {
-        if(ctx->requires_grad)
+        if (ctx->requires_grad)
         {
             ctx->saved_data["dim"] = dim;
             ctx->save_for_backward({index});
@@ -489,8 +497,8 @@ struct Cat2Node : public FunctionNode<Cat2Node>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        int dim     = ctx->saved_data["dim"].toInt();
-        auto l      = ctx->get_saved_variables();
+        int dim = ctx->saved_data["dim"].toInt();
+        auto l  = ctx->get_saved_variables();
         // auto a      = l[0];
         // auto b      = l[1];
 
@@ -504,8 +512,8 @@ struct Cat2Node : public FunctionNode<Cat2Node>
         grad_a.copy_(g.slice_view(dim, 0, 0 + a.size(dim)));
         grad_b.copy_(g.slice_view(dim, a.size(dim), a.size(dim) + b.size(dim)));
 #else
-      auto grad_a = g.slice_view(dim, 0, 0 + a_size[dim]);
-      auto grad_b = g.slice_view(dim, a_size[dim], a_size[dim] + b_size[dim]);
+        auto grad_a = g.slice_view(dim, 0, 0 + a_size[dim]);
+        auto grad_b = g.slice_view(dim, a_size[dim], a_size[dim] + b_size[dim]);
 
 #endif
 

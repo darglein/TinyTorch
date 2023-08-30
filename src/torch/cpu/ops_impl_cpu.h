@@ -14,7 +14,7 @@ namespace tinytorch
 namespace cpu_impl
 {
 void print_impl(std::ostream& strm, Tensor t);
-void to_impl_cpu_cuda(Tensor a, Tensor b);
+void to_impl_cpu_cuda(Tensor a, Tensor b, bool async);
 
 void std_impl(Tensor a, Tensor result);
 

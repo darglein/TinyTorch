@@ -32,16 +32,30 @@ void print_impl(std::ostream& strm, Tensor t)
     print_impl<double>(strm, t.to(kDouble));
 }
 
-void to_impl_cpu_cuda(Tensor a, Tensor b)
+void to_impl_cpu_cuda(Tensor a, Tensor b, bool async)
 {
 #ifdef TT_HAS_CUDA
     CHECK(a.is_contiguous());
     CHECK(b.is_contiguous());
+
+    if (async)
+    {
+        CHECK(a.is_cpu());
+        CHECK(a.options().pinned_memory_);
+    }
+
     int64_t bytes = a.element_size() * a.numel();
     auto type     = (b.device() == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
 
-     CHECK_CUDA_ERROR(cudaMemcpy(b.data_ptr(), a.data_ptr(), bytes, type));
-//    CHECK_CUDA_ERROR(cudaMemcpyAsync(b.data_ptr(), a.data_ptr(), bytes, type));
+    if (async)
+    {
+        CHECK_CUDA_ERROR(cudaMemcpyAsync(b.data_ptr(), a.data_ptr(), bytes, type, cuda::getCurrentCUDAStream()));
+    }
+    else
+    {
+        CHECK_CUDA_ERROR(cudaMemcpy(b.data_ptr(), a.data_ptr(), bytes, type));
+    }
+
 #else
     CHECK(false);
 #endif

@@ -32,6 +32,7 @@ struct TINYTORCH_API TensorOptions
     // Bitmask required here to get this to fit inside 32 bits (or even 64 bits,
     // for that matter)
     bool requires_grad_ = 0;
+    bool pinned_memory_ = 0;
 
     // bool pinned_memory_ : 1= 0;
     // bool has_device_ : 1;
@@ -50,6 +51,12 @@ struct TINYTORCH_API TensorOptions
         requires_grad_ = b;
         return *this;
     }
+    TensorOptions& pinned_memory(bool b)
+    {
+        pinned_memory_ = b;
+        return *this;
+    }
+
     TensorOptions& device(Device d)
     {
         device_ = d;

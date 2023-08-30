@@ -18,7 +18,7 @@ TINYTORCH_API Tensor transpose(Tensor t, int64_t dim0, int64_t dim1);
 
 TINYTORCH_API Tensor permute(Tensor t, const SizeType& size);
 
-TINYTORCH_API void copy(Tensor src, Tensor target);
+TINYTORCH_API void copy(Tensor src, Tensor target, bool async = false);
 
 
 TINYTORCH_API void fill(Tensor& t, double value);
@@ -33,8 +33,8 @@ TINYTORCH_API std::pair<Tensor, Tensor> sort(Tensor t, int64_t dim);
 
 TINYTORCH_API Tensor clone(Tensor a);
 
-TINYTORCH_API Tensor to(Tensor a, ScalarType other_type);
-TINYTORCH_API Tensor to(Tensor a, Device other_type);
+TINYTORCH_API Tensor to(Tensor a, ScalarType other_type, bool non_blocking);
+TINYTORCH_API Tensor to(Tensor a, Device other_type, bool non_blocking);
 
 
 TINYTORCH_API Tensor slice(Tensor a, int64_t dim, int64_t start, int64_t end, int64_t step);

@@ -13,7 +13,7 @@ namespace tinytorch
 TensorImpl::TensorImpl(const SizeType& sizes, TensorOptions options) : sizes_(sizes), options_(options)
 {
     recompute_strides();
-    storage_ = std::make_shared<StorageImpl>(elementSize(options.dtype_) * numel(), options.device_);
+    storage_ = std::make_shared<StorageImpl>(elementSize(options.dtype_) * numel(), options);
 }
 
 TensorImpl::TensorImpl(std::shared_ptr<StorageImpl> storage, int64_t storage_offset, const SizeType& sizes,

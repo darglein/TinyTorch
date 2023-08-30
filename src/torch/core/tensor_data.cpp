@@ -15,15 +15,23 @@
 
 namespace tinytorch
 {
-StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(device)
+StorageImpl::StorageImpl(int64_t size, TensorOptions options) : size_(size), options_(options)
 {
-    if (device_ == kCPU)
+    if (options_.device_ == kCPU)
     {
-#ifdef TT_HAS_CUDA3465
-        cudaMallocHost(&data_ptr_, size);
+#ifdef TT_HAS_CUDA
+        if (options.pinned_memory_)
+        {
+            cudaMallocHost(&data_ptr_, size);
+        }
+        else
+        {
+            data_ptr_ = malloc(size);
+        }
 #else
         data_ptr_ = malloc(size);
 #endif
+
 #if TT_DEBUG
         memset(data_ptr_, 0xabababab, size);
 #endif
@@ -44,7 +52,7 @@ StorageImpl::StorageImpl(int64_t size, Device device) : size_(size), device_(dev
 }
 
 
-StorageImpl::StorageImpl(void* data_ptr, int64_t size, Device device) : size_(size), device_(device)
+StorageImpl::StorageImpl(void* data_ptr, int64_t size, TensorOptions options) : size_(size), options_(options)
 {
     data_ptr_     = data_ptr;
     has_ownership = false;
@@ -55,12 +63,19 @@ StorageImpl::~StorageImpl()
 {
     if (has_ownership == true)
     {
-        if (device_ == kCPU)
+        if (options_.device_ == kCPU)
         {
-#ifdef TT_HAS_CUDA456
-            cudaFreeHost(data_ptr_);
+#ifdef TT_HAS_CUDA
+            if (options_.pinned_memory_)
+            {
+                cudaFreeHost(data_ptr_);
+            }
+            else
+            {
+                free(data_ptr_);
+            }
 #else
-            free(data_ptr_);
+            data_ptr_ = malloc(size);
 #endif
         }
         else

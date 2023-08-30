@@ -18,6 +18,7 @@
 
 #include "torch/tiny_torch_config.h"
 #include "types.h"
+#include "tensor_options.h"
 
 namespace tinytorch
 {
@@ -25,8 +26,8 @@ namespace tinytorch
 
 struct StorageImpl
 {
-    StorageImpl(int64_t size, Device device);
-    StorageImpl(void* data_ptr, int64_t size, Device device);
+    StorageImpl(int64_t size, TensorOptions options);
+    StorageImpl(void* data_ptr, int64_t size, TensorOptions options);
 
     StorageImpl& operator=(StorageImpl&& other) = default;
     StorageImpl& operator=(const StorageImpl&)  = delete;
@@ -38,7 +39,7 @@ struct StorageImpl
     uint8_t* byte_ptr() { return (uint8_t*)data_ptr_; }
 
    protected:
-    Device device_;
+    TensorOptions options_;
     bool has_ownership = false;
     void* data_ptr_ = nullptr;
     int64_t size_;

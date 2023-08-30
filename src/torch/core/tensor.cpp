@@ -376,25 +376,25 @@ Tensor Tensor::contiguous() const
 
     return clone();
 }
-Tensor Tensor::to(ScalarType new_type) const
+Tensor Tensor::to(ScalarType new_type, bool non_blocking) const
 {
     if (dtype() == new_type)
     {
         return *this;
     }
-    return tinytorch::to(*this, new_type);
+    return tinytorch::to(*this, new_type,non_blocking);
 }
-Tensor Tensor::to(Device new_device) const
+Tensor Tensor::to(Device new_device, bool non_blocking) const
 {
     if (!impl_)
     {
         return *this;
     }
 
-    return tinytorch::to(*this, new_device);
+    return tinytorch::to(*this, new_device,non_blocking);
 }
 
-void Tensor::to_(ScalarType new_type)
+void Tensor::to_(ScalarType new_type )
 {
     auto result = to(new_type);
     result.set_requires_grad(requires_grad());

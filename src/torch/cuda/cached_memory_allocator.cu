@@ -47,6 +47,7 @@ void* cuda_cached_malloc(int64_t size)
             << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
             << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n";
     }
+    CHECK_CUDA_ERROR(cuda_error);
 
     CHECK_NOTNULL(ptr);
     return ptr;

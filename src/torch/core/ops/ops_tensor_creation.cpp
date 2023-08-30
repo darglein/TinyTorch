@@ -136,7 +136,7 @@ Tensor from_blob(void* data, const SizeType& sizes, const SizeType& stride, Tens
 {
     CHECK(options.requires_grad_ == false);
     int64_t size = sizes.numel() * elementSize(options.dtype_);
-    auto storage = std::make_shared<StorageImpl>(data, size, options.device_);
+    auto storage = std::make_shared<StorageImpl>(data, size, options);
 
     Tensor t(TensorImpl::create(storage, 0, sizes, stride, options));
     return t;
