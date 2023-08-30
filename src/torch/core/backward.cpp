@@ -1,5 +1,6 @@
 #include "backward.h"
 
+#include "torch/core/ops/all.h"
 #include "torch/core/graph.h"
 namespace tinytorch
 {

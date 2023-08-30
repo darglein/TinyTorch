@@ -6,9 +6,7 @@
 
 #pragma once
 #include "torch/core/tensor.h"
-#include "torch/core/tensor_impl.h"
 
-#include "torch/tiny_torch_config.h"
 namespace tinytorch
 {
 TINYTORCH_API void manual_seed(int64_t seed);

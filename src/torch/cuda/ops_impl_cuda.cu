@@ -177,16 +177,14 @@ __launch_bounds__(128) static __global__ void rand_float_impl(TensorInfoCuda<T> 
     int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     int64_t grid_size = blockDim.x * gridDim.x;
     //    if (i >= a.numel()) return;
+    unsigned int seed2 = seed + (i * 891623501275UL);
 
     for (; i < a.numel(); i += grid_size)
     {
-        unsigned int seed2 = seed + i;
-        unsigned int x     = xorshift64(seed2);
-        float xf           = float(x) * (1.0 / std::numeric_limits<unsigned int>::max());
-
+        seed2    = xorshift64(seed2);
+        float xf = float(seed2) * (1.0 / std::numeric_limits<unsigned int>::max());
         a[i] = T(xf * (high - low) + low);
     }
-    //    a[i] = T(float(i));
 }
 
 void uniform_impl(Tensor& a, double mi, double ma)

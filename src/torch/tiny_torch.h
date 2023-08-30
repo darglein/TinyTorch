@@ -19,4 +19,8 @@
 
 #define TINY_TORCH
 
+#ifdef MAX_TENSORINFO_DIMS
+#error asdf
+#endif
+
 

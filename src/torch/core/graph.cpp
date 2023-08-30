@@ -4,6 +4,7 @@
  * See LICENSE file for more information.
  */
 #include "graph.h"
+#include "torch/core/ops/all.h"
 namespace tinytorch
 {
 int autograd::Node::current_seq_nr = 0;

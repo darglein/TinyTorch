@@ -7,6 +7,7 @@
 #include "ops_tensor_creation.h"
 #include "torch/core/ops/ops_impl.h"
 
+#include "torch/core/tensor_impl.h"
 #include <chrono>
 
 

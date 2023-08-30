@@ -5,12 +5,10 @@
  */
 
 #pragma once
-#include "torch/core/ops/all.h"
 #include "torch/core/tensor.h"
 
 #include <map>
 
-#include "torch/tiny_torch_config.h"
 
 namespace tinytorch
 {

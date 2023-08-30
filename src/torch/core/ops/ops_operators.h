@@ -7,7 +7,6 @@
 #pragma once
 #include "torch/core/tensor.h"
 
-#include "torch/tiny_torch_config.h"
 namespace tinytorch
 {
 TINYTORCH_API std::ostream& operator<<(std::ostream& strm, Tensor t);
