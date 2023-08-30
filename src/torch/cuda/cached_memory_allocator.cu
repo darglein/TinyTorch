@@ -32,10 +32,14 @@ std::mutex mu;
 #if 1
 void* cuda_cached_malloc(int64_t size)
 {
+    if (size == 0)
+    {
+        return nullptr;
+    }
     std::unique_lock l(mu);
     void* ptr;
     auto cuda_error = cudaMallocAsync(&ptr, size, cuda::getCurrentCUDAStream());
-//    auto cuda_error = cudaMalloc(&ptr, size);
+    //    auto cuda_error = cudaMalloc(&ptr, size);
 
     if (cuda_error == cudaErrorMemoryAllocation)
     {
@@ -56,7 +60,7 @@ void cuda_cached_free(void* ptr)
 {
     std::unique_lock l(mu);
     cudaFreeAsync(ptr, cuda::getCurrentCUDAStream());
-//    cudaFree(ptr);
+    //    cudaFree(ptr);
 }
 void CUDACachingAllocator::emptyCache() {}
 
