@@ -170,6 +170,7 @@ __device__ inline T blockReduce(T val, OP op, T default_val)
 
         val = warpReduce(val, op);
     }
+    __syncthreads();
 
 
     return val;
