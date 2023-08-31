@@ -617,7 +617,7 @@ void Tensor::retain_grad()
 
     auto old_edge = impl_->autograd_meta->edge;
 
-    auto accu_node = std::make_shared<autograd::AccumulateGrad>(*this);
+    auto accu_node = std::make_shared<autograd::AccumulateGrad>(impl_);
     accu_node->next.push_back(old_edge);
     accu_node->num_inputs_of_forward = 1;
 

@@ -1,7 +1,7 @@
 #include "backward.h"
 
-#include "torch/core/ops/all.h"
 #include "torch/core/graph.h"
+#include "torch/core/ops/all.h"
 namespace tinytorch
 {
 
@@ -109,6 +109,16 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
         if (acc_node)
         {
             acc_node->accumulate(it.second);
+            // acc_node->t.SetEdge(nullptr);
+        }
+    }
+
+    if (1)
+    {
+        // clear graph
+        for (auto& it : grad_map)
+        {
+            it.first->clear();
         }
     }
 }

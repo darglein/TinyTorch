@@ -5,6 +5,7 @@
  */
 #include "graph.h"
 #include "torch/core/ops/all.h"
+#include "torch/core/tensor_impl.h"
 namespace tinytorch
 {
 int autograd::Node::current_seq_nr = 0;
@@ -21,7 +22,7 @@ void GradMode::set_enabled(bool enabled)
 }
 namespace autograd
 {
-AccumulateGrad::AccumulateGrad(Tensor t) : t(t)
+AccumulateGrad::AccumulateGrad(std::shared_ptr<TensorImpl> t) : impl_(t)
 {
     num_input_gradients_of_backward = 1;
     num_inputs_of_forward           = 0;
@@ -38,6 +39,13 @@ std::vector<Tensor> AccumulateGrad::accumulate(const std::vector<Tensor>& input_
 {
     CHECK_EQ(input_grad.size(), 1);
     auto g = input_grad[0];
+
+    CHECK(!impl_.expired());
+    auto ptr = impl_.lock();
+    CHECK(ptr);
+
+    Tensor t(ptr);
+
     if (!t.grad().defined())
     {
         t.set_grad(g);

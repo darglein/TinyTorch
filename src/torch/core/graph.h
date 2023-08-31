@@ -337,12 +337,14 @@ using Function = FunctionNode<T>;
 
 struct AccumulateGrad : public Node
 {
-    AccumulateGrad(Tensor t);
+    AccumulateGrad(std::shared_ptr<TensorImpl> t);
 
     std::vector<Tensor> node_backward(const std::vector<Tensor>& input_grad) override;
 
     std::vector<Tensor> accumulate(const std::vector<Tensor>& input_grad);
-    Tensor t;
+
+    // the weak ptr is important because otherwise we get a cyclic dependency to the owning tensor
+    std::weak_ptr<TensorImpl> impl_;
 };
 }  // namespace autograd
 
