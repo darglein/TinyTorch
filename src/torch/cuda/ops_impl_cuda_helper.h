@@ -1,6 +1,8 @@
 #pragma once
 
 
+#include "torch/core/crash.h"
+
 #include "torch/core/tensor_info.h"
 #include "torch/tiny_torch_cuda.h"
 
@@ -24,11 +26,12 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 #    undef CUDA_DEBUG
 #endif
 
-#define CHECK_CUDA_ERROR(cudaFunction)                                                        \
-    {                                                                                         \
-        cudaError_t cudaErrorCode = cudaFunction;                                             \
-        CHECK_EQ(cudaErrorCode, cudaSuccess)                                                  \
-            << ": " << cudaGetErrorString(cudaErrorCode) << " in function " << #cudaFunction; \
+#define CHECK_CUDA_ERROR(cudaFunction)                                                               \
+    {                                                                                                \
+        cudaError_t cudaErrorCode = cudaFunction;                                                    \
+        CHECK_EQ(cudaErrorCode, cudaSuccess)                                                         \
+            << ": " << cudaGetErrorString(cudaErrorCode) << " in function " << #cudaFunction << "\n" \
+            << tinytorch::printCurrentStack();                                                       \
     }
 
 #if defined(CUDA_DEBUG) && TT_DEBUG
