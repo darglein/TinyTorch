@@ -40,8 +40,14 @@ void to_impl_cpu_cuda(Tensor a, Tensor b, bool async)
 
     if (async)
     {
-        CHECK(a.is_cpu());
-        CHECK(a.options().pinned_memory_);
+        if(a.is_cpu())
+        {
+            CHECK(a.options().pinned_memory_);
+        }
+        if(b.is_cpu())
+        {
+            CHECK(b.options().pinned_memory_);
+        }
     }
 
     int64_t bytes = a.element_size() * a.numel();

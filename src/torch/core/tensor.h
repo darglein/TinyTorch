@@ -192,7 +192,7 @@ struct TINYTORCH_API Tensor
     // }
     Tensor& index_copy_(int64_t dim, Tensor ids, Tensor value);
     Tensor pow(Tensor a) const;
-    void copy_(Tensor a);
+    void copy_(Tensor a, bool non_blocking = false);
 
     Tensor clone() const;
 

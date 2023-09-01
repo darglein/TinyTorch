@@ -203,8 +203,8 @@ std::pair<Tensor, int> Tensor::collapse_view(int excludeDim) const
     if (newIndex == -1 || (newIndex == 0 && sizes[0] == 1))
     {
         remappedExcludedDim = 0;
-        sizes[0]   = 1;
-        strides[0] = 1;
+        sizes[0]            = 1;
+        strides[0]          = 1;
         sizes.resize(1);
         strides.resize(1);
     }
@@ -382,7 +382,7 @@ Tensor Tensor::to(ScalarType new_type, bool non_blocking) const
     {
         return *this;
     }
-    return tinytorch::to(*this, new_type,non_blocking);
+    return tinytorch::to(*this, new_type, non_blocking);
 }
 Tensor Tensor::to(Device new_device, bool non_blocking) const
 {
@@ -391,10 +391,10 @@ Tensor Tensor::to(Device new_device, bool non_blocking) const
         return *this;
     }
 
-    return tinytorch::to(*this, new_device,non_blocking);
+    return tinytorch::to(*this, new_device, non_blocking);
 }
 
-void Tensor::to_(ScalarType new_type )
+void Tensor::to_(ScalarType new_type)
 {
     auto result = to(new_type);
     result.set_requires_grad(requires_grad());
@@ -444,9 +444,9 @@ Tensor Tensor::clone() const
 {
     return tinytorch::clone(*this);
 }
-void Tensor::copy_(Tensor a)
+void Tensor::copy_(Tensor a, bool non_blocking)
 {
-    tinytorch::copy(a, *this);
+    tinytorch::copy(a, *this, non_blocking);
 }
 Tensor Tensor::min() const
 {
