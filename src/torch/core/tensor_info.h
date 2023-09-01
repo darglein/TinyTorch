@@ -391,10 +391,10 @@ struct TensorInfoBase
 #pragma unroll
         for (int64_t i = 0; i < max_dims; ++i)
         {
-            if (i < dim())
-            {
-                result[i] = std::clamp(index[i], int64_t(0), sizes[i] - 1);
-            }
+            if (i == dim()) break;
+
+
+            result[i] = std::clamp(index[i], int64_t(0), sizes[i] - 1);
         }
         return result;
     }

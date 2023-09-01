@@ -283,6 +283,7 @@ static __global__ void dimensional_reduce(TensorInfoCuda<InputType> a, int64_t d
         }
         if (threadIdx.x == 0)
         {
+            CUDA_KERNEL_ASSERT(block_id < result.numel());
             result[block_id] = value;
         }
     }
@@ -293,7 +294,9 @@ void dimensional_reduce_launcher(TensorInfoCuda<InputType> a, int64_t dim, Tenso
 {
     int64_t size_to_reduce       = a.size(dim);
     int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
-    int64_t num_threads = std::min(num_blocks_to_reduce * REDUCE_BLOCK_SIZE, int64_t(1024) * 1024);
+    int64_t num_threads          = std::min(num_blocks_to_reduce * REDUCE_BLOCK_SIZE, int64_t(1024) * 1024);
+
+    CHECK_EQ(result.numel(), num_blocks_to_reduce);
 
     dimensional_reduce<InputType, OutputType, Op>
         <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
@@ -318,18 +321,6 @@ void dimensional_reduce_helper(Tensor a, int64_t dim, Tensor result)
         default:
             CHECK(false) << "invalid input type " << a.scalar_type();
     }
-}
-
-template <typename T>
-__launch_bounds__(128) static __global__ void sum_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<T> result)
-{
-    int64_t linear_index_input = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (linear_index_input >= input.numel()) return;
-
-    auto index_input  = input.LinearIndexToDimIndex(linear_index_input);
-    auto result_index = index_input;
-    result_index[dim] = 0;
-    atomicAdd(&result[result_index], input[index_input]);
 }
 
 void sum_impl(Tensor a, int64_t dim, Tensor result)

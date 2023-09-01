@@ -32,11 +32,12 @@ inline std::pair<SizeType, SizeType> CheckOperatorSizeMatchOneDim(const Tensor& 
         {
             CHECK(a.size(i) == 1 || b.size(i) == 1) << "Size Missmatch " << a.sizes() << " " << b.sizes();
 
-            if (a.size(i) == 1)
+            // make sure we don't expand a 0 to a 1
+            if (a.size(i) == 1 && b.size(i) > 1)
             {
                 expand_a.push_back(i);
             }
-            else
+            else if (b.size(i) == 1 && a.size(i) > 1)
             {
                 expand_b.push_back(i);
             }
@@ -69,7 +70,15 @@ static SizeType max_size(Tensor a, Tensor b)
         int64_t as = a.size(i);
         int64_t bs = b.size(i);
         CHECK(as == bs || as == 1 || bs == 1);
-        new_sizes[i] = std::max(as, bs);
+        if (as == 0 || bs == 0)
+        {
+            // 0-sized dims are not expanded
+            new_sizes[i] = 0;
+        }
+        else
+        {
+            new_sizes[i] = std::max(as, bs);
+        }
     }
     return new_sizes;
 }

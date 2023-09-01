@@ -189,7 +189,7 @@ struct ToIValueList
 struct TINYTORCH_API Node
 {
     // Create a node and give it a unique increasing sequence number
-    Node() : sequence_nr(current_seq_nr++) {}
+    Node();
     virtual ~Node() {}
 
     void clear()
@@ -203,7 +203,6 @@ struct TINYTORCH_API Node
 
     // A global counter to get correct node ordering
     int64_t sequence_nr;
-    static thread_local int64_t current_seq_nr;
 
     // The next edges are the inputs of the forward operator
     std::vector<std::shared_ptr<Edge>> next;

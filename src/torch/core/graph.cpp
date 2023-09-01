@@ -4,11 +4,12 @@
  * See LICENSE file for more information.
  */
 #include "graph.h"
+
 #include "torch/core/ops/all.h"
+
 #include "torch/core/tensor_impl.h"
 namespace tinytorch
 {
-thread_local int64_t autograd::Node::current_seq_nr = 0;
 
 static thread_local bool grad_mode_ = true;
 
@@ -55,6 +56,12 @@ std::vector<Tensor> AccumulateGrad::accumulate(const std::vector<Tensor>& input_
         t.mutable_grad() += g;
     }
     return {g};
+}
+
+Node::Node()
+{
+    static thread_local int64_t current_seq_nr = 0;
+    this->sequence_nr = current_seq_nr++;
 }
 
 }  // namespace autograd

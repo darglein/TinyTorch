@@ -44,6 +44,7 @@ struct SumDimNode : public FunctionNode<SumDimNode>
         Tensor result = zeros(out_size, a.options());
 
         auto [a_collapsed, new_dim] = a.collapse_view(dim.toInt());
+        CHECK_NE(new_dim, -1);
         auto out_size_collapsed     = a_collapsed.sizes();
         out_size_collapsed[new_dim] = 1;
 
