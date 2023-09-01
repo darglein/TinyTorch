@@ -359,7 +359,7 @@ bool Tensor::is_contiguous() const
     int64_t expected_stride = 1;
     for (int64_t i = dim() - 1; i >= 0; --i)
     {
-        if (stride(i) != expected_stride)
+        if (size(i) != 1 && stride(i) != expected_stride)
         {
             return false;
         }

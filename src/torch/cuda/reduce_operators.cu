@@ -393,6 +393,7 @@ __launch_bounds__(128) static __global__
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
+
     {
         auto index_result = result.LinearIndexToDimIndex(i);
 

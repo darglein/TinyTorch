@@ -35,8 +35,8 @@ void print_impl(std::ostream& strm, Tensor t)
 void to_impl_cpu_cuda(Tensor a, Tensor b, bool async)
 {
 #ifdef TT_HAS_CUDA
-    CHECK(a.is_contiguous());
-    CHECK(b.is_contiguous());
+    CHECK(a.is_contiguous()) << a.sizes() << " " << a.strides();
+    CHECK(b.is_contiguous()) << b.sizes() << " " << b.strides();
 
     if (async)
     {
