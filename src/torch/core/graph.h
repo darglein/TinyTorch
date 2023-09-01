@@ -202,8 +202,8 @@ struct TINYTORCH_API Node
     virtual std::vector<Tensor> node_backward(const std::vector<Tensor>& fwd_output_grad) = 0;
 
     // A global counter to get correct node ordering
-    int sequence_nr;
-    static int current_seq_nr;
+    int64_t sequence_nr;
+    static thread_local int64_t current_seq_nr;
 
     // The next edges are the inputs of the forward operator
     std::vector<std::shared_ptr<Edge>> next;

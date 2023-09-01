@@ -8,7 +8,7 @@
 #include "torch/core/tensor_impl.h"
 namespace tinytorch
 {
-int autograd::Node::current_seq_nr = 0;
+thread_local int64_t autograd::Node::current_seq_nr = 0;
 
 static thread_local bool grad_mode_ = true;
 
