@@ -33,7 +33,8 @@ void* cuda_cached_malloc(int64_t size)
     }
     std::unique_lock l(mu);
     void* ptr;
-    auto cuda_error = cudaMallocAsync(&ptr, size, cuda::getCurrentCUDAStream());
+    auto strm = cuda::getCurrentCUDAStream();
+    auto cuda_error = cudaMallocAsync(&ptr, size, strm);
     if (cuda_error == cudaErrorMemoryAllocation)
     {
         size_t mem_free, mem_total;
