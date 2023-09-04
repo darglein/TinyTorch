@@ -89,7 +89,7 @@ std::string printCurrentStack()
     // to undecorate the symbol names we're returned.  If you want, you can add other
     // symbol servers or paths via a semi-colon separated list in SymInitialized.
     ::SymSetOptions(SYMOPT_DEFERRED_LOADS | SYMOPT_INCLUDE_32BIT_MODULES | SYMOPT_UNDNAME);
-    if (!::SymInitialize(::GetCurrentProcess(), "http://msdl.microsoft.com/download/symbols", TRUE)) return;
+    if (!::SymInitialize(::GetCurrentProcess(), "http://msdl.microsoft.com/download/symbols", TRUE)) return "";
 
     // Capture up to 25 stack frames from the current call stack.  We're going to
     // skip the first stack frame returned because that's the GetStackWalk function
