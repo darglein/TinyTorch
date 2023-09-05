@@ -21,7 +21,6 @@ void adam_step(TensorInfo<T> param, TensorInfo<T> param_grad, TensorInfo<T> m1s,
     for (int i = 0; i < param.numel(); ++i)
     {
         T& w = param[i];
-        // assert(param.grad().size() == param.size());
 
         T gradient = param_grad[i];
         T m1       = m1s[i];
@@ -61,7 +60,6 @@ void sgd_step(TensorInfo<T> param, TensorInfo<T> param_grad, TensorInfo<T> veloc
     for (int i = 0; i < param.numel(); ++i)
     {
         auto& w = param[i];
-        // assert(param.grad().size() == param.size());
 
         auto g  = param_grad[i];
         auto& b = velocity[i];
