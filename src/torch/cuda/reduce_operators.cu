@@ -9,6 +9,7 @@
 #include "torch/cuda/ops_impl_cuda.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
 #include "unary_operators.h"
+#include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 
@@ -21,27 +22,6 @@ namespace cuda_impl
 
 constexpr int REDUCE_BLOCK_SIZE = 256;
 
-template <int Size>
-struct AtomicCASType
-{
-};
-
-template <>
-struct AtomicCASType<2>
-{
-    using Type = short;
-};
-template <>
-struct AtomicCASType<4>
-{
-    using Type = int;
-};
-template <>
-struct AtomicCASType<8>
-{
-    using Type = unsigned long long int;
-};
-
 
 struct ReduceAdd
 {
@@ -51,9 +31,9 @@ struct ReduceAdd
         return a + b;
     }
     template <typename T>
-    TT_HD void atomic_reduce(T* target, T value)
+    TT_HD T atomic_reduce(T* target, T value)
     {
-        atomicAdd(target, value);
+        return atomicAddSelect(target, value);
     }
     template <typename T>
     static constexpr T default_value()
@@ -70,6 +50,11 @@ struct ReduceProd
         return a * b;
     }
     template <typename T>
+    TT_HD T atomic_reduce(T* target, T value)
+    {
+        return atomicMulSelect(target, value);
+    }
+    template <typename T>
     static constexpr T default_value()
     {
         return T(1);
@@ -83,9 +68,9 @@ struct ReduceMin
         return a < b ? a : b;
     }
     template <typename T>
-    TT_HD void atomic_reduce(T* target, T value)
+    TT_HD T atomic_reduce(T* target, T value)
     {
-        atomicMin(target, value);
+        return atomicMinSelect(target, value);
     }
     template <typename T>
     static constexpr T default_value()
@@ -101,9 +86,9 @@ struct ReduceMax
         return a > b ? a : b;
     }
     template <typename T>
-    TT_HD void atomic_reduce(T* target, T value)
+    TT_HD T atomic_reduce(T* target, T value)
     {
-        atomicMax(target, value);
+        return atomicMaxSelect(target, value);
     }
     template <typename T>
     static constexpr T default_value()
@@ -172,7 +157,6 @@ __device__ inline T blockReduce(T val, OP op, T default_val)
     }
     __syncthreads();
 
-
     return val;
 }
 
@@ -220,6 +204,9 @@ void global_reduce_helper(Tensor a, Tensor result)
     {
         case kInt32:
             global_reduce_launcher<int, int, Op>(a, kernel_result);
+            break;
+        case kInt64:
+            global_reduce_launcher<int64_t , int64_t, Op>(a, kernel_result);
             break;
         case kFloat16:
             global_reduce_launcher<__half, float, Op>(a, kernel_result);
@@ -428,11 +415,11 @@ __launch_bounds__(128) static __global__
 
         if (calc_min)
         {
-            atomicMin(&result_value, v);
+            atomicMinSelect(&result_value, v);
         }
         else
         {
-            atomicMax(&result_value, v);
+            atomicMaxSelect(&result_value, v);
         }
     }
 }
