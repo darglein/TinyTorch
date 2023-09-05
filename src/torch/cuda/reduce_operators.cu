@@ -109,6 +109,18 @@ __device__ inline T shfl_xor(T var, unsigned int srcLane, int width = 32)
     return var;
 }
 
+template <typename T, typename ShuffleType = int>
+__device__ inline T shfl_up(T var, unsigned int srcLane, int width = 32)
+{
+    static_assert(sizeof(T) % sizeof(ShuffleType) == 0, "Cannot shuffle this type.");
+    ShuffleType* a = reinterpret_cast<ShuffleType*>(&var);
+    for (int i = 0; i < sizeof(T) / sizeof(ShuffleType); ++i)
+    {
+        a[i] = __shfl_up_sync(0xFFFFFFFF, a[i], srcLane, width);
+    }
+    return var;
+}
+
 template <typename T, typename OP, unsigned int LOCAL_WARP_SIZE = 32>
 __device__ inline T warpReduce(T val, OP op)
 {
@@ -206,7 +218,7 @@ void global_reduce_helper(Tensor a, Tensor result)
             global_reduce_launcher<int, int, Op>(a, kernel_result);
             break;
         case kInt64:
-            global_reduce_launcher<int64_t , int64_t, Op>(a, kernel_result);
+            global_reduce_launcher<int64_t, int64_t, Op>(a, kernel_result);
             break;
         case kFloat16:
             global_reduce_launcher<__half, float, Op>(a, kernel_result);
@@ -314,80 +326,171 @@ void sum_impl(Tensor a, int64_t dim, Tensor result)
 {
     dimensional_reduce_helper<ReduceAdd>(a, dim, result);
 }
-
-
-
-template <typename T>
-__launch_bounds__(128) static __global__ void prod_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-    {
-        auto index_result = result.LinearIndexToDimIndex(i);
-
-        T prod = T(1.f);
-        for (int64_t j = 0; j < input.size(dim); ++j)
-        {
-            auto index_input = index_result;
-            index_input[dim] = j;
-            prod             = prod * input[index_input];
-        }
-        result[index_result] = prod;
-    }
-}
-
 void prod_impl(Tensor input, int64_t dim, Tensor result)
 {
     dimensional_reduce_helper<ReduceProd>(input, dim, result);
-    return;
-    //    CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), prod_impl, input, dim, result);
 }
-template <typename T>
-__launch_bounds__(128) static __global__
-    void cumprod_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<T> result)
-{
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-    {
-        auto index_result = result.LinearIndexToDimIndex(i);
 
-        T prod = T(1.f);
-        for (int64_t j = 0; j <= index_result[dim]; ++j)
+
+
+// ========================================================================================================
+
+
+
+template <typename T, typename Op, unsigned int LOCAL_WARP_SIZE = 32>
+__device__ inline T warpInclusiveScan(T val, Op op, unsigned int lane)
+{
+#pragma unroll
+    for (int d = 1; d < LOCAL_WARP_SIZE; d *= 2)
+    {
+        T tmp = shfl_up<T, T>(val, d, LOCAL_WARP_SIZE);
+        if (lane >= d) val = op(val, tmp);
+    }
+    return val;
+}
+
+
+template <unsigned int BLOCK_SIZE, typename T, typename Op>
+__device__ inline T blockInclusiveScan(T val, Op op, T default_value)
+{
+    __shared__ T shared[BLOCK_SIZE / 32];
+
+    int lane_id   = threadIdx.x % 32;
+    int warp_lane = threadIdx.x / 32;
+
+
+    val = warpInclusiveScan(val, op, lane_id);
+
+    // the last thread in the warp writes its value to shared memory
+    if (lane_id == 31) shared[warp_lane] = val;
+    __syncthreads();
+
+
+    if (warp_lane == 0)
+    {
+        T valWarp;
+        if (threadIdx.x < BLOCK_SIZE / 32)
         {
-            auto index_input = index_result;
-            index_input[dim] = j;
-            prod             = prod * input[index_input];
+            valWarp = shared[threadIdx.x];
         }
-        result[index_result] = prod;
+        else
+        {
+            valWarp = default_value;
+        }
+
+
+        valWarp = warpInclusiveScan<T, Op>(valWarp, op, lane_id);
+        if (threadIdx.x < BLOCK_SIZE / 32)
+        {
+            shared[lane_id] = valWarp;
+        }
+    }
+
+
+    __syncthreads();
+
+    // add value of previous warp
+    if (warp_lane > 0)
+    {
+        val = op(val,shared[warp_lane - 1]);
+    }
+
+    __syncthreads();
+
+    return val;
+}
+
+
+
+template <typename InputType, typename OutputType, typename Op>
+static __global__ void dimensional_scan(TensorInfoCuda<InputType> a, int64_t dim, TensorInfoCuda<OutputType> result,
+                                        Op op, OutputType default_value)
+{
+    int64_t size_to_reduce       = a.size(dim);
+    int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
+    int64_t num_steps            = iDivUp(size_to_reduce, REDUCE_BLOCK_SIZE);
+    __shared__ OutputType previous_block_sum;
+
+
+
+    // each reduction is computed by a separate block
+    for (int64_t block_id = blockIdx.x; block_id < num_blocks_to_reduce; block_id += gridDim.x)
+    {
+        auto index_input = a.LinearIndexToDimIndexSkipDim(block_id, dim);
+
+        if (threadIdx.x == 0)
+        {
+            previous_block_sum = default_value;
+        }
+        __syncthreads();
+
+        for (int64_t k = 0; k < num_steps; ++k)
+        {
+            auto previous_block_sum_copy = previous_block_sum;
+            int64_t i                    = k * REDUCE_BLOCK_SIZE + threadIdx.x;
+            index_input.set_index(dim, i);
+            OutputType local_value = i < size_to_reduce ? OutputType(a[index_input]) : default_value;
+            auto value = blockInclusiveScan<REDUCE_BLOCK_SIZE, OutputType, Op>(local_value, op, default_value);
+            value      = op(value, previous_block_sum_copy);
+
+            if (i < size_to_reduce)
+            {
+                result[index_input] = value;
+            }
+
+            if (threadIdx.x == REDUCE_BLOCK_SIZE - 1)
+            {
+                previous_block_sum = value;
+            }
+            __syncthreads();
+        }
     }
 }
-void cumprod_impl(Tensor input, int64_t dim, Tensor result)
+
+template <typename InputType, typename OutputType, typename Op>
+void dimensional_scan_launcher(TensorInfoCuda<InputType> a, int64_t dim, TensorInfoCuda<OutputType> result)
 {
-    CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), cumprod_impl, input, dim, result);
+    int64_t size_to_reduce       = a.size(dim);
+    int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
+    int64_t num_threads          = std::min(num_blocks_to_reduce * REDUCE_BLOCK_SIZE, int64_t(1024) * 1024);
+
+
+
+    dimensional_scan<InputType, OutputType, Op>
+        <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
+            a, dim, result, Op(), Op::template default_value<OutputType>());
+    CUDA_SYNC_CHECK_ERROR();
 }
-template <typename T>
-__launch_bounds__(128) static __global__
-    void cumsum_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<T> result)
+
+template <typename Op>
+void dimensional_scan_helper(Tensor a, int64_t dim, Tensor result)
 {
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
-
+    switch (a.scalar_type())
     {
-        auto index_result = result.LinearIndexToDimIndex(i);
-
-        T prod = T(0.f);
-        for (int64_t j = 0; j <= index_result[dim]; ++j)
-        {
-            auto index_input = index_result;
-            index_input[dim] = j;
-            prod             = prod + input[index_input];
-        }
-        result[index_result] = prod;
+        case kHalf:
+            dimensional_scan_launcher<__half, __half, Op>(a, dim, result);
+            break;
+        case kInt32:
+            dimensional_scan_launcher<int, int, Op>(a, dim, result);
+            break;
+        case kFloat:
+            dimensional_scan_launcher<float, float, Op>(a, dim, result);
+            break;
+        case kDouble:
+            dimensional_scan_launcher<double, double, Op>(a, dim, result);
+            break;
+        default:
+            CHECK(false) << "invalid input type " << a.scalar_type();
     }
 }
 void cumsum_impl(Tensor input, int64_t dim, Tensor result)
 {
-    CUDA_SWITCH_MACRO_ALL(input.scalar_type(), result.numel(), cumsum_impl, input, dim, result);
+    dimensional_scan_helper<ReduceAdd>(input, dim, result);
+}
+
+void cumprod_impl(Tensor input, int64_t dim, Tensor result)
+{
+    dimensional_scan_helper<ReduceProd>(input, dim, result);
 }
 
 
