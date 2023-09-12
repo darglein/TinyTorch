@@ -236,12 +236,7 @@ struct TINYTORCH_API Tensor
     Tensor cumprod(int64_t dim) const;
     Tensor cumsum(int64_t dim) const;
     void fill_(double a);
-    void operator=(double a)
-    {
-        CHECK_EQ(dim(), 1);
-        CHECK_EQ(numel(), 1);
-        fill_(a);
-    }
+
     Tensor min() const;
     Tensor max() const;
 
