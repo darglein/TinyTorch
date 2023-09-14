@@ -471,6 +471,7 @@ struct PermuteNode : public FunctionNode<PermuteNode>
 
 Tensor clone(Tensor a)
 {
+    if(!a.defined()) return Tensor();
     return autograd::CloneNode::apply(a)[0];
 }
 Tensor permute(Tensor t, const SizeType& size)
