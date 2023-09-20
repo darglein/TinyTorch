@@ -123,6 +123,9 @@ static void fill_with_infinite(Tensor& a, bool positive_inf)
         case kFloat64:
             fill_with_infinite<double>(a, positive_inf);
             break;
+        case kInt16:
+            fill_with_infinite<short>(a, positive_inf);
+            break;
         case kInt32:
             fill_with_infinite<int>(a, positive_inf);
             break;
