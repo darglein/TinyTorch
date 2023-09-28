@@ -93,6 +93,13 @@ struct Sigmoid
     {
         return T(1.f) / (T(1.f) + ::exp(-x));
     }
+    template <typename T>
+    TT_HD T backward(T input_x, T grad_output)
+    {
+        float x = 1.0f / (1.0f + expf(-input_x));
+        T J     = (T)(x * (1.0f - x));
+        return J * grad_output;
+    }
 };
 struct Softplus
 {
@@ -104,12 +111,12 @@ struct Softplus
         return T(::log(::exp(x * T(beta)) + T(1.f)) / T(beta));
     }
     template <typename T>
-    TT_HD T backward(T x)
+    TT_HD T backward(T input_x, T grad_output)
     {
-        if (x > T(threshold)) return 1;
-        // T tmp =  expf((float)frag.x[t] * beta);
-        if (x > T(threshold)) return x;
-        return T(::log(::exp(x * T(beta)) + T(1.f)) / T(beta));
+        if (input_x > T(threshold)) return T(1.f) * grad_output;
+        T tmp = expf((float)input_x * beta);
+        T J   = (tmp / (tmp + T(1.f)));
+        return grad_output * J;
     }
     float beta;
     float threshold;

@@ -130,8 +130,9 @@ struct SigmoidNode : public FunctionNode<SigmoidNode>
         auto l = ctx->get_saved_variables();
         auto a = l[0];
         auto g = grad[0];
-        CHECK(false);
-        return {g};
+        auto g_a = empty_like(a);
+        SELECT_DEVICE(a.device(), sigmoid_backward_impl, a, g_a, g);
+        return {g_a};
     }
 };
 struct SoftplusNode : public FunctionNode<SoftplusNode>
@@ -139,6 +140,7 @@ struct SoftplusNode : public FunctionNode<SoftplusNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue beta)
     {
         ctx->save_for_backward({a});
+        ctx->saved_data["beta"] = beta;
         auto result = empty_like(a);
         SELECT_DEVICE(a.device(), softplus_impl, a, beta.toDouble(), result);
         return {result};
@@ -149,8 +151,10 @@ struct SoftplusNode : public FunctionNode<SoftplusNode>
         auto l = ctx->get_saved_variables();
         auto a = l[0];
         auto g = grad[0];
-        CHECK(false);
-        return {g, {}};
+        auto g_a = empty_like(a);
+
+        SELECT_DEVICE(a.device(), softplus_backward_impl, a, ctx->saved_data["beta"].toDouble(), g_a, g);
+        return {g_a, {}};
     }
 };
 }  // namespace autograd

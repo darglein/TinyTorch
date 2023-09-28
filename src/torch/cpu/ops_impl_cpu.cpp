@@ -40,11 +40,11 @@ void to_impl_cpu_cuda(Tensor a, Tensor b, bool async)
 
     if (async)
     {
-        if(a.is_cpu())
+        if (a.is_cpu())
         {
             CHECK(a.options().pinned_memory_);
         }
-        if(b.is_cpu())
+        if (b.is_cpu())
         {
             CHECK(b.options().pinned_memory_);
         }
@@ -562,7 +562,14 @@ static void copy_and_convert_impl_kernel(TensorInfo<TSource> src, TensorInfo<TTa
 {
     for (int64_t i = 0; i < src.numel(); ++i)
     {
-        target[i] = TTarget(src[i]);
+        if constexpr (std::is_same_v<TTarget, Half>)
+        {
+            target[i] = TTarget(float(src[i]));
+        }
+        else
+        {
+            target[i] = TTarget(src[i]);
+        }
     }
 }
 
@@ -584,6 +591,11 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
         case kInt64:
         {
             SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int64_t, copy_and_convert_impl_kernel, src, target);
+            break;
+        }
+        case kFloat16:
+        {
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), Half, copy_and_convert_impl_kernel, src, target);
             break;
         }
         case kFloat32:

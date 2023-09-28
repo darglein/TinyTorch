@@ -23,7 +23,9 @@ void sin_impl(Tensor a, Tensor result);
 void cos_impl(Tensor a, Tensor result);
 void relu_impl(Tensor a, Tensor result);
 void sigmoid_impl(Tensor a, Tensor result);
+void sigmoid_backward_impl(Tensor a, Tensor grad_a, Tensor grad_result);
 void softplus_impl(Tensor a, double beta, Tensor result);
+void softplus_backward_impl(Tensor a, double beta, Tensor grad_a, Tensor grad_result);
 
-}  // namespace cpu_impl
+}  // namespace cuda_impl
 }  // namespace tinytorch
