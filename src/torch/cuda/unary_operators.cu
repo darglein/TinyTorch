@@ -94,6 +94,11 @@ void sqrt_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sqrt(), a, result);
 }
+void sqrt_backward_impl(Tensor a, Tensor grad_a, Tensor grad_result)
+{
+    SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(UnaryOperators::Sqrt(), a, grad_a, grad_result);
+}
+
 void log_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Log(), a, result);
@@ -126,7 +131,6 @@ void sigmoid_backward_impl(Tensor a, Tensor grad_a, Tensor grad_result)
 {
     SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(UnaryOperators::Sigmoid(), a, grad_a, grad_result);
 }
-
 void softplus_impl(Tensor a, double beta, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Softplus(beta), a, result);

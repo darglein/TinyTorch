@@ -52,8 +52,10 @@ struct SqrtNode : public FunctionNode<SqrtNode>
         auto l      = ctx->get_saved_variables();
         auto a      = l[0];
         auto g      = grad[0];
-        auto grad_a = 1 / (2 * a.sqrt()) * g;
-        return {grad_a};
+        auto g_a = empty_like(a);
+        SELECT_DEVICE(a.device(), sqrt_backward_impl, a, g_a, g);
+        // auto grad_a = 1 / (2 * a.sqrt()) * g;
+        return {g_a};
     }
 };
 struct LogNode : public FunctionNode<LogNode>

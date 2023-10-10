@@ -37,6 +37,16 @@ struct Sqrt
     {
         return ::sqrt(v);
     }
+    template <typename T>
+    TT_HD T backward(T input_x, T grad_output)
+    {
+        float J = 0;
+        if (input_x > T(0))
+        {
+            J = 1.f / (2.f * ::sqrt(float(input_x)));
+        }
+        return T(J) * grad_output;
+    }
 };
 struct Log
 {

@@ -16,6 +16,7 @@ namespace cpu_impl
 void abs_impl(Tensor a, Tensor result);
 void round_impl(Tensor a, Tensor result);
 void sqrt_impl(Tensor a, Tensor result);
+void sqrt_backward_impl(Tensor a, Tensor grad_a, Tensor grad_result);
 void log_impl(Tensor a, Tensor result);
 void exp_impl(Tensor a, Tensor result);
 void sign_impl(Tensor a, Tensor result);
