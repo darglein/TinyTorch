@@ -18,8 +18,8 @@ namespace cuda
 {
 
 std::mutex mu;
- static std::map<void*, int64_t> allocated_blocks;
- static bool debug_print = false;
+static std::map<void*, int64_t> allocated_blocks;
+static bool debug_print = false;
 
 static void* malloc_async(int64_t size)
 {
@@ -62,11 +62,11 @@ static void free_async(void* ptr)
 
     if (debug_print)
     {
-        std::cout << "free_async" << std::endl;
-        int64_t size =  allocated_blocks.find(ptr)->second;
+        int64_t size = allocated_blocks.find(ptr)->second;
         if ((size / 1000.0 / 1000.0) > 100)
         {
-            std::cout << "Free CUDA Memory: " << (size / 1000.0 / 1000.0) << "MB (" << ptr << ")" << "\n";
+            std::cout << "Free CUDA Memory: " << (size / 1000.0 / 1000.0) << "MB (" << ptr << ")"
+                      << "\n";
         }
     }
     allocated_blocks.erase(ptr);
