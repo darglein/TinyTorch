@@ -298,6 +298,7 @@ Tensor Tensor::permute_view(const SizeType& index) const
 
 void Tensor::resize_(const SizeType& size)
 {
+    this->impl_->autograd_meta = nullptr;
     auto new_tensor = empty(size, options());
 
     int64_t elements_to_copy = std::min(this->numel(), new_tensor.numel());
