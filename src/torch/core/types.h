@@ -46,6 +46,8 @@ struct TINYTORCH_API Device
             CHECK_EQ(index, 0);
         }
     }
+
+    // DeviceType type(){ return _type; }
 };
 
 inline bool operator==(Device device, DeviceType type)

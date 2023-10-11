@@ -139,18 +139,25 @@ struct Module
             b.second->to(d);
         }
     }
-    void zero_grad()
+    void zero_grad(bool set_to_none = false)
     {
         for (auto& b : parameters_)
         {
             if (b.second.grad().defined())
             {
-                b.second.mutable_grad().zero_();
+                if (set_to_none)
+                {
+                    b.second.mutable_grad() = Tensor();
+                }
+                else
+                {
+                    b.second.mutable_grad().zero_();
+                }
             }
         }
         for (auto& b : modules_)
         {
-            b.second->zero_grad();
+            b.second->zero_grad(set_to_none);
         }
     }
     void train(bool on = true)
