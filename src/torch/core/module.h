@@ -66,7 +66,7 @@ class ModuleHolder : ModuleHolderIndicator
 
     std::shared_ptr<Contained> ptr() { return impl_; }
 
-    ModuleHolder()
+    ModuleHolder() // : impl_(new Contained())
     {
         static_assert(std::is_default_constructible<Contained>::value,
                       "You are trying to default construct a module which has "

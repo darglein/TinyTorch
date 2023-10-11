@@ -13,8 +13,8 @@ std::ostream& operator<<(std::ostream& strm, Device type)
         "cpu",
         "cuda",
     };
-    strm << type_names[(int)type.type];
-    if (type.type == kCUDA)
+    strm << type_names[(int)type.type()];
+    if (type.type() == kCUDA)
     {
         strm << ":" << type.device_index;
     }

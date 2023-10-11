@@ -18,11 +18,8 @@ namespace cuda
 {
 
 std::mutex mu;
-
-
-static std::map<void*, int64_t> allocated_blocks;
-
-static bool debug_print = true;
+// static std::map<void*, int64_t> allocated_blocks;
+// static bool debug_print = false;
 
 static void* malloc_async(int64_t size)
 {
@@ -42,12 +39,20 @@ static void* malloc_async(int64_t size)
     }
     CHECK_CUDA_ERROR(cuda_error);
     CHECK_NOTNULL(ptr);
-    allocated_blocks.insert({ptr, size});
+#if 0
 
-    if (debug_print && (size / 1000.0 / 1000.0) > 100)
+    if (debug_print)
     {
-        std::cout << "Allocate CUDA Memory: " << (size / 1000.0 / 1000.0) << "MB (" << ptr << ")\n";
+
+        CHECK(allocated_blocks.find(ptr) == allocated_blocks.end());
+        allocated_blocks.insert({ptr, size});
+        CHECK(allocated_blocks.find(ptr) != allocated_blocks.end());
+        if ((size / 1000.0 / 1000.0) > 100)
+        {
+            std::cout << "Allocate CUDA Memory: " << (size / 1000.0 / 1000.0) << "MB (" << ptr << ")\n";
+        }
     }
+#endif
 
     return ptr;
 }
@@ -55,18 +60,23 @@ static void* malloc_async(int64_t size)
 static void* free_async(void* ptr)
 {
     std::unique_lock l(mu);
-    CHECK(allocated_blocks.find(ptr) != allocated_blocks.end());
 
+#if 0
     if (debug_print)
     {
-        int64_t size = allocated_blocks[ptr];
+        CHECK(allocated_blocks.find(ptr) != allocated_blocks.end());
+        std::cout << "free_async" << std::endl;
+        auto it = allocated_blocks.find(ptr);
+        CHECK(it != allocated_blocks.end());
+        int64_t size = it->second;
         if ((size / 1000.0 / 1000.0) > 100)
         {
-            std::cout << "Free CUDA Memory: " << (size / 1000.0 / 1000.0) << "MB (" << ptr << ")\n";
+            std::cout << "Free CUDA Memory: " << (size / 1000.0 / 1000.0) << "MB (" << ptr << ")" << it->first << "\n";
         }
+        allocated_blocks.erase(ptr);
     }
+#endif
 
-    allocated_blocks.erase(ptr);
     cudaFreeAsync(ptr, cuda::getCurrentCUDAStream());
 }
 
