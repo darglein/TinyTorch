@@ -270,11 +270,22 @@ Tensor mean(Tensor a, SizeType s, bool keepdim)
 Tensor std(Tensor a)
 {
     auto mean = a.mean();
-    a         = a - mean;
-    a         = a.square();
-    a         = a.mean();
-    a         = a.sqrt();
-    return a;
+
+    Tensor result;
+    if (a.is_cuda() && (!a.requires_grad() || !GradMode::is_enabled()))
+    {
+        result = zeros_like(mean);
+        cuda_impl::std_helper_impl(a, mean, result);
+    }
+    else
+    {
+        result = a - mean;
+        result = result.square();
+        result = result.sum();
+    }
+    result = result / (double)a.numel();
+    result = result.sqrt();
+    return result;
 }
 
 

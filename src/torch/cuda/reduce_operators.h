@@ -19,6 +19,8 @@ void sum_impl(Tensor a, Tensor result);
 void min_impl(Tensor a, Tensor result);
 void max_impl(Tensor a, Tensor result);
 
+void std_helper_impl(Tensor a,Tensor mean, Tensor result);
+
 // 1D reductions
 void min_impl(Tensor a, int64_t dim, Tensor result, Tensor& indices);
 void sum_impl(Tensor a, int64_t dim, Tensor result);

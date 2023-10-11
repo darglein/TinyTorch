@@ -26,6 +26,12 @@ constexpr int REDUCE_BLOCK_SIZE = 256;
 struct ReduceAdd
 {
     template <typename T>
+    TT_HD T load_op(T a)
+    {
+        return a;
+    }
+
+    template <typename T>
     TT_HD T operator()(T a, T b)
     {
         return a + b;
@@ -45,6 +51,12 @@ struct ReduceAdd
 struct ReduceProd
 {
     template <typename T>
+    TT_HD T load_op(T a)
+    {
+        return a;
+    }
+
+    template <typename T>
     TT_HD T operator()(T a, T b)
     {
         return a * b;
@@ -62,6 +74,12 @@ struct ReduceProd
 };
 struct ReduceMin
 {
+    template <typename T>
+    TT_HD T load_op(T a)
+    {
+        return a;
+    }
+
     template <typename T>
     TT_HD T operator()(T a, T b)
     {
@@ -81,6 +99,12 @@ struct ReduceMin
 struct ReduceMax
 {
     template <typename T>
+    TT_HD T load_op(T a)
+    {
+        return a;
+    }
+
+    template <typename T>
     TT_HD T operator()(T a, T b)
     {
         return a > b ? a : b;
@@ -96,7 +120,35 @@ struct ReduceMax
         return std::numeric_limits<T>::lowest();
     }
 };
+struct StdHelper
+{
+    StdHelper(void* mean_ptr):mean_ptr(mean_ptr){}
+    template <typename T>
+    TT_HD T load_op(T a)
+    {
+        a = a - ((T*)mean_ptr)[0];
+        return a * a;
+    }
 
+    template <typename T>
+    TT_HD T operator()(T a, T b)
+    {
+        return a + b;
+    }
+    template <typename T>
+    TT_HD T atomic_reduce(T* target, T value)
+    {
+        return atomicAddSelect(target, value);
+    }
+    template <typename T>
+    static constexpr T default_value()
+    {
+        return 0;
+    }
+
+    void* mean_ptr;
+
+};
 template <typename T, typename ShuffleType = int>
 __device__ inline T shfl_xor(T var, unsigned int srcLane, int width = 32)
 {
@@ -183,7 +235,7 @@ static __global__ void global_reduce(TensorInfoCuda<InputType> a, TensorInfoCuda
     for (int64_t k = 0; k < num_steps; ++k)
     {
         int64_t i              = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x + k * grid_size;
-        OutputType local_value = i < a.numel() ? OutputType(a[i]) : default_value;
+        OutputType local_value = i < a.numel() ? op.load_op(OutputType(a[i])) : default_value;
         local_value            = blockReduce<REDUCE_BLOCK_SIZE, OutputType>(local_value, op, default_value);
         value                  = op(value, local_value);
     }
@@ -193,18 +245,18 @@ static __global__ void global_reduce(TensorInfoCuda<InputType> a, TensorInfoCuda
     }
 }
 template <typename InputType, typename OutputType, typename Op>
-void global_reduce_launcher(TensorInfoCuda<InputType> a, TensorInfoCuda<OutputType> result)
+void global_reduce_launcher(TensorInfoCuda<InputType> a, TensorInfoCuda<OutputType> result, Op op)
 {
     int64_t num_threads = std::min(a.numel(), int64_t(1024) * 1024);
     global_reduce<InputType, OutputType, Op>
         <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
-            a, result, Op(), Op::template default_value<OutputType>());
+            a, result,op, Op::template default_value<OutputType>());
     CUDA_SYNC_CHECK_ERROR();
 }
 
 
 template <typename Op>
-void global_reduce_helper(Tensor a, Tensor result)
+void global_reduce_helper(Tensor a, Tensor result, Op op)
 {
     auto kernel_result = result;
     if (a.scalar_type() == kHalf)
@@ -215,19 +267,19 @@ void global_reduce_helper(Tensor a, Tensor result)
     switch (a.scalar_type())
     {
         case kInt32:
-            global_reduce_launcher<int, int, Op>(a, kernel_result);
+            global_reduce_launcher<int, int, Op>(a, kernel_result, op);
             break;
         case kInt64:
-            global_reduce_launcher<int64_t, int64_t, Op>(a, kernel_result);
+            global_reduce_launcher<int64_t, int64_t, Op>(a, kernel_result, op);
             break;
         case kFloat16:
-            global_reduce_launcher<__half, float, Op>(a, kernel_result);
+            global_reduce_launcher<__half, float, Op>(a, kernel_result, op);
             break;
         case kFloat:
-            global_reduce_launcher<float, float, Op>(a, kernel_result);
+            global_reduce_launcher<float, float, Op>(a, kernel_result, op);
             break;
         case kDouble:
-            global_reduce_launcher<double, double, Op>(a, kernel_result);
+            global_reduce_launcher<double, double, Op>(a, kernel_result, op);
             break;
         default:
             CHECK(false) << "invalid input type " << a.scalar_type();
@@ -241,17 +293,21 @@ void global_reduce_helper(Tensor a, Tensor result)
 
 void sum_impl(Tensor a, Tensor result)
 {
-    global_reduce_helper<ReduceAdd>(a, result);
+    global_reduce_helper(a, result,ReduceAdd());
 }
 void min_impl(Tensor a, Tensor result)
 {
-    global_reduce_helper<ReduceMin>(a, result);
+    global_reduce_helper(a, result, ReduceMin());
 }
 void max_impl(Tensor a, Tensor result)
 {
-    global_reduce_helper<ReduceMax>(a, result);
+    global_reduce_helper(a, result, ReduceMax());
 }
 
+void std_helper_impl(Tensor a, Tensor mean, Tensor result)
+{
+    global_reduce_helper(a, result, StdHelper(mean.data_ptr()));
+}
 
 // ====================================================================================================================
 
@@ -392,7 +448,7 @@ __device__ inline T blockInclusiveScan(T val, Op op, T default_value)
     // add value of previous warp
     if (warp_lane > 0)
     {
-        val = op(val,shared[warp_lane - 1]);
+        val = op(val, shared[warp_lane - 1]);
     }
 
     __syncthreads();
