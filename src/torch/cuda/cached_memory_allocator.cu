@@ -36,6 +36,10 @@ int64_t max_allocated_size()
 
 static void* malloc_async(int64_t size)
 {
+    if (size == 0)
+    {
+        return nullptr;
+    }
     std::unique_lock l(mu);
     void* ptr;
     auto strm       = cuda::getCurrentCUDAStream();
@@ -73,6 +77,10 @@ static void* malloc_async(int64_t size)
 
 static void free_async(void* ptr)
 {
+    if (ptr == nullptr)
+    {
+        return;
+    }
     std::unique_lock l(mu);
     CHECK(allocated_blocks.find(ptr) != allocated_blocks.end());
     int64_t size = allocated_blocks.find(ptr)->second;
@@ -94,10 +102,6 @@ static void free_async(void* ptr)
 
 void* cuda_cached_malloc(int64_t size)
 {
-    if (size == 0)
-    {
-        return nullptr;
-    }
     auto ptr = malloc_async(size);
 
     return ptr;
