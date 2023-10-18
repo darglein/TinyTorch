@@ -5,10 +5,11 @@
  */
 
 #include "ops_tensor_creation.h"
-#include "torch/core/ops/ops_impl.h"
 
-#include "torch/core/tensor_impl.h"
 #include <chrono>
+
+#include "torch/core/ops/ops_impl.h"
+#include "torch/core/tensor_impl.h"
 
 
 namespace tinytorch
@@ -156,16 +157,12 @@ Tensor from_blob(void* data, const SizeType& sizes, const SizeType& stride, Scal
     return from_blob(data, sizes, stride, TensorOptions().dtype(type));
 }
 
-Tensor range(double start, double end, TensorOptions options, double step)
+Tensor range(double start, double end, double step, TensorOptions options)
 {
     int64_t count = int64_t((end - start) / step) + 1;
     Tensor t      = empty({count}, options);
-    SELECT_DEVICE(t.device(), range_impl,t,start,end,step);
+    SELECT_DEVICE(t.device(), range_impl, t, start, end, step);
     return t;
-}
-Tensor range(double start, double end, double step)
-{
-    return range(start, end, TensorOptions(), step);
 }
 
 
