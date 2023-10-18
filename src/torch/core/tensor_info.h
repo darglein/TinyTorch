@@ -202,7 +202,7 @@ struct DimIndexStruct
 
 
 // CUDA kernel argument that defines tensor layout
-template <typename T, bool TIS_CUDA, int MAX_DIMS = -1>
+template <typename T, typename IndexType, bool TIS_CUDA, int MAX_DIMS = -1>
 struct TensorInfoBase
 {
     static constexpr bool is_dynamic = MAX_DIMS == -1;
@@ -229,6 +229,9 @@ struct TensorInfoBase
         {
             if (i < t.dim())
             {
+                // check for overflow, if 32bit indexing is used
+                CHECK_LE(t.size(i), std::numeric_limits<IndexType>::max());
+                CHECK_LE(t.stride(i), std::numeric_limits<IndexType>::max());
                 sizes[i]   = t.size(i);
                 strides[i] = t.stride(i);
             }
@@ -394,16 +397,16 @@ struct TensorInfoBase
             if (i == dim()) break;
 
 
-            result[i] = std::clamp(index[i], int64_t(0), sizes[i] - 1);
+            result[i] = std::clamp(int64_t(index[i]), int64_t(0), int64_t(sizes[i] - 1));
         }
         return result;
     }
 
 
-    T* data       = nullptr;
-    int64_t dims_ = 0;
-    int64_t sizes[max_dims];
-    int64_t strides[max_dims];
+    T* data = nullptr;
+    IndexType sizes[max_dims];
+    IndexType strides[max_dims];
+    int dims_       = 0;
     bool contiguous = false;
 };
 
@@ -433,11 +436,11 @@ struct TensorInfoBase
 // }
 
 template <typename T, int MAX_DIMS = -1>
-using TensorInfo = TensorInfoBase<T, false, MAX_DIMS>;
+using TensorInfo = TensorInfoBase<T, int64_t, false, MAX_DIMS>;
 
 
 template <typename T, int MAX_DIMS = -1>
-using TensorInfoCuda = TensorInfoBase<T, true, MAX_DIMS>;
+using TensorInfoCuda = TensorInfoBase<T, int64_t, true, MAX_DIMS>;
 
 
 }  // namespace tinytorch

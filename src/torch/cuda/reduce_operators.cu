@@ -347,6 +347,7 @@ static __global__ void dimensional_reduce(TensorInfoCuda<InputType> a, int64_t d
 template <typename InputType, typename OutputType, typename Op>
 void dimensional_reduce_launcher(TensorInfoCuda<InputType> a, int64_t dim, TensorInfoCuda<OutputType> result)
 {
+
     int64_t size_to_reduce       = a.size(dim);
     int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
     int64_t num_threads          = std::min(num_blocks_to_reduce * REDUCE_BLOCK_SIZE, int64_t(1024) * 1024);
@@ -362,6 +363,7 @@ void dimensional_reduce_launcher(TensorInfoCuda<InputType> a, int64_t dim, Tenso
 template <typename Op>
 void dimensional_reduce_helper(Tensor a, int64_t dim, Tensor result)
 {
+    // std::cout << "dimensional reduce " << dim << " | " << a.sizes() << " | " << result.sizes() << "\n";
     switch (a.scalar_type())
     {
         case kHalf:

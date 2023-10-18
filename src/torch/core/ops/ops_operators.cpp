@@ -182,13 +182,22 @@ struct MultNode : public FunctionNode<MultNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto l      = ctx->get_saved_variables();
-        auto a      = l[0];
-        auto b      = l[1];
-        auto g      = grad[0];
-        auto grad_a = g * b;
-        auto grad_b = g * a;
+        auto l = ctx->get_saved_variables();
+        auto a = l[0];
+        auto b = l[1];
+        auto g = grad[0];
+        Tensor grad_a, grad_b;
+        if (ctx->requires_grad_for_input(0))
+        {
+            grad_a = g * b;
+        }
+        if (ctx->requires_grad_for_input(1))
+        {
+            grad_b = g * a;
+        }
 
+        std::cout << "backward mult " << a.sizes() << "x" << b.sizes()
+                  << " req grad: " << ctx->requires_grad_for_input(0) << " " << ctx->requires_grad_for_input(1) << "\n";
         BackwardExpand(grad_a, grad_b, ctx->saved_data["expand_a"].toSizes(), ctx->saved_data["expand_b"].toSizes());
         return {grad_a, grad_b};
     }
