@@ -195,9 +195,6 @@ struct MultNode : public FunctionNode<MultNode>
         {
             grad_b = g * a;
         }
-
-        std::cout << "backward mult " << a.sizes() << "x" << b.sizes()
-                  << " req grad: " << ctx->requires_grad_for_input(0) << " " << ctx->requires_grad_for_input(1) << "\n";
         BackwardExpand(grad_a, grad_b, ctx->saved_data["expand_a"].toSizes(), ctx->saved_data["expand_b"].toSizes());
         return {grad_a, grad_b};
     }
