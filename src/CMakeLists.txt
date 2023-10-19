@@ -42,6 +42,7 @@ target_include_directories(torch PUBLIC ".")
 if (UNIX)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fvisibility=hidden>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fvisibility=hidden>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--generate-line-info>) # for profiling
 endif ()
 
 
@@ -49,7 +50,7 @@ target_link_libraries(torch PUBLIC glog::glog)
 
 if (TT_HAS_CUDA)
     target_link_libraries(torch PUBLIC CUDA::cudart)
-    set_target_properties(torch PROPERTIES CUDA_ARCHITECTURES "72;72-virtual")
+    set_target_properties(torch PROPERTIES CUDA_ARCHITECTURES "72;72-virtual;89")
 
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 endif ()

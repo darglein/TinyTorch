@@ -73,7 +73,7 @@ void fill_impl(Tensor& a, Tensor values, int dim)
 
 template <typename T>
 __launch_bounds__(128) static __global__
-    void permute_impl(TensorInfoCuda<T> src, TensorInfoCuda<T> result, DimIndexStruct<25> new_dims)
+    void permute_impl(TensorInfoCuda<T> src, TensorInfoCuda<T> result, DimIndexStruct<25, int> new_dims)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= src.numel()) return;
@@ -264,12 +264,11 @@ __launch_bounds__(128) static __global__
     index_result.set_index(dim, index[index_input.get_index(dim)]);
 
 
-#if TT_DEBUG
     CUDA_KERNEL_ASSERT(index_input[dim] < index.sizes[0]);
     CUDA_KERNEL_ASSERT(index_result[dim] < result.sizes[dim]);
     CUDA_KERNEL_ASSERT(result.index_in_range(index_result));
     CUDA_KERNEL_ASSERT(data.index_in_range(index_input));
-#endif
+
 
     atomicAdd(&result[index_result], data[index_input]);
 }
@@ -330,12 +329,12 @@ __launch_bounds__(128) static __global__
     // index_result[dim] = index[index_input[dim]];
     index_result.set_index(dim, index[index_input.get_index(dim)]);
 
-#if TT_DEBUG
+
     CUDA_KERNEL_ASSERT(index_input[dim] < index.sizes[0]);
     CUDA_KERNEL_ASSERT(index_result[dim] < target.sizes[dim]);
     CUDA_KERNEL_ASSERT(target.index_in_range(index_result));
     CUDA_KERNEL_ASSERT(value.index_in_range(index_input));
-#endif
+
     target[index_result] = value[index_input];
 }
 

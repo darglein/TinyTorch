@@ -122,7 +122,7 @@ struct ReduceMax
 };
 struct StdHelper
 {
-    StdHelper(void* mean_ptr):mean_ptr(mean_ptr){}
+    StdHelper(void* mean_ptr) : mean_ptr(mean_ptr) {}
     template <typename T>
     TT_HD T load_op(T a)
     {
@@ -147,7 +147,6 @@ struct StdHelper
     }
 
     void* mean_ptr;
-
 };
 template <typename T, typename ShuffleType = int>
 __device__ inline T shfl_xor(T var, unsigned int srcLane, int width = 32)
@@ -247,10 +246,10 @@ static __global__ void global_reduce(TensorInfoCuda<InputType> a, TensorInfoCuda
 template <typename InputType, typename OutputType, typename Op>
 void global_reduce_launcher(TensorInfoCuda<InputType> a, TensorInfoCuda<OutputType> result, Op op)
 {
-    int64_t num_threads = std::min(a.numel(), int64_t(1024) * 1024);
+    int64_t num_threads = std::min(int64_t(a.numel()), int64_t(1024) * 1024);
     global_reduce<InputType, OutputType, Op>
         <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
-            a, result,op, Op::template default_value<OutputType>());
+            a, result, op, Op::template default_value<OutputType>());
     CUDA_SYNC_CHECK_ERROR();
 }
 
@@ -293,7 +292,7 @@ void global_reduce_helper(Tensor a, Tensor result, Op op)
 
 void sum_impl(Tensor a, Tensor result)
 {
-    global_reduce_helper(a, result,ReduceAdd());
+    global_reduce_helper(a, result, ReduceAdd());
 }
 void min_impl(Tensor a, Tensor result)
 {
@@ -317,20 +316,21 @@ template <typename InputType, typename OutputType, typename Op>
 static __global__ void dimensional_reduce(TensorInfoCuda<InputType> a, int64_t dim, TensorInfoCuda<OutputType> result,
                                           Op op, OutputType default_value)
 {
-    int64_t size_to_reduce       = a.size(dim);
-    int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
-    int64_t num_steps            = iDivUp(size_to_reduce, REDUCE_BLOCK_SIZE);
+    using IndexType                = typename TensorInfoCuda<InputType>::IndexType;
+    IndexType size_to_reduce       = a.size(dim);
+    IndexType num_blocks_to_reduce = a.numel() / size_to_reduce;
+    IndexType num_steps            = iDivUp(size_to_reduce, REDUCE_BLOCK_SIZE);
 
     // each reduction is computed by a separate block
-    for (int64_t block_id = blockIdx.x; block_id < num_blocks_to_reduce; block_id += gridDim.x)
+    for (IndexType block_id = blockIdx.x; block_id < num_blocks_to_reduce; block_id += gridDim.x)
     {
         auto index_input = a.LinearIndexToDimIndexSkipDim(block_id, dim);
         OutputType value = default_value;
 
 
-        for (int64_t k = 0; k < num_steps; ++k)
+        for (IndexType k = 0; k < num_steps; ++k)
         {
-            int64_t i = k * REDUCE_BLOCK_SIZE + threadIdx.x;
+            IndexType i = k * REDUCE_BLOCK_SIZE + threadIdx.x;
             index_input.set_index(dim, i);
             OutputType local_value = i < size_to_reduce ? OutputType(a[index_input]) : default_value;
             local_value            = blockReduce<REDUCE_BLOCK_SIZE, OutputType>(local_value, op, default_value);
@@ -347,7 +347,6 @@ static __global__ void dimensional_reduce(TensorInfoCuda<InputType> a, int64_t d
 template <typename InputType, typename OutputType, typename Op>
 void dimensional_reduce_launcher(TensorInfoCuda<InputType> a, int64_t dim, TensorInfoCuda<OutputType> result)
 {
-
     int64_t size_to_reduce       = a.size(dim);
     int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
     int64_t num_threads          = std::min(num_blocks_to_reduce * REDUCE_BLOCK_SIZE, int64_t(1024) * 1024);

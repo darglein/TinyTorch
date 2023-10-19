@@ -24,7 +24,7 @@ __launch_bounds__(128) static __global__
 {
     using G   = typename CpuComputeFloatType<T>::Type;
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= result.numel()) return;
+    if (i < result.numel())
     {
         G input   = G(a[i]);
         G output  = op.forward(input);
@@ -82,6 +82,11 @@ __launch_bounds__(128) static __global__
         default:                                                                                                 \
             CHECK(false) << "invalid input type " << input.scalar_type();                                        \
     }
+
+
+
+
+
 void abs_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Abs(), a, result);

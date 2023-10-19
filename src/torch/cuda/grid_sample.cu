@@ -11,6 +11,7 @@ namespace tinytorch
 {
 namespace cuda_impl
 {
+#if 1
 
 template <typename T>
 TT_HD inline std::pair<T, T> UVToPixel(T u, T v, int w, int h, bool align_corners)
@@ -58,16 +59,17 @@ static __global__ void grid_sample_2d_impl_kernel(TensorInfoCuda<T, 4> input, Te
                                                   InterpolationType interpolation, PaddingMode padding,
                                                   bool align_corners, TensorInfoCuda<T, 4> result)
 {
-    int64_t b        = blockIdx.x;
-    int64_t sample   = blockIdx.y * blockDim.x + threadIdx.x;
+    using IndexType  = typename TensorInfoCuda<T, 4>::IndexType;
+    IndexType b        = blockIdx.x;
+    IndexType sample   = blockIdx.y * blockDim.x + threadIdx.x;
     auto num_samples = grid.size(1) * grid.size(2);
     if (sample >= num_samples) return;
 
-    int64_t sample_i = sample / grid.size(2);
-    int64_t sample_j = sample % grid.size(2);
+    IndexType sample_i = sample / grid.size(2);
+    IndexType sample_j = sample % grid.size(2);
 
-    T u = grid(b, sample_i, sample_j, 0);
-    T v = grid(b, sample_i, sample_j, 1);
+    T u = grid(b, sample_i, sample_j, IndexType (0));
+    T v = grid(b, sample_i, sample_j, IndexType (1));
 
 
     u = (u + 1) * 0.5f;
@@ -123,14 +125,15 @@ static __global__ void grid_sample_3d_impl_kernel(TensorInfoCuda<T, 5> input, Te
                                                   InterpolationType interpolation, PaddingMode padding,
                                                   bool align_corners, TensorInfoCuda<T, 5> result)
 {
-    int64_t b        = blockIdx.x;
-    int64_t sample   = blockIdx.y * blockDim.x + threadIdx.x;
+    using IndexType  = typename TensorInfoCuda<T, 4>::IndexType;
+    IndexType b        = blockIdx.x;
+    IndexType sample   = blockIdx.y * blockDim.x + threadIdx.x;
     auto num_samples = grid.size(1) * grid.size(2) * grid.size(3);
     if (sample >= num_samples) return;
 
-    int64_t sample_k = sample % grid.size(3);
-    int64_t sample_j = (sample / grid.size(3)) % grid.size(2);
-    int64_t sample_i = sample / (grid.size(2) * grid.size(3));
+    IndexType sample_k = sample % grid.size(3);
+    IndexType sample_j = (sample / grid.size(3)) % grid.size(2);
+    IndexType sample_i = sample / (grid.size(2) * grid.size(3));
 
     float u = grid(b, sample_i, sample_j, sample_k, 0);
     float v = grid(b, sample_i, sample_j, sample_k, 1);
@@ -241,13 +244,15 @@ static __global__ void grid_sample_2d_backward_impl_kernel(TensorInfoCuda<T, 4> 
                                                            TensorInfoCuda<T, 4> grad_grid,
                                                            TensorInfoCuda<T, 4> grad_result)
 {
-    int64_t b        = blockIdx.x;
-    int64_t sample   = blockIdx.y * blockDim.x + threadIdx.x;
+
+    using IndexType  = typename TensorInfoCuda<T, 4>::IndexType;
+    IndexType b        = blockIdx.x;
+    IndexType sample   = blockIdx.y * blockDim.x + threadIdx.x;
     auto num_samples = grid.size(1) * grid.size(2);
     if (sample >= num_samples) return;
 
-    int64_t sample_i = sample / grid.size(2);
-    int64_t sample_j = sample % grid.size(2);
+    IndexType sample_i = sample / grid.size(2);
+    IndexType sample_j = sample % grid.size(2);
 
     T u = grid(b, sample_i, sample_j, 0);
     T v = grid(b, sample_i, sample_j, 1);
@@ -343,14 +348,16 @@ static __global__ void grid_sample_3d_backward_impl_kernel(TensorInfoCuda<T, 5> 
                                                            TensorInfoCuda<T, 5> grad_grid,
                                                            TensorInfoCuda<T, 5> grad_result)
 {
-    int64_t b        = blockIdx.x;
-    int64_t sample   = blockIdx.y * blockDim.x + threadIdx.x;
+
+    using IndexType  = typename TensorInfoCuda<T, 4>::IndexType;
+    IndexType b        = blockIdx.x;
+    IndexType sample   = blockIdx.y * blockDim.x + threadIdx.x;
     auto num_samples = grid.size(1) * grid.size(2) * grid.size(3);
     if (sample >= num_samples) return;
 
-    int64_t sample_k = sample % grid.size(3);
-    int64_t sample_j = (sample / grid.size(3)) % grid.size(2);
-    int64_t sample_i = sample / (grid.size(2) * grid.size(3));
+    IndexType sample_k = sample % grid.size(3);
+    IndexType sample_j = (sample / grid.size(3)) % grid.size(2);
+    IndexType sample_i = sample / (grid.size(2) * grid.size(3));
 
     float u = grid(b, sample_i, sample_j, sample_k, 0);
     float v = grid(b, sample_i, sample_j, sample_k, 1);
@@ -587,6 +594,7 @@ void grid_sample_3d_backward_impl(Tensor input, Tensor grid, InterpolationType i
 
     CUDA_SYNC_CHECK_ERROR();
 }
+#endif
 }  // namespace cuda_impl
 
 }  // namespace tinytorch

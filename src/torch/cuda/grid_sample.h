@@ -24,5 +24,7 @@ void grid_sample_3d_impl(Tensor input, Tensor grid, InterpolationType interpolat
 void grid_sample_3d_backward_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
                                   bool align_corners, Tensor& grad_input, Tensor& grad_grid, Tensor grad_result);
 
+
+
 }  // namespace cpu_impl
 }  // namespace tinytorch

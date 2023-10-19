@@ -12,8 +12,11 @@
 #include "cuda_runtime.h"
 
 #ifdef __CUDACC__
+// Warning: This assert is pretty slow, so make sure it is only active during debug
 
 #    undef assert
+
+#    if TT_DEBUG
 inline __device__ void __assert_fail_cuda(const char* __assertion, const char* __file, unsigned int __line,
                                           const char* __function)
 {
@@ -22,15 +25,21 @@ inline __device__ void __assert_fail_cuda(const char* __assertion, const char* _
     __trap();
 }
 
-#    define CUDA_KERNEL_ASSERT(cond)                                                            \
-        if ((!(cond)))                                                                          \
-        {                                                                                       \
-            __assert_fail_cuda(#cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
-        }
+#        define CUDA_KERNEL_ASSERT(cond)                                                            \
+            if ((!(cond)))                                                                          \
+            {                                                                                       \
+                __assert_fail_cuda(#cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
+            }
+#    else
+#        define CUDA_KERNEL_ASSERT(cond) (__ASSERT_VOID_CAST(0))
+#    endif
 
 #else
 #    define CUDA_KERNEL_ASSERT(cond) assert(cond)
 #endif
+
+
+
 #if defined(__CUDA_RUNTIME_H__) || defined(__CUDACC__)
 #endif
 

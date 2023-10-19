@@ -20,7 +20,8 @@ template <typename T>
 static void conv2d_impl(TensorInfo<T, 4> input, TensorInfo<T, 4> weight, TensorInfo<T, 4> bias, int stride, int padding,
                         int dilation, int groups, TensorInfo<T, 4> result)
 {
-    CHECK_EQ(weight.size(0), 1);
+    using IndexType = typename TensorInfo<T, 4>::IndexType;
+        CHECK_EQ(weight.size(0), 1);
     CHECK_EQ(weight.size(1), 1);
     for (int64_t i = 0; i < result.numel(); ++i)
     {
@@ -42,8 +43,8 @@ static void conv2d_impl(TensorInfo<T, 4> input, TensorInfo<T, 4> weight, TensorI
 
                 index_input[2] = std::min(index_input[2], input.size(2) - 1);
                 index_input[3] = std::min(index_input[3], input.size(3) - 1);
-                index_input[2] = std::max(index_input[2], int64_t(0));
-                index_input[3] = std::max(index_input[3], int64_t(0));
+                index_input[2] = std::max(index_input[2], IndexType(0));
+                index_input[3] = std::max(index_input[3], IndexType(0));
 
                 auto v = input[index_input];
 

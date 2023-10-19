@@ -11,13 +11,13 @@ namespace UnaryOperators
 struct Abs
 {
     template <typename T>
-    TT_HD T forward(T v)
+    __forceinline__ TT_HD T forward(T v)
     {
         return v > T(0) ? v : -v;
     }
 
     template <typename T>
-    TT_HD T backward(T v)
+    __forceinline__ TT_HD T backward(T v)
     {
         return v < 0 ? -1 : v > 0 ? 1 : 0;
     }

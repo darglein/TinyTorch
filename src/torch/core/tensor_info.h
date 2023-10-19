@@ -105,10 +105,10 @@ inline std::pair<int64_t, int64_t> collapse_dims(T* sizes, T* strides, int64_t d
     return std::pair<int64_t, int64_t>(remappedExcludedDim, dims);
 }
 
-template <int DIM>
+template <int DIM, typename IndexType>
 struct DimIndexStruct
 {
-    int64_t indices[DIM];
+    IndexType indices[DIM];
 
     TT_HD DimIndexStruct() {}
 
@@ -122,7 +122,7 @@ struct DimIndexStruct
     }
 
 
-    TT_HD DimIndexStruct(std::initializer_list<int64_t> l)
+    __forceinline__ constexpr TT_HD DimIndexStruct(std::initializer_list<IndexType> l)
     {
         int k = 0;
         for (auto i : l)
@@ -131,7 +131,7 @@ struct DimIndexStruct
         }
     }
 
-    constexpr TT_HD void set_index(int64_t dim, int64_t value)
+    __forceinline__ constexpr TT_HD void set_index(IndexType dim, IndexType value)
     {
 #pragma unroll
         for (int i = 0; i < DIM; ++i)
@@ -143,7 +143,7 @@ struct DimIndexStruct
         }
     }
 
-    constexpr TT_HD int64_t get_index(int64_t dim)
+    __forceinline__ constexpr TT_HD IndexType get_index(IndexType dim)
     {
 #pragma unroll
         for (int i = 0; i < DIM; ++i)
@@ -156,7 +156,7 @@ struct DimIndexStruct
         return 0;
     }
 
-    constexpr TT_HD int64_t& operator[](int64_t dim)
+    __forceinline__ constexpr TT_HD IndexType& operator[](IndexType dim)
     {
 #if 1 || defined(__CUDACC__)
 #    pragma unroll
@@ -173,7 +173,7 @@ struct DimIndexStruct
 #endif
     }
 
-    constexpr TT_HD int64_t operator[](int64_t dim) const
+    __forceinline__ constexpr TT_HD IndexType operator[](IndexType dim) const
     {
 #if 1 || defined(__CUDACC__)
 #    pragma unroll
@@ -190,7 +190,7 @@ struct DimIndexStruct
 #endif
     }
 
-    TT_HD void zero_()
+    __forceinline__ constexpr TT_HD void zero_()
     {
 #pragma unroll
         for (int i = 0; i < DIM; ++i)
@@ -202,19 +202,19 @@ struct DimIndexStruct
 
 
 // CUDA kernel argument that defines tensor layout
-template <typename T, typename IndexType, bool TIS_CUDA, int MAX_DIMS = -1>
+template <typename T, typename _IndexType, bool TIS_CUDA, int MAX_DIMS = -1>
 struct TensorInfoBase
 {
     static constexpr bool is_dynamic = MAX_DIMS == -1;
     static constexpr int max_dims    = is_dynamic ? MAX_TENSORINFO_DIMS : MAX_DIMS;
-    using DimIndex                   = DimIndexStruct<max_dims>;
+    using IndexType                  = _IndexType;
+    using DimIndex                   = DimIndexStruct<max_dims, IndexType>;
 
     TensorInfoBase()
     {
         data  = nullptr;
         dims_ = 0;
     }
-    // TensorInfoBase(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims]);
     TensorInfoBase(Tensor t)
     {
         if (!t.defined())
@@ -252,7 +252,7 @@ struct TensorInfoBase
         }
     }
 
-    TT_HD int64_t dim()
+    __forceinline__ constexpr TT_HD int dim()
     {
         if constexpr (is_dynamic)
         {
@@ -263,13 +263,13 @@ struct TensorInfoBase
             return max_dims;
         }
     }
-    TT_HD int64_t size(int index) { return sizes[index]; }
+    __forceinline__ constexpr TT_HD IndexType size(int index) { return sizes[index]; }
 
-    TT_HD int64_t numel()
+    __forceinline__ constexpr TT_HD IndexType numel()
     {
-        int64_t result = 1;
+        IndexType result = 1;
 #pragma unroll
-        for (int64_t i = 0; i < max_dims; ++i)
+        for (int i = 0; i < max_dims; ++i)
         {
             if (i < dim())
             {
@@ -280,7 +280,7 @@ struct TensorInfoBase
     }
 
 
-    TT_HD T& operator[](int64_t linearId)
+    __forceinline__ constexpr TT_HD T& operator[](IndexType linearId)
     {
         if (contiguous)
         {
@@ -288,21 +288,21 @@ struct TensorInfoBase
         }
         return operator[](LinearIndexToDimIndex(linearId));
     }
-    TT_HD T& operator[](DimIndex index) { return data[IndexToOffset(index)]; }
+    __forceinline__ constexpr TT_HD T& operator[](DimIndex index) { return data[IndexToOffset(index)]; }
 
 
     template <typename... Ts>
-    TT_HD inline T& operator()(Ts... args)
+    __forceinline__ constexpr TT_HD T& operator()(Ts... args)
     {
         return operator[](IndexToOffset(DimIndex({args...})));
     }
 
-    TT_HD int64_t IndexToOffset(DimIndex index)
+    __forceinline__ constexpr TT_HD IndexType IndexToOffset(DimIndex index)
     {
-        int64_t offset = 0;
+        IndexType offset = 0;
 
 #pragma unroll
-        for (int64_t i = 0; i < max_dims; ++i)
+        for (int i = 0; i < max_dims; ++i)
         {
             if (i < dim())
             {
@@ -323,20 +323,19 @@ struct TensorInfoBase
         return offset;
     }
 
-    TT_HD DimIndex LinearIndexToDimIndex(int64_t linearId)
+    __forceinline__ constexpr TT_HD DimIndex LinearIndexToDimIndex(IndexType linearId)
     {
         DimIndex result;
 
 #pragma unroll
-        // for (int64_t i = max_dims - 1; i > 0; --i)
-        for (int64_t j = 0; j < max_dims - 1; ++j)
+        for (int j = 0; j < max_dims - 1; ++j)
         {
             auto i = max_dims - j - 1;
             // if(i==dim()) break;
             if (i < dim())
             {
-                int64_t curDimIndex = linearId % sizes[i];
-                result[i]           = curDimIndex;
+                IndexType curDimIndex = linearId % sizes[i];
+                result[i]             = curDimIndex;
                 linearId /= sizes[i];
             }
         }
@@ -345,19 +344,18 @@ struct TensorInfoBase
         return result;
     }
 
-    TT_HD DimIndex LinearIndexToDimIndexSkipDim(int64_t linearId, int64_t dim_to_skip)
+    __forceinline__ constexpr TT_HD DimIndex LinearIndexToDimIndexSkipDim(IndexType linearId, IndexType dim_to_skip)
     {
         DimIndex result;
 
 #pragma unroll
-        // for (int64_t i = max_dims - 1; i > 0; --i)
-        for (int64_t j = 0; j < max_dims - 1; ++j)
+        for (int j = 0; j < max_dims - 1; ++j)
         {
             auto i = max_dims - j - 1;
             if (i < dim())
             {
-                int64_t curDimIndex = linearId % sizes[i];
-                int64_t siz         = sizes[i];
+                IndexType curDimIndex = linearId % sizes[i];
+                IndexType siz         = sizes[i];
 
                 if (i == dim_to_skip)
                 {
@@ -373,11 +371,11 @@ struct TensorInfoBase
         result[0] = linearId;
         return result;
     }
-    TT_HD bool index_in_range(DimIndex index)
+    __forceinline__ constexpr TT_HD bool index_in_range(DimIndex index)
     {
         bool result = true;
 #pragma unroll
-        for (int64_t i = 0; i < max_dims; ++i)
+        for (int i = 0; i < max_dims; ++i)
         {
             if (i < dim() && (index[i] < 0 || index[i] > sizes[i]))
             {
@@ -387,17 +385,17 @@ struct TensorInfoBase
         return result;
     }
 
-    TT_HD DimIndex clamp_index_to_size(DimIndex index)
+    __forceinline__ constexpr TT_HD DimIndex clamp_index_to_size(DimIndex index)
     {
         DimIndex result;
 
 #pragma unroll
-        for (int64_t i = 0; i < max_dims; ++i)
+        for (int i = 0; i < max_dims; ++i)
         {
             if (i == dim()) break;
 
 
-            result[i] = std::clamp(int64_t(index[i]), int64_t(0), int64_t(sizes[i] - 1));
+            result[i] = std::clamp(IndexType(index[i]), IndexType(0), IndexType(sizes[i] - 1));
         }
         return result;
     }
@@ -410,37 +408,14 @@ struct TensorInfoBase
     bool contiguous = false;
 };
 
-// template <typename T, bool TIS_CUDA, int MAX_DIMS>
-// TensorInfoBase<T, TIS_CUDA, MAX_DIMS>::TensorInfoBase(T* p, int dim, int64_t sz[max_dims], int64_t st[max_dims])
-//{
-//     data  = p;
-//     dims_ = dim;
-//
-//     for (int i = 0; i < dim; ++i)
-//     {
-//         sizes[i]   = sz[i];
-//         strides[i] = st[i];
-//     }
-//
-//     contiguous              = true;
-//     int64_t expected_stride = 1;
-//     for (int64_t i = dim - 1; i >= 0; --i)
-//     {
-//         if (strides[i] != expected_stride)
-//         {
-//             contiguous = false;
-//             break;
-//         }
-//         expected_stride *= sizes[i];
-//     }
-// }
 
+// on the CPU always use 64-bit indexing
 template <typename T, int MAX_DIMS = -1>
 using TensorInfo = TensorInfoBase<T, int64_t, false, MAX_DIMS>;
 
 
 template <typename T, int MAX_DIMS = -1>
-using TensorInfoCuda = TensorInfoBase<T, int64_t, true, MAX_DIMS>;
+using TensorInfoCuda = TensorInfoBase<T, int, true, MAX_DIMS>;
 
 
 }  // namespace tinytorch
