@@ -31,7 +31,7 @@ inline __device__ void __assert_fail_cuda(const char* __assertion, const char* _
                 __assert_fail_cuda(#cond, __FILE__, static_cast<unsigned int>(__LINE__), __func__); \
             }
 #    else
-#        define CUDA_KERNEL_ASSERT(cond) (__ASSERT_VOID_CAST(0))
+#        define CUDA_KERNEL_ASSERT(cond) (void)0
 #    endif
 
 #else
