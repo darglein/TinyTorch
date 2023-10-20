@@ -312,7 +312,7 @@ void std_helper_impl(Tensor a, Tensor mean, Tensor result)
 
 
 
-template <typename InputType, typename OutputType, typename Op>
+template <typename InputType, typename OutputType, typename Op, int REDUCE_BLOCK_SIZE>
 static __global__ void dimensional_reduce(TensorInfoCuda<InputType> a, int64_t dim, TensorInfoCuda<OutputType> result,
                                           Op op, OutputType default_value)
 {
@@ -333,8 +333,16 @@ static __global__ void dimensional_reduce(TensorInfoCuda<InputType> a, int64_t d
             IndexType i = k * REDUCE_BLOCK_SIZE + threadIdx.x;
             index_input.set_index(dim, i);
             OutputType local_value = i < size_to_reduce ? OutputType(a[index_input]) : default_value;
-            local_value            = blockReduce<REDUCE_BLOCK_SIZE, OutputType>(local_value, op, default_value);
-            value                  = op(value, local_value);
+
+            if constexpr (REDUCE_BLOCK_SIZE <= 32)
+            {
+                local_value = warpReduce<OutputType, Op, REDUCE_BLOCK_SIZE>(local_value, op);
+            }
+            else
+            {
+                local_value = blockReduce<REDUCE_BLOCK_SIZE, OutputType>(local_value, op, default_value);
+            }
+            value = op(value, local_value);
         }
         if (threadIdx.x == 0)
         {
@@ -353,9 +361,18 @@ void dimensional_reduce_launcher(TensorInfoCuda<InputType> a, int64_t dim, Tenso
 
     CHECK_EQ(result.numel(), num_blocks_to_reduce);
 
-    dimensional_reduce<InputType, OutputType, Op>
-        <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
-            a, dim, result, Op(), Op::template default_value<OutputType>());
+    if (size_to_reduce > 8)
+    {
+        dimensional_reduce<InputType, OutputType, Op, REDUCE_BLOCK_SIZE>
+            <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
+                a, dim, result, Op(), Op::template default_value<OutputType>());
+    }
+    else
+    {
+        dimensional_reduce<InputType, OutputType, Op, 8>
+            <<<iDivUp(num_threads, 8), 8, 0, cuda::getCurrentCUDAStream()>>>(a, dim, result, Op(),
+                                                                             Op::template default_value<OutputType>());
+    }
     CUDA_SYNC_CHECK_ERROR();
 }
 

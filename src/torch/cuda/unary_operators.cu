@@ -48,21 +48,26 @@ __launch_bounds__(128) static __global__
     }
 }
 
-#define SWITCH_MACRO_UNARY_OPERATOR(op, input, output)                                              \
+
+template<typename Op>
+static void unary_operator_forward_helper(Op op, Tensor input, Tensor result)
+{
     switch (input.scalar_type())                                                                    \
     {                                                                                               \
-        CUDA_CASE_MACRO((unary_operator_kernel<uint8_t>), kUInt8, input.numel(), op, input, output) \
-        CUDA_CASE_MACRO((unary_operator_kernel<int16_t>), kInt16, input.numel(), op, input, output) \
-        CUDA_CASE_MACRO((unary_operator_kernel<int32_t>), kInt32, input.numel(), op, input, output) \
-        CUDA_CASE_MACRO((unary_operator_kernel<int64_t>), kLong, input.numel(), op, input, output)  \
-        CUDA_CASE_MACRO((unary_operator_kernel<__half>), kHalf, input.numel(), op, input, output)   \
-        CUDA_CASE_MACRO((unary_operator_kernel<float>), kFloat, input.numel(), op, input, output)   \
-        CUDA_CASE_MACRO((unary_operator_kernel<double>), kDouble, input.numel(), op, input, output) \
+        CUDA_CASE_MACRO((unary_operator_kernel<uint8_t>), kUInt8, input.numel(), op, input, result) \
+        CUDA_CASE_MACRO((unary_operator_kernel<int16_t>), kInt16, input.numel(), op, input, result) \
+        CUDA_CASE_MACRO((unary_operator_kernel<int32_t>), kInt32, input.numel(), op, input, result) \
+        CUDA_CASE_MACRO((unary_operator_kernel<int64_t>), kLong, input.numel(), op, input, result)  \
+        CUDA_CASE_MACRO((unary_operator_kernel<__half>), kHalf, input.numel(), op, input, result)   \
+        CUDA_CASE_MACRO((unary_operator_kernel<float>), kFloat, input.numel(), op, input, result)   \
+        CUDA_CASE_MACRO((unary_operator_kernel<double>), kDouble, input.numel(), op, input, result) \
         default:                                                                                    \
             CHECK(false) << "invalid input type " << input.scalar_type();                           \
     }
-
-#define SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(op, input, grad_input, grad_result)                                 \
+}
+template<typename Op>
+static void unary_operator_backward_helper(Op op, Tensor input, Tensor grad_input, Tensor grad_result)
+{
     switch (input.scalar_type())                                                                                 \
     {                                                                                                            \
         CUDA_CASE_MACRO((unary_operator_backward_kernel<uint8_t>), kUInt8, input.numel(), op, input, grad_input, \
@@ -82,67 +87,66 @@ __launch_bounds__(128) static __global__
         default:                                                                                                 \
             CHECK(false) << "invalid input type " << input.scalar_type();                                        \
     }
-
-
+}
 
 
 
 void abs_impl(Tensor a, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Abs(), a, result);
+    unary_operator_forward_helper(UnaryOperators::Abs(), a, result);
 }
 void round_impl(Tensor a, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Round(), a, result);
+    unary_operator_forward_helper(UnaryOperators::Round(), a, result);
 }
 void sqrt_impl(Tensor a, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sqrt(), a, result);
+    unary_operator_forward_helper(UnaryOperators::Sqrt(), a, result);
 }
 void sqrt_backward_impl(Tensor a, Tensor grad_a, Tensor grad_result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(UnaryOperators::Sqrt(), a, grad_a, grad_result);
+    unary_operator_backward_helper(UnaryOperators::Sqrt(), a, grad_a, grad_result);
 }
 
 void log_impl(Tensor a, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Log(), a, result);
+    unary_operator_forward_helper(UnaryOperators::Log(), a, result);
 }
 void exp_impl(Tensor a, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Exp(), a, result);
+    unary_operator_forward_helper(UnaryOperators::Exp(), a, result);
 }
 void sign_impl(Tensor a, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sign(), a, result);
+    unary_operator_forward_helper(UnaryOperators::Sign(), a, result);
 }
 void sin_impl(Tensor a, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sin(), a, result);
+    unary_operator_forward_helper(UnaryOperators::Sin(), a, result);
 }
 void cos_impl(Tensor a, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Cos(), a, result);
+    unary_operator_forward_helper(UnaryOperators::Cos(), a, result);
 }
 void relu_impl(Tensor a, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Relu(), a, result);
+    unary_operator_forward_helper(UnaryOperators::Relu(), a, result);
 }
 void sigmoid_impl(Tensor a, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Sigmoid(), a, result);
+    unary_operator_forward_helper(UnaryOperators::Sigmoid(), a, result);
 }
 void sigmoid_backward_impl(Tensor a, Tensor grad_a, Tensor grad_result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(UnaryOperators::Sigmoid(), a, grad_a, grad_result);
+    unary_operator_backward_helper(UnaryOperators::Sigmoid(), a, grad_a, grad_result);
 }
 void softplus_impl(Tensor a, double beta, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Softplus(beta), a, result);
+    unary_operator_forward_helper(UnaryOperators::Softplus(beta), a, result);
 }
 void softplus_backward_impl(Tensor a, double beta, Tensor grad_a, Tensor grad_result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(UnaryOperators::Softplus(beta), a, grad_a, grad_result);
+    unary_operator_backward_helper(UnaryOperators::Softplus(beta), a, grad_a, grad_result);
 }
 }  // namespace cuda_impl
 }  // namespace tinytorch
