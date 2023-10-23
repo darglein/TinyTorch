@@ -249,8 +249,16 @@ struct FunctionNode : public Node
                     }
                     for (int j = 0; j < grad_list.size(); ++j)
                     {
-                        std::cerr << "input " << context.next_meta[j].size << " grad " << grad_list[j].sizes()
-                                  << std::endl;
+                        std::cerr << "input " << context.next_meta[j].size << " grad ";
+                        if (grad_list[j].defined())
+                        {
+                            std::cerr << grad_list[j].sizes();
+                        }
+                        else
+                        {
+                            std::cerr << "[undefined]";
+                        }
+                        std::cerr << "\n";
                     }
 
                     CHECK(false) << "incorrect gradient size";

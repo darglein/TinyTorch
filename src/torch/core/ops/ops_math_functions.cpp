@@ -74,16 +74,46 @@ struct SumDimNode : public FunctionNode<SumDimNode>
         return {grad_a, {}};
     }
 };
+
+
+struct PowScalarNode : public FunctionNode<PowScalarNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, IValue b)
+    {
+        ctx->saved_data["b"] = b;
+        ctx->save_for_backward({a});
+
+        auto result = empty_like(a);
+        SELECT_DEVICE(result.device(), pow_impl, a, b.toDouble(), result);
+
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        CHECK_EQ(grad.size(), 1);
+        auto a        = ctx->get_saved_variables()[0];
+        double b      = ctx->saved_data["b"].toDouble();
+        auto g        = grad[0];
+        Tensor grad_a = empty(ctx->next_meta[0].size, g.options());
+
+        SELECT_DEVICE(grad_a.device(), pow_impl, a, b - 1, grad_a);
+        grad_a = grad_a * g;
+        return {grad_a, {}};
+    }
+};
+
 }  // namespace autograd
 
 using namespace autograd;
 
 Tensor pow(Tensor a, double b)
 {
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    auto result = empty_like(a);
-    SELECT_DEVICE(a.device(), pow_impl, a, b, result);
-    return result;
+    // CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    // auto result = empty_like(a);
+    // SELECT_DEVICE(a.device(), pow_impl, a, b, result);
+    // return result;
+        return autograd::PowScalarNode::apply(a, b)[0];
 }
 Tensor pow(Tensor a, Tensor b)
 {
