@@ -36,11 +36,19 @@ Tensor empty(const SizeType& sizes, TensorOptions options)
 
 Tensor empty_like(Tensor t)
 {
+    if (!t.defined())
+    {
+        return {};
+    }
     return empty_like(t, t.options().requires_grad(false));
 }
 
 Tensor empty_like(Tensor t, TensorOptions options)
 {
+    if (!t.defined())
+    {
+        return {};
+    }
     return empty(t.sizes(), options.requires_grad(false));
 }
 
@@ -57,11 +65,19 @@ Tensor full(const SizeType& sizes, float value, TensorOptions options)
 }
 Tensor full_like(Tensor t, float value, TensorOptions options)
 {
+    if (!t.defined())
+    {
+        return {};
+    }
     return full(t.sizes(), value, options.requires_grad(false));
 }
 
 Tensor full_like(Tensor t, float value)
 {
+    if (!t.defined())
+    {
+        return {};
+    }
     return full_like(t, value, t.options().requires_grad(false));
 }
 
@@ -75,11 +91,19 @@ Tensor zeros(const SizeType& sizes, TensorOptions options)
 }
 Tensor zeros_like(Tensor t, TensorOptions options)
 {
+    if (!t.defined())
+    {
+        return {};
+    }
     return zeros(t.sizes(), options.requires_grad(false));
 }
 
 Tensor zeros_like(Tensor t)
 {
+    if (!t.defined())
+    {
+        return {};
+    }
     return zeros_like(t, t.options().requires_grad(false));
 }
 
@@ -92,11 +116,19 @@ Tensor ones(const SizeType& sizes, TensorOptions options)
 }
 Tensor ones_like(Tensor t, TensorOptions options)
 {
+    if (!t.defined())
+    {
+        return {};
+    }
     return ones(t.sizes(), options.requires_grad(false));
 }
 
 Tensor ones_like(Tensor t)
 {
+    if (!t.defined())
+    {
+        return {};
+    }
     return ones_like(t, t.options().requires_grad(false));
 }
 

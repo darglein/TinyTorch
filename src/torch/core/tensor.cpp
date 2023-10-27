@@ -57,10 +57,12 @@ void Tensor::SetEdge(std::shared_ptr<Edge> edge)
 }
 void Tensor::set_requires_grad(bool requires_grad)
 {
+    CHECK(impl_);
     impl_->set_requires_grad(requires_grad);
 }
 bool Tensor::requires_grad() const
 {
+    CHECK(impl_);
     return impl_->requires_grad();
 }
 int64_t Tensor::element_size() const
@@ -69,30 +71,37 @@ int64_t Tensor::element_size() const
 }
 Device Tensor::device() const
 {
+    CHECK(impl_);
     return impl_->options_.device_;
 }
 uint8_t* Tensor::ptr() const
 {
+    CHECK(impl_);
     return impl_->data_ptr();
 }
 const SizeType& Tensor::strides() const
 {
+    CHECK(impl_);
     return impl_->strides_;
 }
 const SizeType& Tensor::sizes() const
 {
+    CHECK(impl_);
     return impl_->sizes_;
 }
 int64_t Tensor::dim() const
 {
+    CHECK(impl_);
     return impl_->dim();
 }
 int64_t Tensor::size(int64_t index) const
 {
+    CHECK(impl_);
     return impl_->sizes_[index];
 }
 int64_t Tensor::stride(int64_t index) const
 {
+    CHECK(impl_);
     return impl_->strides_[index];
 }
 void Tensor::zero_()
@@ -101,10 +110,12 @@ void Tensor::zero_()
 }
 ScalarType Tensor::scalar_type() const
 {
+    CHECK(impl_);
     return impl_->options_.dtype_;
 }
 TensorOptions Tensor::options() const
 {
+    CHECK(impl_);
     return impl_->options_;
 }
 
