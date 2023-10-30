@@ -75,6 +75,35 @@ struct SumDimNode : public FunctionNode<SumDimNode>
     }
 };
 
+struct PowNode : public FunctionNode<PowNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
+    {
+        auto [expand_a, expand_b]   = CheckOperatorSizeMatchOneDim(a, b);
+        ctx->saved_data["expand_a"] = expand_a;
+        ctx->saved_data["expand_b"] = expand_b;
+        Tensor result               = empty(max_size(a, b), a.options());
+        ctx->save_for_backward({a, b});
+        SELECT_DEVICE(result.device(), pow_impl, a, b, result);
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        CHECK_EQ(grad.size(), 1);
+        auto a        = ctx->get_saved_variables()[0];
+        auto b        = ctx->get_saved_variables()[1];
+        auto g        = grad[0];
+        Tensor grad_a = empty(max_size(a, b), g.options());
+        Tensor grad_b;
+        SELECT_DEVICE(grad_a.device(), pow_impl, a, b - 1, grad_a);
+        grad_a = grad_a * g;
+
+        BackwardExpand(grad_a, grad_b, ctx->saved_data["expand_a"].toSizes(), ctx->saved_data["expand_b"].toSizes());
+
+        return {grad_a, grad_b};
+    }
+};
 
 struct PowScalarNode : public FunctionNode<PowScalarNode>
 {
@@ -109,18 +138,12 @@ using namespace autograd;
 
 Tensor pow(Tensor a, double b)
 {
-    // CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    // auto result = empty_like(a);
-    // SELECT_DEVICE(a.device(), pow_impl, a, b, result);
-    // return result;
-        return autograd::PowScalarNode::apply(a, b)[0];
+    return autograd::PowScalarNode::apply(a, b)[0];
 }
 Tensor pow(Tensor a, Tensor b)
 {
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    auto result = empty_like(a);
-    SELECT_DEVICE(a.device(), pow_impl, a, b, result);
-    return result;
+    CHECK(!b.requires_grad() || !GradMode::is_enabled());
+    return autograd::PowNode::apply(a, b)[0];
 }
 
 template <typename T>

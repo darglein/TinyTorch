@@ -68,19 +68,5 @@ namespace tinytorch
     }
 
 
-static SizeType max_size(Tensor a, Tensor b)
-{
-    CHECK_EQ(a.dim(), b.dim());
-    SizeType new_sizes;
-    new_sizes.resize(a.dim());
-    for (int64_t i = 0; i < a.dim(); ++i)
-    {
-        int64_t as = a.size(i);
-        int64_t bs = b.size(i);
-        CHECK(as == bs || as == 1 || bs == 1);
-        new_sizes[i] = std::max(as, bs);
-    }
-    return new_sizes;
-}
 
 }  // namespace tinytorch

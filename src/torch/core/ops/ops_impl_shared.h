@@ -217,81 +217,70 @@ struct Max
 };
 }  // namespace BinaryOperators
 
-//
-// template <typename T>
-// inline TT_HD T relu(T x)
-//{
-//    return (x > T(0.f)) ? x : T(0.f);
-//}
-//
-// template <typename T>
-// inline TT_HD T sigmoid(T x)
-//{
-//    return T(1.f) / (T(1.f) + ::exp(-x));
-//}
-//
-// template <typename T>
-// inline TT_HD T softplus(T x, T beta)
-//{
-//    return T(::log(T(1.f) + ::exp(beta * x)) / beta);
-//}
-//
-//
-//
-// template <typename T>
-// inline TT_HD std::pair<T, T> div_backward(T a, T b)
-//{
-//    return {T(1.f) / b, -a / (b * b)};
-//}
-//
-// template <typename T>
-// inline TT_HD T log_backward(T x)
-//{
-//    return T(1.f) / x;
-//}
-//
-// template <typename T>
-// inline TT_HD T log1p_backward(T x)
-//{
-//    return T(1.f) / (x + T(1.f));
-//}
-//
-// template <typename T>
-// inline TT_HD T pow_backward(T x, T b)
-//{
-//    return b * ::pow(x, b - 1);
-//}
-//
-// template <typename T>
-// inline TT_HD T sin_backward(T x)
-//{
-//    return ::cos(x);
-//}
-//
-// template <typename T>
-// inline TT_HD T cos_backward(T x)
-//{
-//    return -::sin(x);
-//}
-//
-// template <typename T>
-// inline TT_HD T relu_backward(T x)
-//{
-//    return ((x < T(0.f)) ? T(0.f) : T(1.f));
-//}
-//
-// template <typename T>
-// inline TT_HD T sigmoid_backward(T x)
-//{
-//    T expnegx = T(::exp(-x));
-//    return expnegx / ((T(1.f) + expnegx) * (T(1.f) + expnegx));
-//}
-//
-// template <typename T>
-// inline TT_HD T softplus_backward(T x, T beta)
-//{
-//    T e = T(::exp(beta * x));
-//    return e / (e + T(1.f));
-//}
+
+
+inline std::pair<SizeType, SizeType> CheckOperatorSizeMatchOneDim(const Tensor& a, const Tensor& b)
+{
+    CHECK_EQ(a.device(), b.device());
+    CHECK_EQ(a.dim(), b.dim());
+
+    std::vector<int64_t> expand_a, expand_b;
+    for (int i = 0; i < a.dim(); ++i)
+    {
+        if (a.size(i) != b.size(i))
+        {
+            CHECK(a.size(i) == 1 || b.size(i) == 1) << "Size Missmatch " << a.sizes() << " " << b.sizes();
+
+            // make sure we don't expand a 0 to a 1
+            if (a.size(i) == 1 && b.size(i) > 1)
+            {
+                expand_a.push_back(i);
+            }
+            else if (b.size(i) == 1 && a.size(i) > 1)
+            {
+                expand_b.push_back(i);
+            }
+        }
+    }
+    return {expand_a, expand_b};
+}
+
+inline void BackwardExpand(Tensor& grad_a, Tensor& grad_b, SizeType expand_a, SizeType expand_b)
+{
+    if (grad_a.defined() && expand_a.size() > 0)
+    {
+        grad_a = grad_a.sum(expand_a, true);
+    }
+    if (grad_b.defined() && expand_b.size() > 0)
+    {
+        grad_b = grad_b.sum(expand_b, true);
+    }
+}
+
+// Operators can have the case that one Tensor is dimension 1 along one axis and the other is not.
+// This computes the size of the result tensor and checks if everything else is ok.
+inline SizeType max_size(Tensor a, Tensor b)
+{
+    CHECK_EQ(a.dim(), b.dim());
+    SizeType new_sizes;
+    new_sizes.resize(a.dim());
+    for (int64_t i = 0; i < a.dim(); ++i)
+    {
+        int64_t as = a.size(i);
+        int64_t bs = b.size(i);
+        CHECK(as == bs || as == 1 || bs == 1);
+        if (as == 0 || bs == 0)
+        {
+            // 0-sized dims are not expanded
+            new_sizes[i] = 0;
+        }
+        else
+        {
+            new_sizes[i] = std::max(as, bs);
+        }
+    }
+    return new_sizes;
+}
+
 
 }  // namespace tinytorch
