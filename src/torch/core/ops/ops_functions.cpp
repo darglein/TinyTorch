@@ -118,7 +118,7 @@ Tensor repeat(Tensor t, SizeType repeats)
 Tensor repeat_interleave(Tensor t, int64_t count)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
-
+    TINYTORCH_LOG_FUNCTION_CALL();
     SizeType new_sizes = t.sizes();
     new_sizes[0] *= count;
     Tensor result = empty(new_sizes, t.options());
@@ -130,7 +130,7 @@ Tensor repeat_interleave(Tensor t, int64_t count)
 Tensor transpose(Tensor t, int64_t dim0, int64_t dim1)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
-
+    TINYTORCH_LOG_FUNCTION_CALL();
     SizeType new_sizes = t.sizes();
     std::swap(new_sizes[dim0], new_sizes[dim1]);
 
@@ -142,6 +142,7 @@ Tensor transpose(Tensor t, int64_t dim0, int64_t dim1)
 void fill(Tensor& t, double value)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(t.device(), fill_impl, t, value);
 }
 
@@ -149,30 +150,35 @@ void fill(Tensor& t, Tensor value)
 {
     CHECK_EQ(value.numel(), 1);
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(t.device(), fill_impl, t, value);
 }
 void fill(Tensor& t, Tensor values, int dim)
 {
     CHECK_EQ(values.numel(), t.size(dim));
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(t.device(), fill_impl, t, values, dim);
 }
 
 void uniform(Tensor& t, double mi, double ma)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(t.device(), uniform_impl, t, mi, ma);
 }
 
 void uniform_int(Tensor& t, int low, int high)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(t.device(), uniform_int_impl, t, low, high);
 }
 
 void copy(Tensor src, Tensor target, bool async)
 {
     CHECK(!src.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
 
     if (src.device() == target.device())
     {
@@ -357,12 +363,14 @@ Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data)
 void index_copy_(Tensor& target, int64_t dim, Tensor index, Tensor value)
 {
     CHECK(!target.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(target.device(), index_copy_impl, target, dim, index, value);
 }
 
 Tensor gather(Tensor data, int64_t dim, Tensor index)
 {
     CHECK(!data.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     CHECK_EQ(data.dim(), index.dim());
     auto out_sizes = index.sizes();
     auto result    = empty(out_sizes, data.options());
@@ -471,7 +479,7 @@ struct PermuteNode : public FunctionNode<PermuteNode>
 
 Tensor clone(Tensor a)
 {
-    if(!a.defined()) return Tensor();
+    if (!a.defined()) return Tensor();
     return autograd::CloneNode::apply(a)[0];
 }
 Tensor permute(Tensor t, const SizeType& size)

@@ -45,6 +45,27 @@
 #endif
 
 
+
+#if defined _WIN32
+#    define TT_FUNCTION_NAME __FUNCSIG__
+#elif defined __unix__
+#    include <features.h>
+#    if defined __cplusplus ? __GNUC_PREREQ(2, 6) : __GNUC_PREREQ(2, 4)
+#        define TT_FUNCTION_NAME __PRETTY_FUNCTION__
+#    else
+#        if defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
+#            define TT_FUNCTION_NAME __func__
+#        else
+#            define TT_FUNCTION_NAME ((const char*)0)
+#        endif
+#    endif
+#elif defined __APPLE__
+#    define TT_FUNCTION_NAME __PRETTY_FUNCTION__
+#else
+#    error Unknown compiler.
+#endif
+
+
 #ifdef NDEBUG
 #define TT_DEBUG 0
 #else

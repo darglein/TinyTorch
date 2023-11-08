@@ -184,7 +184,40 @@ struct ToIValueList
     static void apply(std::vector<IValue>& output) {}
 };
 
+struct NodeInfo
+{
+    NodeInfo(std::string n, Context* c) : name(n), context(c) {}
+    std::string name;
+    Context* context;
+};
+struct NodeCallback
+{
+    virtual ~NodeCallback() {}
+    virtual void ForwardStart(const NodeInfo& info) = 0;
+    virtual void ForwardEnd(const NodeInfo& info)   = 0;
 
+    virtual void BackwardStart(const NodeInfo& info) = 0;
+    virtual void BackwardEnd(const NodeInfo& info)   = 0;
+};
+
+
+extern TINYTORCH_API NodeCallback* call_back;
+
+struct FunctionCallbackScope
+{
+    FunctionCallbackScope(std::string function_name) : function_name(function_name)
+    {
+        if (call_back) call_back->ForwardStart(NodeInfo(function_name, &context));
+    }
+    ~FunctionCallbackScope()
+    {
+        if (call_back) call_back->ForwardEnd(NodeInfo(function_name, &context));
+    }
+    std::string function_name;
+    Context context;
+};
+
+#define TINYTORCH_LOG_FUNCTION_CALL() auto f = autograd::FunctionCallbackScope(TT_FUNCTION_NAME)
 
 struct TINYTORCH_API Node
 {
@@ -227,6 +260,9 @@ struct FunctionNode : public Node
         NoGradGuard ngg;
         CHECK_EQ(fwd_output_grad.size(), num_input_gradients_of_backward);
 
+
+        if (call_back) call_back->BackwardStart(NodeInfo(std::string("bw_") + typeid(T).name(), &context));
+
         CHECK(context.requires_grad);
         // backward
         auto grad_list = T::backward(&context, fwd_output_grad);
@@ -265,6 +301,8 @@ struct FunctionNode : public Node
                 }
             }
         }
+
+        if (call_back) call_back->BackwardEnd(NodeInfo(std::string("bw_") + typeid(T).name(), &context));
 
         // This is important, because if the node would store the output tensor here then
         // we get a shared_ptr cycle and leak memory.
@@ -314,6 +352,9 @@ struct FunctionNode : public Node
 
         node->context.requires_grad = need_grad;
 
+
+        if (call_back) call_back->ForwardStart(NodeInfo(typeid(T).name(), &node->context));
+
         // Forward
         NoGradGuard ngg;
         auto result                           = T::forward(&node->context, std::forward<Args>(args)...);
@@ -328,6 +369,8 @@ struct FunctionNode : public Node
                 result[i].SetEdge(std::make_shared<Edge>(node, i));
             }
         }
+
+        if (call_back) call_back->ForwardEnd(NodeInfo(typeid(T).name(), &node->context));
         return result;
     }
 

@@ -294,20 +294,23 @@ Tensor operator+(double a, Tensor b)
 // ============================================================================
 
 Tensor operator==(Tensor a, double b)
-{
+{  CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     auto result = empty_like(a);
     SELECT_DEVICE(a.device(), equal_impl, a, b, result);
     return result;
 }
 
 Tensor operator<(Tensor a, double b)
-{
+{  CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     auto result = empty_like(a);
     SELECT_DEVICE(a.device(), less_impl, a, b, result);
     return result;
 }
 Tensor operator>(Tensor a, double b)
-{
+{  CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     auto result = empty_like(a);
     SELECT_DEVICE(a.device(), greater_impl, a, b, result);
     return result;
@@ -316,19 +319,21 @@ Tensor operator>(Tensor a, double b)
 Tensor operator+=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-
+    TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(a.device(), add_impl, a, b, a);
     return a;
 }
 Tensor operator+=(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(a.device(), add_impl, a, b, a);
     return a;
 }
 Tensor operator-=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     MatchTensorSize(a, b);
     SELECT_DEVICE(a.device(), sub_impl, a, b, a);
     return a;
@@ -336,12 +341,14 @@ Tensor operator-=(Tensor a, Tensor b)
 Tensor operator-=(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(a.device(), sub_impl, a, b, a);
     return a;
 }
 Tensor operator*=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     MatchTensorSize(a, b);
     SELECT_DEVICE(a.device(), mult_impl, a, b, a);
     return a;
@@ -349,12 +356,14 @@ Tensor operator*=(Tensor a, Tensor b)
 Tensor operator*=(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(a.device(), mult_impl, a, b, a);
     return a;
 }
 Tensor operator/=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     MatchTensorSize(a, b);
     SELECT_DEVICE(a.device(), div_impl, a, b, a);
     return a;
@@ -362,6 +371,7 @@ Tensor operator/=(Tensor a, Tensor b)
 Tensor operator/=(Tensor a, double b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
     return a *= (1.0 / b);
 }
 

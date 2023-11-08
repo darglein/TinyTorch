@@ -23,6 +23,7 @@ void GradMode::set_enabled(bool enabled)
 }
 namespace autograd
 {
+NodeCallback* call_back = nullptr;
 AccumulateGrad::AccumulateGrad(std::shared_ptr<TensorImpl> t) : impl_(t)
 {
     num_input_gradients_of_backward = 1;
