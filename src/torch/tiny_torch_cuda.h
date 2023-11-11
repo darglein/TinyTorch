@@ -9,7 +9,7 @@
 
 #if __has_include("cuda_runtime.h")
 
-#    include "torch/cuda/cuda.h"
+#    include "torch/cuda/tt_cuda.h"
 
 #    include "cuda_runtime.h"
 
