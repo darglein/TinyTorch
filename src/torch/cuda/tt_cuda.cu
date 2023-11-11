@@ -4,7 +4,7 @@
  * See LICENSE file for more information.
  */
 
-#include "cuda.h"
+#include "tt_cuda.h"
 
 
 namespace tinytorch
