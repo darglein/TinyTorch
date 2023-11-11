@@ -325,12 +325,14 @@ Tensor std(Tensor a)
     auto mean = a.mean();
 
     Tensor result;
+#ifdef TT_HAS_CUDA
     if (a.is_cuda() && (!a.requires_grad() || !GradMode::is_enabled()))
     {
         result = zeros_like(mean);
         cuda_impl::std_helper_impl(a, mean, result);
     }
     else
+#endif
     {
         result = a - mean;
         result = result.square();

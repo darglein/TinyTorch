@@ -75,7 +75,7 @@ StorageImpl::~StorageImpl()
                 free(data_ptr_);
             }
 #else
-            data_ptr_ = malloc(size);
+            free(data_ptr_);
 #endif
         }
         else

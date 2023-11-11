@@ -22,6 +22,12 @@
 #include "torch/tiny_torch_cuda.h"
 #include <type_traits>
 
+#if defined(__CUDACC__)
+#define TT_INLINE __forceinline__
+#else
+#define TT_INLINE inline
+#endif
+
 namespace tinytorch
 {
 
@@ -122,7 +128,7 @@ struct DimIndexStruct
     }
 
 
-    __forceinline__ constexpr TT_HD DimIndexStruct(std::initializer_list<IndexType> l)
+    TT_INLINE constexpr TT_HD DimIndexStruct(std::initializer_list<IndexType> l)
     {
         int k = 0;
         for (auto i : l)
@@ -131,7 +137,7 @@ struct DimIndexStruct
         }
     }
 
-    __forceinline__ constexpr TT_HD void set_index(IndexType dim, IndexType value)
+    TT_INLINE constexpr TT_HD void set_index(IndexType dim, IndexType value)
     {
 #pragma unroll
         for (int i = 0; i < DIM; ++i)
@@ -143,7 +149,7 @@ struct DimIndexStruct
         }
     }
 
-    __forceinline__ constexpr TT_HD IndexType get_index(IndexType dim)
+    TT_INLINE constexpr TT_HD IndexType get_index(IndexType dim)
     {
 #pragma unroll
         for (int i = 0; i < DIM; ++i)
@@ -156,7 +162,7 @@ struct DimIndexStruct
         return 0;
     }
 
-    __forceinline__ constexpr TT_HD IndexType& operator[](IndexType dim)
+    TT_INLINE constexpr TT_HD IndexType& operator[](IndexType dim)
     {
 #if 1 || defined(__CUDACC__)
 #    pragma unroll
@@ -173,7 +179,7 @@ struct DimIndexStruct
 #endif
     }
 
-    __forceinline__ constexpr TT_HD IndexType operator[](IndexType dim) const
+    TT_INLINE constexpr TT_HD IndexType operator[](IndexType dim) const
     {
 #if 1 || defined(__CUDACC__)
 #    pragma unroll
@@ -190,7 +196,7 @@ struct DimIndexStruct
 #endif
     }
 
-    __forceinline__ constexpr TT_HD void zero_()
+    TT_INLINE constexpr TT_HD void zero_()
     {
 #pragma unroll
         for (int i = 0; i < DIM; ++i)
@@ -252,7 +258,7 @@ struct TensorInfoBase
         }
     }
 
-    __forceinline__ constexpr TT_HD int dim()
+    TT_INLINE constexpr TT_HD int dim()
     {
         if constexpr (is_dynamic)
         {
@@ -263,9 +269,9 @@ struct TensorInfoBase
             return max_dims;
         }
     }
-    __forceinline__ constexpr TT_HD IndexType size(int index) { return sizes[index]; }
+    TT_INLINE constexpr TT_HD IndexType size(int index) { return sizes[index]; }
 
-    __forceinline__ constexpr TT_HD IndexType numel()
+    TT_INLINE constexpr TT_HD IndexType numel()
     {
         IndexType result = 1;
 #pragma unroll
@@ -280,7 +286,7 @@ struct TensorInfoBase
     }
 
 
-    __forceinline__ constexpr TT_HD T& operator[](IndexType linearId)
+    TT_INLINE constexpr TT_HD T& operator[](IndexType linearId)
     {
         if (contiguous)
         {
@@ -288,16 +294,16 @@ struct TensorInfoBase
         }
         return operator[](LinearIndexToDimIndex(linearId));
     }
-    __forceinline__ constexpr TT_HD T& operator[](DimIndex index) { return data[IndexToOffset(index)]; }
+    TT_INLINE constexpr TT_HD T& operator[](DimIndex index) { return data[IndexToOffset(index)]; }
 
 
     template <typename... Ts>
-    __forceinline__ constexpr TT_HD T& operator()(Ts... args)
+    TT_INLINE constexpr TT_HD T& operator()(Ts... args)
     {
         return operator[](IndexToOffset(DimIndex({args...})));
     }
 
-    __forceinline__ constexpr TT_HD IndexType IndexToOffset(DimIndex index)
+    TT_INLINE constexpr TT_HD IndexType IndexToOffset(DimIndex index)
     {
         IndexType offset = 0;
 
@@ -323,7 +329,7 @@ struct TensorInfoBase
         return offset;
     }
 
-    __forceinline__ constexpr TT_HD DimIndex LinearIndexToDimIndex(IndexType linearId)
+    TT_INLINE constexpr TT_HD DimIndex LinearIndexToDimIndex(IndexType linearId)
     {
         DimIndex result;
 
@@ -344,7 +350,7 @@ struct TensorInfoBase
         return result;
     }
 
-    __forceinline__ constexpr TT_HD DimIndex LinearIndexToDimIndexSkipDim(IndexType linearId, IndexType dim_to_skip)
+    TT_INLINE constexpr TT_HD DimIndex LinearIndexToDimIndexSkipDim(IndexType linearId, IndexType dim_to_skip)
     {
         DimIndex result;
 
@@ -371,7 +377,7 @@ struct TensorInfoBase
         result[0] = linearId;
         return result;
     }
-    __forceinline__ constexpr TT_HD bool index_in_range(DimIndex index)
+    TT_INLINE constexpr TT_HD bool index_in_range(DimIndex index)
     {
         bool result = true;
 #pragma unroll
@@ -385,7 +391,7 @@ struct TensorInfoBase
         return result;
     }
 
-    __forceinline__ constexpr TT_HD DimIndex clamp_index_to_size(DimIndex index)
+    TT_INLINE constexpr TT_HD DimIndex clamp_index_to_size(DimIndex index)
     {
         DimIndex result;
 
