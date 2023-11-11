@@ -41,7 +41,7 @@ TINYTORCH_API Tensor stack(const std::vector<Tensor>& a);
 TINYTORCH_API Tensor cat(const std::vector<Tensor>& a, int64_t dim);
 TINYTORCH_API Tensor index_select(Tensor input, int64_t dim, Tensor index);
 TINYTORCH_API Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data);
-TINYTORCH_API void index_copy_(Tensor& target, int64_t dim, Tensor index, Tensor value);
+TINYTORCH_API void index_copy(Tensor& target, int64_t dim, Tensor index, Tensor source);
 TINYTORCH_API Tensor gather(Tensor data, int64_t dim, Tensor index);
 
 inline void load(Tensor&, std::string)

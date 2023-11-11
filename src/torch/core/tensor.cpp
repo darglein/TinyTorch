@@ -622,7 +622,7 @@ Tensor Tensor::round() const
 }
 Tensor& Tensor::index_copy_(int64_t dim, Tensor ids, Tensor value)
 {
-    tinytorch::index_copy_(*this, dim, ids, value);
+    tinytorch::index_copy(*this, dim, ids, value);
     return *this;
 }
 void Tensor::retain_grad()

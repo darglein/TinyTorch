@@ -360,11 +360,11 @@ Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data)
     return autograd::IndexAddNode::apply(input, dim, index, data)[0];
 }
 
-void index_copy_(Tensor& target, int64_t dim, Tensor index, Tensor value)
+void index_copy(Tensor& target, int64_t dim, Tensor index, Tensor source)
 {
     CHECK(!target.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
-    SELECT_DEVICE(target.device(), index_copy_impl, target, dim, index, value);
+    SELECT_DEVICE(target.device(), index_copy_impl, target, dim, index, source);
 }
 
 Tensor gather(Tensor data, int64_t dim, Tensor index)
