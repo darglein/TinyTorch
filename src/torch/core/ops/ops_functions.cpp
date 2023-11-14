@@ -468,10 +468,7 @@ struct PermuteNode : public FunctionNode<PermuteNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         auto g = grad[0];
-
         auto grad_a = g.permute_view(ctx->saved_data["reverse_indices"].toSizes());
-        // Tensor grad_a = empty(ctx->next_meta[0].size, g.options());
-        // SELECT_DEVICE(grad_a.device(), permute_impl, g, grad_a, ctx->saved_data["reverse_indices"].toSizes());
         return {grad_a, {}};
     }
 };
