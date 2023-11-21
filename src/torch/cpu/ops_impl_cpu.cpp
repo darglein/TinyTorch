@@ -177,10 +177,18 @@ void range_impl(Tensor a, double start, double end, double step)
 template <typename T>
 static void rand_float_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, float low, float high)
 {
+//     std::mt19937_64  mersenne_engine(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()));
+//    std::minstd_rand  mersenne_engine(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()));
+
+    float scale = (1.0 / double(std::numeric_limits<uint64_t>::max())) * (high - low);
+
     std::uniform_real_distribution<float> dist{low, high};
     for (int64_t i = 0; i < t.numel(); ++i)
     {
-        t[i] = T(dist(mersenne_engine));
+         // t[i] = T(dist(mersenne_engine));
+        uint64_t value = mersenne_engine.operator()();
+        float xf = float(value) * scale;
+        t[i] = T(xf + low);
     }
 }
 
