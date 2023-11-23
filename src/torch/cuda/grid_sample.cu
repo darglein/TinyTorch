@@ -46,11 +46,11 @@ TT_HD inline std::tuple<T, T, T> UVToPixel(T u, T v, T k, int w, int h, int d, b
     return {u, v, k};
 }
 
-#undef MIN
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-#undef MAX
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
-#define CLIP_COORDINATES(in, out, clip_limit) out = MIN((clip_limit - 1), MAX(in, 0))
+#    undef MIN
+#    define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#    undef MAX
+#    define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#    define CLIP_COORDINATES(in, out, clip_limit) out = MIN((clip_limit - 1), MAX(in, 0))
 
 
 
@@ -60,16 +60,21 @@ static __global__ void grid_sample_2d_impl_kernel(TensorInfoCuda<T, 4> input, Te
                                                   bool align_corners, TensorInfoCuda<T, 4> result)
 {
     using IndexType  = typename TensorInfoCuda<T, 4>::IndexType;
-    IndexType b        = blockIdx.x;
-    IndexType sample   = blockIdx.y * blockDim.x + threadIdx.x;
     auto num_samples = grid.size(1) * grid.size(2);
+
+
+    IndexType tid    = blockIdx.x * blockDim.x + threadIdx.x;
+    IndexType b      = tid / num_samples;
+    IndexType sample = tid % num_samples;
+
     if (sample >= num_samples) return;
+    if (b >= input.size(0)) return;
 
     IndexType sample_i = sample / grid.size(2);
     IndexType sample_j = sample % grid.size(2);
 
-    T u = grid(b, sample_i, sample_j, IndexType (0));
-    T v = grid(b, sample_i, sample_j, IndexType (1));
+    T u = grid(b, sample_i, sample_j, IndexType(0));
+    T v = grid(b, sample_i, sample_j, IndexType(1));
 
 
     u = (u + 1) * 0.5f;
@@ -126,14 +131,20 @@ static __global__ void grid_sample_3d_impl_kernel(TensorInfoCuda<T, 5> input, Te
                                                   bool align_corners, TensorInfoCuda<T, 5> result)
 {
     using IndexType  = typename TensorInfoCuda<T, 4>::IndexType;
-    IndexType b        = blockIdx.x;
-    IndexType sample   = blockIdx.y * blockDim.x + threadIdx.x;
     auto num_samples = grid.size(1) * grid.size(2) * grid.size(3);
+
+    IndexType tid    = blockIdx.x * blockDim.x + threadIdx.x;
+    IndexType b      = tid / num_samples;
+    IndexType sample = tid % num_samples;
+
     if (sample >= num_samples) return;
+    if (b >= input.size(0)) return;
+
 
     IndexType sample_k = sample % grid.size(3);
     IndexType sample_j = (sample / grid.size(3)) % grid.size(2);
     IndexType sample_i = sample / (grid.size(2) * grid.size(3));
+
 
     float u = grid(b, sample_i, sample_j, sample_k, 0);
     float v = grid(b, sample_i, sample_j, sample_k, 1);
@@ -244,12 +255,15 @@ static __global__ void grid_sample_2d_backward_impl_kernel(TensorInfoCuda<T, 4> 
                                                            TensorInfoCuda<T, 4> grad_grid,
                                                            TensorInfoCuda<T, 4> grad_result)
 {
-
     using IndexType  = typename TensorInfoCuda<T, 4>::IndexType;
-    IndexType b        = blockIdx.x;
-    IndexType sample   = blockIdx.y * blockDim.x + threadIdx.x;
     auto num_samples = grid.size(1) * grid.size(2);
+
+    IndexType tid    = blockIdx.x * blockDim.x + threadIdx.x;
+    IndexType b      = tid / num_samples;
+    IndexType sample = tid % num_samples;
+
     if (sample >= num_samples) return;
+    if (b >= input.size(0)) return;
 
     IndexType sample_i = sample / grid.size(2);
     IndexType sample_j = sample % grid.size(2);
@@ -348,12 +362,15 @@ static __global__ void grid_sample_3d_backward_impl_kernel(TensorInfoCuda<T, 5> 
                                                            TensorInfoCuda<T, 5> grad_grid,
                                                            TensorInfoCuda<T, 5> grad_result)
 {
-
     using IndexType  = typename TensorInfoCuda<T, 4>::IndexType;
-    IndexType b        = blockIdx.x;
-    IndexType sample   = blockIdx.y * blockDim.x + threadIdx.x;
     auto num_samples = grid.size(1) * grid.size(2) * grid.size(3);
+
+    IndexType tid    = blockIdx.x * blockDim.x + threadIdx.x;
+    IndexType b      = tid / num_samples;
+    IndexType sample = tid % num_samples;
+
     if (sample >= num_samples) return;
+    if (b >= input.size(0)) return;
 
     IndexType sample_k = sample % grid.size(3);
     IndexType sample_j = (sample / grid.size(3)) % grid.size(2);
@@ -524,7 +541,7 @@ void grid_sample_2d_impl(Tensor input, Tensor grid, InterpolationType interpolat
     auto num_batches = input.size(0);
     auto num_samples = grid.size(1) * grid.size(2);
     grid_sample_2d_impl_kernel<float>
-        <<<dim3(num_batches, iDivUp(num_samples, 128), 1), 128, 0, cuda::getCurrentCUDAStream()>>>(
+        <<<iDivUp(num_batches * num_samples, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
             input, grid, interpolation, padding, align_corners, result);
     CUDA_SYNC_CHECK_ERROR();
 }
@@ -534,7 +551,7 @@ void grid_sample_2d_backward_impl(Tensor input, Tensor grid, InterpolationType i
     auto num_batches = input.size(0);
     auto num_samples = grid.size(1) * grid.size(2);
     grid_sample_2d_backward_impl_kernel<float>
-        <<<dim3(num_batches, iDivUp(num_samples, 128), 1), 128, 0, cuda::getCurrentCUDAStream()>>>(
+        <<<iDivUp(num_batches * num_samples, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
             input, grid, interpolation, padding, align_corners, grad_input, grad_grid, grad_result);
     CUDA_SYNC_CHECK_ERROR();
 }
@@ -544,27 +561,29 @@ void grid_sample_3d_impl(Tensor input, Tensor grid, InterpolationType interpolat
     auto num_batches = input.size(0);
     auto num_samples = grid.size(1) * grid.size(2) * grid.size(3);
 
+    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+
     switch (input.scalar_type())
     {
         case kHalf:
             grid_sample_3d_impl_kernel<__half>
-                <<<dim3(num_batches, iDivUp(num_samples, 128), 1), 128, 0, cuda::getCurrentCUDAStream()>>>(
+                <<<iDivUp(num_batches * num_samples, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
                     input, grid, interpolation, padding, align_corners, result);
             break;
         case kFloat:
             grid_sample_3d_impl_kernel<float>
-                <<<dim3(num_batches, iDivUp(num_samples, 128), 1), 128, 0, cuda::getCurrentCUDAStream()>>>(
+                <<<iDivUp(num_batches * num_samples, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
                     input, grid, interpolation, padding, align_corners, result);
             break;
         case kDouble:
             grid_sample_3d_impl_kernel<double>
-                <<<dim3(num_batches, iDivUp(num_samples, 128), 1), 128, 0, cuda::getCurrentCUDAStream()>>>(
+                <<<iDivUp(num_batches * num_samples, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
                     input, grid, interpolation, padding, align_corners, result);
             break;
         default:
             CHECK(false);
     }
-
+    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 
     CUDA_SYNC_CHECK_ERROR();
 }
@@ -580,12 +599,12 @@ void grid_sample_3d_backward_impl(Tensor input, Tensor grid, InterpolationType i
     {
         case kHalf:
             grid_sample_3d_backward_impl_kernel<__half>
-                <<<dim3(num_batches, iDivUp(num_samples, 128), 1), 128, 0, cuda::getCurrentCUDAStream()>>>(
+                <<<iDivUp(num_batches * num_samples, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
                     input, grid, interpolation, padding, align_corners, grad_input, grad_grid, grad_result);
             break;
         case kFloat:
             grid_sample_3d_backward_impl_kernel<float>
-                <<<dim3(num_batches, iDivUp(num_samples, 128), 1), 128, 0, cuda::getCurrentCUDAStream()>>>(
+                <<<iDivUp(num_batches * num_samples, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
                     input, grid, interpolation, padding, align_corners, grad_input, grad_grid, grad_result);
             break;
         default:
