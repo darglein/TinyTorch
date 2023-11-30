@@ -68,7 +68,8 @@ enum PaddingMode
 };
 enum InterpolationType
 {
-    kBilinear,
+    kBilinear = 0,
+    kNearest = 1,
 };
 
 
