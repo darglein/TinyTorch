@@ -15,6 +15,7 @@ namespace cuda_impl
 {
 
 // full reductions
+void abs_sum_impl(Tensor a, Tensor result);
 void sum_impl(Tensor a, Tensor result);
 void min_impl(Tensor a, Tensor result);
 void max_impl(Tensor a, Tensor result);

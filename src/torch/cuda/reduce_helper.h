@@ -41,6 +41,31 @@ struct ReduceAdd
     }
 };
 
+struct ReduceAbsAdd
+{
+    template <typename T>
+    TT_HD T load_op(T a)
+    {
+        return a > 0 ? a : -a;
+    }
+
+    template <typename T>
+    TT_HD T operator()(T a, T b)
+    {
+        return a + b;
+    }
+    template <typename T>
+    TT_HD T atomic_reduce(T* target, T value)
+    {
+        return atomicAddSelect(target, value);
+    }
+    template <typename T>
+    static constexpr T default_value()
+    {
+        return T(0);
+    }
+};
+
 struct ReduceProd
 {
     template <typename T>

@@ -87,7 +87,10 @@ void global_reduce_helper(Tensor a, Tensor result, Op op)
         result.copy_(kernel_result);
     }
 }
-
+void abs_sum_impl(Tensor a, Tensor result)
+{
+    global_reduce_helper(a, result, ReduceAbsAdd());
+}
 void sum_impl(Tensor a, Tensor result)
 {
     global_reduce_helper(a, result, ReduceAdd());

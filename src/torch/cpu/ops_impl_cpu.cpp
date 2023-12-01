@@ -226,6 +226,21 @@ void sum_impl(Tensor a, Tensor result)
 }
 
 template <typename T>
+static void abs_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
+{
+    for (int64_t i = 0; i < a.numel(); ++i)
+    {
+        result[0] = result[0] + std::abs(a[i]);
+    }
+}
+
+void abs_sum_impl(Tensor a, Tensor result)
+{
+    SWITCH_MACRO_ALL(a.scalar_type(), abs_sum_impl, a, result);
+}
+
+
+template <typename T>
 static void sum_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
     for (int64_t linear_index_input = 0; linear_index_input < input.numel(); ++linear_index_input)

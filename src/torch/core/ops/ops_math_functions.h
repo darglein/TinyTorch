@@ -36,6 +36,8 @@ TINYTORCH_API Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep);
 TINYTORCH_API Tensor std(Tensor a);
 TINYTORCH_API Tensor std(Tensor a, int64_t dim);
 
+TINYTORCH_API Tensor abs_sum(Tensor a);
+
 TINYTORCH_API Tensor sum(Tensor a);
 TINYTORCH_API Tensor sum(Tensor a, int64_t dim, bool keepdim);
 TINYTORCH_API Tensor sum(Tensor a, SizeType s, bool keepdim = false);

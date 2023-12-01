@@ -5,6 +5,8 @@
  */
 
 #include "ops_impl.h"
+#include "ops_math_functions.h"
+
 
 
 namespace tinytorch
@@ -13,7 +15,26 @@ namespace tinytorch
 
 namespace autograd
 {
+struct AbsSumNode : public FunctionNode<AbsSumNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a)
+    {
+        Tensor result = zeros({1}, a.options());
+        SELECT_DEVICE(a.device(), abs_sum_impl, a, result);
+        return {result};
+    }
 
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        CHECK(false);
+        CHECK_EQ(grad.size(), 1);
+        CHECK_EQ(grad[0].numel(), 1);
+        auto g        = grad[0];
+        Tensor grad_a = empty(ctx->next_meta[0].size, g.options());
+        SELECT_DEVICE(grad_a.device(), fill_impl, grad_a, g);
+        return {grad_a};
+    }
+};
 struct SumNode : public FunctionNode<SumNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
@@ -262,6 +283,13 @@ Tensor max(Tensor a, Tensor b)
     return result;
 }
 
+
+Tensor abs_sum(Tensor a)
+{
+    return AbsSumNode::forward_and_build_graph(a)[0];
+}
+
+
 Tensor sum(Tensor a)
 {
     return SumNode::forward_and_build_graph(a)[0];
@@ -400,5 +428,4 @@ Tensor cumsum(Tensor a, int64_t dim)
     SELECT_DEVICE(a.device(), cumsum_impl, a, dim, result);
     return result;
 }
-
 }  // namespace tinytorch
