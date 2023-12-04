@@ -165,6 +165,11 @@ static __global__ void grid_sample_3d_impl_kernel(TensorInfoCuda<T, 5> input, Te
 
     auto [ix, iy, iz] = UVToPixel(u, v, w, IW, IH, ID, align_corners);
 
+
+    int ix_nearest = round(ix);
+    int iy_nearest = round(iy);
+    int iz_nearest = round(iz);
+
     int ix_tnw = floor((ix));
     int iy_tnw = floor((iy));
     int iz_tnw = floor((iz));
@@ -234,14 +239,22 @@ static __global__ void grid_sample_3d_impl_kernel(TensorInfoCuda<T, 5> input, Te
     for (int c = 0; c < C; ++c)
     {
         float sum = 0;
-        sum += float(input(b, c, iz_tnw, iy_tnw, ix_tnw)) * tnw;
-        sum += float(input(b, c, iz_tne, iy_tne, ix_tne)) * tne;
-        sum += float(input(b, c, iz_tsw, iy_tsw, ix_tsw)) * tsw;
-        sum += float(input(b, c, iz_tse, iy_tse, ix_tse)) * tse;
-        sum += float(input(b, c, iz_bnw, iy_bnw, ix_bnw)) * bnw;
-        sum += float(input(b, c, iz_bne, iy_bne, ix_bne)) * bne;
-        sum += float(input(b, c, iz_bsw, iy_bsw, ix_bsw)) * bsw;
-        sum += float(input(b, c, iz_bse, iy_bse, ix_bse)) * bse;
+
+        if (interpolation == InterpolationType::kBilinear)
+        {
+            sum += float(input(b, c, iz_tnw, iy_tnw, ix_tnw)) * tnw;
+            sum += float(input(b, c, iz_tne, iy_tne, ix_tne)) * tne;
+            sum += float(input(b, c, iz_tsw, iy_tsw, ix_tsw)) * tsw;
+            sum += float(input(b, c, iz_tse, iy_tse, ix_tse)) * tse;
+            sum += float(input(b, c, iz_bnw, iy_bnw, ix_bnw)) * bnw;
+            sum += float(input(b, c, iz_bne, iy_bne, ix_bne)) * bne;
+            sum += float(input(b, c, iz_bsw, iy_bsw, ix_bsw)) * bsw;
+            sum += float(input(b, c, iz_bse, iy_bse, ix_bse)) * bse;
+        }
+        else
+        {
+            sum += float(input(b, c, iz_nearest, iy_nearest, ix_nearest));
+        }
 
         result(b, c, sample_i, sample_j, sample_k) = T(sum);
     }
@@ -395,6 +408,10 @@ static __global__ void grid_sample_3d_backward_impl_kernel(TensorInfoCuda<T, 5> 
 
     auto [ix, iy, iz] = UVToPixel(u, v, w, IW, IH, ID, align_corners);
 
+    int ix_nearest = round(ix);
+    int iy_nearest = round(iy);
+    int iz_nearest = round(iz);
+
     int ix_tnw = floor((ix));
     int iy_tnw = floor((iy));
     int iz_tnw = floor((iz));
@@ -477,14 +494,21 @@ static __global__ void grid_sample_3d_backward_impl_kernel(TensorInfoCuda<T, 5> 
         float bse_val = input(b, c, iz_bse, iy_bse, ix_bse);
 
         float g = grad_result(b, c, sample_i, sample_j, sample_k);
-        atomicAdd(&grad_input(b, c, iz_tnw, iy_tnw, ix_tnw), tnw * g);
-        atomicAdd(&grad_input(b, c, iz_tne, iy_tne, ix_tne), tne * g);
-        atomicAdd(&grad_input(b, c, iz_tsw, iy_tsw, ix_tsw), tsw * g);
-        atomicAdd(&grad_input(b, c, iz_tse, iy_tse, ix_tse), tse * g);
-        atomicAdd(&grad_input(b, c, iz_bnw, iy_bnw, ix_bnw), bnw * g);
-        atomicAdd(&grad_input(b, c, iz_bne, iy_bne, ix_bne), bne * g);
-        atomicAdd(&grad_input(b, c, iz_bsw, iy_bsw, ix_bsw), bsw * g);
-        atomicAdd(&grad_input(b, c, iz_bse, iy_bse, ix_bse), bse * g);
+        if (interpolation == kBilinear)
+        {
+            atomicAdd(&grad_input(b, c, iz_tnw, iy_tnw, ix_tnw), tnw * g);
+            atomicAdd(&grad_input(b, c, iz_tne, iy_tne, ix_tne), tne * g);
+            atomicAdd(&grad_input(b, c, iz_tsw, iy_tsw, ix_tsw), tsw * g);
+            atomicAdd(&grad_input(b, c, iz_tse, iy_tse, ix_tse), tse * g);
+            atomicAdd(&grad_input(b, c, iz_bnw, iy_bnw, ix_bnw), bnw * g);
+            atomicAdd(&grad_input(b, c, iz_bne, iy_bne, ix_bne), bne * g);
+            atomicAdd(&grad_input(b, c, iz_bsw, iy_bsw, ix_bsw), bsw * g);
+            atomicAdd(&grad_input(b, c, iz_bse, iy_bse, ix_bse), bse * g);
+        }
+        else
+        {
+            atomicAdd(&grad_input(b, c, iz_nearest, iy_nearest, ix_nearest), g);
+        }
 
         float gradout = g;
         float m1      = -1;
@@ -540,9 +564,8 @@ void grid_sample_2d_impl(Tensor input, Tensor grid, InterpolationType interpolat
 {
     auto num_batches = input.size(0);
     auto num_samples = grid.size(1) * grid.size(2);
-    grid_sample_2d_impl_kernel<float>
-        <<<iDivUp(num_batches * num_samples, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
-            input, grid, interpolation, padding, align_corners, result);
+    grid_sample_2d_impl_kernel<float><<<iDivUp(num_batches * num_samples, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
+        input, grid, interpolation, padding, align_corners, result);
     CUDA_SYNC_CHECK_ERROR();
 }
 void grid_sample_2d_backward_impl(Tensor input, Tensor grid, InterpolationType interpolation, PaddingMode padding,
