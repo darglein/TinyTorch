@@ -4,7 +4,10 @@
  * See LICENSE file for more information.
  */
 
+#include "ops_unary_functions.h"
+
 #include "ops_impl.h"
+
 
 
 namespace tinytorch
@@ -49,9 +52,9 @@ struct SqrtNode : public FunctionNode<SqrtNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto l      = ctx->get_saved_variables();
-        auto a      = l[0];
-        auto g      = grad[0];
+        auto l   = ctx->get_saved_variables();
+        auto a   = l[0];
+        auto g   = grad[0];
         auto g_a = empty_like(a);
         SELECT_DEVICE(a.device(), sqrt_backward_impl, a, g_a, g);
         // auto grad_a = 1 / (2 * a.sqrt()) * g;
@@ -129,9 +132,9 @@ struct SigmoidNode : public FunctionNode<SigmoidNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto l = ctx->get_saved_variables();
-        auto a = l[0];
-        auto g = grad[0];
+        auto l   = ctx->get_saved_variables();
+        auto a   = l[0];
+        auto g   = grad[0];
         auto g_a = empty_like(a);
         SELECT_DEVICE(a.device(), sigmoid_backward_impl, a, g_a, g);
         return {g_a};
@@ -143,16 +146,16 @@ struct SoftplusNode : public FunctionNode<SoftplusNode>
     {
         ctx->save_for_backward({a});
         ctx->saved_data["beta"] = beta;
-        auto result = empty_like(a);
+        auto result             = empty_like(a);
         SELECT_DEVICE(a.device(), softplus_impl, a, beta.toDouble(), result);
         return {result};
     }
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto l = ctx->get_saved_variables();
-        auto a = l[0];
-        auto g = grad[0];
+        auto l   = ctx->get_saved_variables();
+        auto a   = l[0];
+        auto g   = grad[0];
         auto g_a = empty_like(a);
 
         SELECT_DEVICE(a.device(), softplus_backward_impl, a, ctx->saved_data["beta"].toDouble(), g_a, g);
@@ -230,6 +233,13 @@ Tensor sigmoid(Tensor a)
 Tensor softplus(Tensor a, double beta)
 {
     return SoftplusNode::forward_and_build_graph(a, beta)[0];
+}
+Tensor softmax(Tensor a)
+{
+    a      = a - a.detach().max();
+    auto t = exp(a);
+    auto k = t.sum();
+    return t / k;
 }
 
 }  // namespace tinytorch
