@@ -23,7 +23,7 @@ static void print_impl(std::ostream& strm, TensorInfo<T> a)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        strm << a[i] << " ";
+        strm << std::setw(std::cout.precision() + 6) << a[i] << " ";
     }
 }
 
