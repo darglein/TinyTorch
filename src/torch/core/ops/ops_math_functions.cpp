@@ -118,7 +118,7 @@ struct PowNode : public FunctionNode<PowNode>
         Tensor grad_a = empty(max_size(a, b), g.options());
         Tensor grad_b;
         SELECT_DEVICE(grad_a.device(), pow_impl, a, b - 1, grad_a);
-        grad_a = grad_a * g;
+        grad_a = grad_a * g * b;
 
         BackwardExpand(grad_a, grad_b, ctx->saved_data["expand_a"].toSizes(), ctx->saved_data["expand_b"].toSizes());
 
@@ -148,7 +148,7 @@ struct PowScalarNode : public FunctionNode<PowScalarNode>
         Tensor grad_a = empty(ctx->next_meta[0].size, g.options());
 
         SELECT_DEVICE(grad_a.device(), pow_impl, a, b - 1, grad_a);
-        grad_a = grad_a * g;
+        grad_a = grad_a * g * b;
         return {grad_a, {}};
     }
 };
