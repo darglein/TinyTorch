@@ -4,8 +4,9 @@
  * See LICENSE file for more information.
  */
 
-#include "ops_impl.h"
 #include "ops_math_functions.h"
+
+#include "ops_impl.h"
 
 
 
@@ -112,13 +113,24 @@ struct PowNode : public FunctionNode<PowNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         CHECK_EQ(grad.size(), 1);
-        auto a        = ctx->get_saved_variables()[0];
-        auto b        = ctx->get_saved_variables()[1];
-        auto g        = grad[0];
-        Tensor grad_a = empty(max_size(a, b), g.options());
+        auto a = ctx->get_saved_variables()[0];
+        auto b = ctx->get_saved_variables()[1];
+        auto g = grad[0];
+        Tensor grad_a;
         Tensor grad_b;
-        SELECT_DEVICE(grad_a.device(), pow_impl, a, b - 1, grad_a);
-        grad_a = grad_a * g * b;
+
+        if (ctx->requires_grad_for_input(0))
+        {
+            grad_a = empty(max_size(a, b), g.options());
+            SELECT_DEVICE(grad_a.device(), pow_impl, a, b - 1, grad_a);
+            grad_a = grad_a * b * g;
+        }
+
+        if (ctx->requires_grad_for_input(1))
+        {
+            // ln(a)*a^b
+            grad_b = log(a) * pow(a, b) * g;
+        }
 
         BackwardExpand(grad_a, grad_b, ctx->saved_data["expand_a"].toSizes(), ctx->saved_data["expand_b"].toSizes());
 
@@ -163,7 +175,6 @@ Tensor pow(Tensor a, double b)
 }
 Tensor pow(Tensor a, Tensor b)
 {
-    CHECK(!b.requires_grad() || !GradMode::is_enabled());
     return autograd::PowNode::apply(a, b)[0];
 }
 
