@@ -1,28 +1,27 @@
 function(GroupSourcesByFolder target)
-  set(SOURCE_GROUP_DELIMITER "/")
-  set(last_dir "")
-  set(files "")
+    set(SOURCE_GROUP_DELIMITER "/")
+    set(last_dir "")
+    set(files "")
 
-  get_target_property(sources ${target} SOURCES)
+    get_target_property(sources ${target} SOURCES)
 
-  foreach(file ${sources})
-    file(RELATIVE_PATH relative_file "${PROJECT_SOURCE_DIR}" ${file})
-    get_filename_component(dir "${relative_file}" PATH)
-    if(NOT "${dir}" STREQUAL "${last_dir}")
-      if(files)
+    foreach (file ${sources})
+        file(RELATIVE_PATH relative_file "${PROJECT_SOURCE_DIR}" ${file})
+        get_filename_component(dir "${relative_file}" PATH)
+        if (NOT "${dir}" STREQUAL "${last_dir}")
+            if (files)
+                source_group("${last_dir}" FILES ${files})
+            endif ()
+            set(files "")
+        endif ()
+        set(files ${files} ${file})
+        set(last_dir "${dir}")
+    endforeach ()
+
+    if (files)
         source_group("${last_dir}" FILES ${files})
-      endif()
-      set(files "")
-    endif()
-    set(files ${files} ${file})
-    set(last_dir "${dir}")
-  endforeach()
-
-  if(files)
-    source_group("${last_dir}" FILES ${files})
-  endif()
+    endif ()
 endfunction()
-
 
 
 #############  source #############
@@ -33,9 +32,9 @@ FILE(GLOB_RECURSE ALL_HEADER *.h)
 
 add_library(torch SHARED ${ALL_HEADER} ${ALL_SRC})
 
-if(MSVC)
+if (MSVC)
     GroupSourcesByFolder(torch)
-endif()
+endif ()
 
 target_include_directories(torch PUBLIC ".")
 
@@ -45,6 +44,10 @@ if (UNIX)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--generate-line-info>) # for profiling
 endif ()
 
+if (MSVC)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe --display_error_number>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe "--diag_suppress=#1394-D">)
+endif ()
 
 target_link_libraries(torch PUBLIC glog::glog)
 
@@ -65,9 +68,9 @@ configure_file(
 target_include_directories(torch PUBLIC ${MY_BUILDCONFIG_DIR})
 
 
-if(MSVC)
+if (MSVC)
     target_sources(torch PRIVATE torch.natvis)
-endif()
+endif ()
 
 
 #############  output dir ############# 
