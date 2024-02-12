@@ -38,15 +38,17 @@ endif ()
 
 target_include_directories(torch PUBLIC ".")
 
+target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_suppress=186>) # pointless comparison of unsigned integer with zero
+target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_suppress=1394>) # field of class type without a DLL interface used in a class with a DLL interface
+
 if (UNIX)
+    #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wno-absolute-value>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-absolute-value>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fvisibility=hidden>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fvisibility=hidden>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--generate-line-info>) # for profiling
-endif ()
 
-if (MSVC)
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe --display_error_number>)
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe "--diag_suppress=#1394-D">)
+
 endif ()
 
 target_link_libraries(torch PUBLIC glog::glog)
