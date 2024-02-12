@@ -183,8 +183,8 @@ static void rand_float_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, floa
     for (int64_t i = 0; i < t.numel(); ++i)
     {
         uint32_t value = (uint32_t)mersenne_engine.operator()();
-        float xf = float(value) * scale;
-        t[i] = T(xf + low);
+        float xf       = float(value) * scale;
+        t[i]           = T(xf + low);
     }
 }
 
@@ -230,7 +230,8 @@ static void abs_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        result[0] = result[0] + std::abs(a[i]);
+        T v = a[i];
+        result[0] = result[0] + (v > T(0.) ? T(v) : T(-v));
     }
 }
 

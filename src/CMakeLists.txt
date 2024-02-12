@@ -43,7 +43,7 @@ target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_s
 
 if (UNIX)
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wno-absolute-value>)
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-absolute-value>)
+    #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-absolute-value>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fvisibility=hidden>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fvisibility=hidden>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--generate-line-info>) # for profiling
