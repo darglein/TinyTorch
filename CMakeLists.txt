@@ -8,6 +8,7 @@ project(TinyTorch VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(TT_BUILD_SAMPLES "Build the tt samples" ON)
 
 find_package(CUDAToolkit 11.8)
 if (CUDAToolkit_FOUND)
@@ -32,7 +33,10 @@ endif ()
 ############# SOURCE ###############
 
 add_subdirectory(src)
-add_subdirectory(samples)
+
+if (TT_BUILD_SAMPLES)
+    add_subdirectory(samples)
+endif ()
 
 
 
