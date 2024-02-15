@@ -27,7 +27,7 @@ struct Round
     template <typename T>
     TT_HD T forward(T v)
     {
-        return ::round(v);
+        return T(roundf((float)v));
     }
 };
 struct Sqrt
@@ -35,7 +35,7 @@ struct Sqrt
     template <typename T>
     TT_HD T forward(T v)
     {
-        return ::sqrt(v);
+        return T(sqrtf((float)v));
     }
     template <typename T>
     TT_HD T backward(T input_x, T grad_output)
@@ -53,7 +53,7 @@ struct Log
     template <typename T>
     TT_HD T forward(T v)
     {
-        return ::log(v);
+        return T(logf((float)v));
     }
 };
 struct Exp
@@ -61,7 +61,7 @@ struct Exp
     template <typename T>
     TT_HD T forward(T v)
     {
-        return ::exp(v);
+        return T(expf((float)v));
     }
 };
 struct Sign
@@ -77,7 +77,7 @@ struct Sin
     template <typename T>
     TT_HD T forward(T v)
     {
-        return ::sin(v);
+        return T(sinf((float)v));
     }
 };
 struct Cos
@@ -85,7 +85,7 @@ struct Cos
     template <typename T>
     TT_HD T forward(T v)
     {
-        return ::cos(v);
+        return T(cosf((float)v));
     }
 };
 struct Relu
@@ -101,12 +101,12 @@ struct Sigmoid
     template <typename T>
     TT_HD T forward(T x)
     {
-        return T(1.f) / (T(1.f) + ::exp(-x));
+        return T(1.f) / T(1.f + expf(-(float)x));
     }
     template <typename T>
     TT_HD T backward(T input_x, T grad_output)
     {
-        float x = 1.0f / (1.0f + expf(-input_x));
+        float x = 1.0f / (1.0f + expf(-(float)input_x));
         T J     = (T)(x * (1.0f - x));
         return J * grad_output;
     }
@@ -118,13 +118,13 @@ struct Softplus
     TT_HD T forward(T x)
     {
         if (x > T(threshold)) return x;
-        return T(::log(::exp(x * T(beta)) + T(1.f)) / T(beta));
+        return T(logf(::expf(float(x) * beta) + 1.f) / beta);
     }
     template <typename T>
     TT_HD T backward(T input_x, T grad_output)
     {
         if (input_x > T(threshold)) return T(1.f) * grad_output;
-        T tmp = expf((float)input_x * beta);
+        T tmp = T(expf((float)input_x * beta));
         T J   = (tmp / (tmp + T(1.f)));
         return grad_output * J;
     }

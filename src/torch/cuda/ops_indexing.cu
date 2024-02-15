@@ -14,7 +14,7 @@ namespace cuda_impl
 
 template <typename T, int MAX_SIZE, typename TIndex>
 __launch_bounds__(128) static __global__
-    void index_select_impl(TensorInfoCuda<T, MAX_SIZE> input, int dim, TensorInfoCuda<TIndex, 1> index,
+    void index_select_impl(TensorInfoCuda<T, MAX_SIZE> input, int64_t dim, TensorInfoCuda<TIndex, 1> index,
                            TensorInfoCuda<T, MAX_SIZE> result)
 {
     int64_t result_linear_index = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;

@@ -401,7 +401,7 @@ static __global__ void grid_sample_3d_backward_impl_kernel(TensorInfoCuda<T, 5> 
     // CUDA_KERNEL_ASSERT(v >= 0 && v <= 1);
     // CUDA_KERNEL_ASSERT(w >= 0 && w <= 1);
 
-    int C  = input.sizes[1];
+    //int C  = input.sizes[1];
     int ID = input.sizes[2];
     int IH = input.sizes[3];
     int IW = input.sizes[4];

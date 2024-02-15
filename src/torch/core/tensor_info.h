@@ -123,7 +123,7 @@ struct DimIndexStruct
         CHECK_LT(data.size(), DIM);
         for (int i = 0; i < data.size(); ++i)
         {
-            indices[i] = data[i];
+            indices[i] = (IndexType)data[i];
         }
     }
 
@@ -229,7 +229,7 @@ struct TensorInfoBase
             return;
         }
         data  = t.template data_ptr<T>();
-        dims_ = t.dim();
+        dims_ = (int)t.dim();
         CHECK_LE(t.dim(), MAX_TENSORINFO_DIMS);
         for (int i = 0; i < max_dims; ++i)
         {
@@ -238,8 +238,8 @@ struct TensorInfoBase
                 // check for overflow, if 32bit indexing is used
                 CHECK_LE(t.size(i), std::numeric_limits<IndexType>::max());
                 CHECK_LE(t.stride(i), std::numeric_limits<IndexType>::max());
-                sizes[i]   = t.size(i);
-                strides[i] = t.stride(i);
+                sizes[i]   = (IndexType)t.size(i);
+                strides[i] = (IndexType)t.stride(i);
             }
             else
             {
@@ -269,7 +269,7 @@ struct TensorInfoBase
             return max_dims;
         }
     }
-    TT_INLINE constexpr TT_HD IndexType size(int index) { return sizes[index]; }
+    TT_INLINE constexpr TT_HD IndexType size(int64_t index) { return sizes[index]; }
 
     TT_INLINE constexpr TT_HD IndexType numel()
     {

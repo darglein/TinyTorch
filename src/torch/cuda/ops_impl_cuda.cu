@@ -42,7 +42,7 @@ __launch_bounds__(128) static __global__ void fill_impl(TensorInfoCuda<T> a, Ten
     a[i] = T(value[0]);
 }
 template <typename T>
-__launch_bounds__(128) static __global__ void fill_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> values, int dim)
+__launch_bounds__(128) static __global__ void fill_impl(TensorInfoCuda<T> a, TensorInfoCuda<T> values, int64_t dim)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -66,7 +66,7 @@ void fill_impl(Tensor& a, Tensor value)
 {
     CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), fill_impl, a, value);
 }
-void fill_impl(Tensor& a, Tensor values, int dim)
+void fill_impl(Tensor& a, Tensor values, int64_t dim)
 {
     CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), fill_impl, a, values, dim);
 }

@@ -122,11 +122,11 @@ void sigmoid_backward_impl(Tensor a, Tensor grad_a, Tensor grad_result)
 
 void softplus_impl(Tensor a, double beta, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Softplus(beta), a, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Softplus((float)beta), a, result);
 }
 void softplus_backward_impl(Tensor a, double beta, Tensor grad_a, Tensor grad_result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(UnaryOperators::Softplus(beta), a, grad_a, grad_result);
+    SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(UnaryOperators::Softplus((float)beta), a, grad_a, grad_result);
 }
 
 }  // namespace cpu_impl

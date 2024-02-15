@@ -297,7 +297,7 @@ struct IndexSelectNode : public FunctionNode<IndexSelectNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        int dim          = ctx->saved_data["dim"].toInt();
+        int64_t dim      = ctx->saved_data["dim"].toInt();
         auto l           = ctx->get_saved_variables();
         auto index       = l[0];
         auto input_sizes = ctx->next_meta[0].size;
@@ -341,7 +341,7 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        int dim    = ctx->saved_data["dim"].toInt();
+        int64_t dim = ctx->saved_data["dim"].toInt();
         auto l     = ctx->get_saved_variables();
         auto index = l[0];
 
@@ -395,10 +395,10 @@ struct SliceNode : public FunctionNode<SliceNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        int dim   = ctx->saved_data["dim"].toInt();
-        int start = ctx->saved_data["start"].toInt();
-        int end   = ctx->saved_data["end"].toInt();
-        int step  = ctx->saved_data["step"].toInt();
+        int64_t dim   = ctx->saved_data["dim"].toInt();
+        int64_t start = ctx->saved_data["start"].toInt();
+        int64_t end   = ctx->saved_data["end"].toInt();
+        int64_t step  = ctx->saved_data["step"].toInt();
 
         auto l      = ctx->get_saved_variables();
         auto a      = l[0];
@@ -503,8 +503,8 @@ struct Cat2Node : public FunctionNode<Cat2Node>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        int dim = ctx->saved_data["dim"].toInt();
-        auto l  = ctx->get_saved_variables();
+        int64_t dim = ctx->saved_data["dim"].toInt();
+        auto l      = ctx->get_saved_variables();
         // auto a      = l[0];
         // auto b      = l[1];
 
@@ -637,16 +637,16 @@ Tensor conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding,
     CHECK_EQ(dilation, 1);
     CHECK_EQ(groups, 1);
 
-    int in_batch    = input.size(0);
-    int in_channels = input.size(1);
-    int in_height   = input.size(2);
-    int in_width    = input.size(3);
+    int64_t in_batch    = input.size(0);
+    int64_t in_channels = input.size(1);
+    int64_t in_height   = input.size(2);
+    int64_t in_width    = input.size(3);
 
     CHECK_EQ(weight.size(0), 1);
-    int out_batch    = in_batch;
-    int out_channels = weight.size(1);
-    int out_height   = in_height - (weight.size(2) - 1) + padding * 2;
-    int out_width    = in_width - (weight.size(3) - 1) + padding * 2;
+    int64_t out_batch    = in_batch;
+    int64_t out_channels = weight.size(1);
+    int64_t out_height   = in_height - (weight.size(2) - 1) + padding * 2;
+    int64_t out_width    = in_width - (weight.size(3) - 1) + padding * 2;
 
     auto result = zeros({out_batch, out_channels, out_height, out_width}, input.options());
 

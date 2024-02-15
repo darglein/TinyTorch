@@ -60,6 +60,9 @@ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> res
     }
 }
 
+#ifdef _MSC_VER
+#pragma warning( disable : 4244 ) // warning C4244: 'argument': conversion from 'double' to 'T', possible loss of data
+#endif
 
 void add_impl(Tensor a, Tensor b, Tensor result)
 {

@@ -47,9 +47,24 @@ if (UNIX)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fvisibility=hidden>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fvisibility=hidden>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--generate-line-info>) # for profiling
+endif ()
 
+
+
+if (WIN32)
+
+    # '...' needs to have dll-interface to be used by clients of struct '...'
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd4251>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4251>)
+    
+    # unknown pragma 'unroll'
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd4068>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4068>)
 
 endif ()
+
+
+
 
 target_link_libraries(torch PUBLIC glog::glog)
 

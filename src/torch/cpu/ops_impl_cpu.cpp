@@ -108,7 +108,7 @@ static void fill_impl(TensorInfo<T> a, TensorInfo<T> value)
     }
 }
 template <typename T>
-static void fill_impl(TensorInfo<T> a, TensorInfo<T> values, int dim)
+static void fill_impl(TensorInfo<T> a, TensorInfo<T> values, int64_t dim)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
@@ -132,7 +132,7 @@ void fill_impl(Tensor& a, Tensor value)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), fill_impl, a, value);
 }
-void fill_impl(Tensor& a, Tensor values, int dim)
+void fill_impl(Tensor& a, Tensor values, int64_t dim)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), fill_impl, a, values, dim);
 }
@@ -177,7 +177,7 @@ void range_impl(Tensor a, double start, double end, double step)
 template <typename T>
 static void rand_float_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, float low, float high)
 {
-    float scale = (1.0 / double(std::numeric_limits<uint32_t>::max())) * (high - low);
+    float scale = (1.f / float(std::numeric_limits<uint32_t>::max())) * (high - low);
 
     std::uniform_real_distribution<float> dist{low, high};
     for (int64_t i = 0; i < t.numel(); ++i)

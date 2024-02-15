@@ -2,7 +2,6 @@
 
 #include "torch/tiny_torch_config.h"
 
-
 namespace tinytorch
 {
 
@@ -30,7 +29,6 @@ struct CpuComputeFloatType<Half>
 };
 
 }  // namespace tinytorch
-
 
 
 #if defined(TT_HAS_CUDA) && defined(__CUDACC__)

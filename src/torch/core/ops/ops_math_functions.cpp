@@ -89,7 +89,7 @@ struct SumDimNode : public FunctionNode<SumDimNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         CHECK_EQ(grad.size(), 1);
-        int dim       = ctx->saved_data["dim"].toInt();
+        int64_t dim   = ctx->saved_data["dim"].toInt();
         auto g        = grad[0];
         Tensor grad_a = empty(ctx->next_meta[0].size, g.options());
         SELECT_DEVICE(grad_a.device(), fill_impl, grad_a, g, dim);

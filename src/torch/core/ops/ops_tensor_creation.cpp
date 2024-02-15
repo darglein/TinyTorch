@@ -138,13 +138,13 @@ Tensor ones_like(Tensor t)
 
 std::mt19937& generator()
 {
-    static thread_local std::mt19937 gen(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()));
+    static thread_local std::mt19937 gen((uint32_t)std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()));
     return gen;
 }
 
 void manual_seed(int64_t seed)
 {
-    generator().seed(seed);
+    generator().seed((uint32_t)seed);
 }
 
 Tensor rand(const SizeType& sizes, TensorOptions options)

@@ -142,11 +142,11 @@ void sigmoid_backward_impl(Tensor a, Tensor grad_a, Tensor grad_result)
 }
 void softplus_impl(Tensor a, double beta, Tensor result)
 {
-    unary_operator_forward_helper(UnaryOperators::Softplus(beta), a, result);
+    unary_operator_forward_helper(UnaryOperators::Softplus((float)beta), a, result);
 }
 void softplus_backward_impl(Tensor a, double beta, Tensor grad_a, Tensor grad_result)
 {
-    unary_operator_backward_helper(UnaryOperators::Softplus(beta), a, grad_a, grad_result);
+    unary_operator_backward_helper(UnaryOperators::Softplus((float)beta), a, grad_a, grad_result);
 }
 }  // namespace cuda_impl
 }  // namespace tinytorch

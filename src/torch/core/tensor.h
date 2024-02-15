@@ -176,7 +176,7 @@ struct TINYTORCH_API Tensor
 
 
     //  returns a view of the collapsed tensor and the new excluded dim
-    std::pair<Tensor, int> collapse_view(int excludeDim = -1) const;
+    std::pair<Tensor, int64_t> collapse_view(int64_t excludeDim = -1) const;
     Tensor view(const SizeType& sizes) const;
     Tensor operator[](int64_t index) const { return slice(0, index, index + 1).squeeze(0); }
 

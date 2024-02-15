@@ -147,7 +147,7 @@ static void fill_neg_one_dim(SizeType& new_sizes, int64_t old_numel)
 }
 
 
-std::pair<Tensor, int> Tensor::collapse_view(int excludeDim) const
+std::pair<Tensor, int64_t> Tensor::collapse_view(int64_t excludeDim) const
 {
     auto sizes   = this->sizes();
     auto strides = this->strides();

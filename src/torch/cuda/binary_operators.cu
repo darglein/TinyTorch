@@ -56,6 +56,10 @@ __launch_bounds__(128) __global__
     result[i] = op.forward(a, b[i]);
 }
 
+#ifdef _MSC_VER
+#pragma warning( disable : 4244 ) // warning C4244: 'argument': conversion from 'double' to 'T', possible loss of data
+#endif
+
 void add_impl(Tensor a, Tensor b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Add(), a, b, result);
@@ -64,7 +68,6 @@ void add_impl(Tensor a, double b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Add(), a, b, result);
 }
-
 void sub_impl(Tensor a, Tensor b, Tensor result)
 {
     SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Sub(), a, b, result);
