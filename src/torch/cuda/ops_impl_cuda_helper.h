@@ -74,6 +74,7 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
     switch (real_scalar_type)                                          \
     {                                                                  \
         CUDA_CASE_MACRO(func<uint8_t>, kUInt8, numel, __VA_ARGS__)     \
+        CUDA_CASE_MACRO(func<uint16_t>, kUInt16, numel, __VA_ARGS__)   \
         CUDA_CASE_MACRO(func<int16_t>, kInt16, numel, __VA_ARGS__)     \
         CUDA_CASE_MACRO(func<int32_t>, kInt32, numel, __VA_ARGS__)     \
         CUDA_CASE_MACRO(func<int64_t>, kLong, numel, __VA_ARGS__)      \
@@ -90,6 +91,7 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
     switch (real_scalar_type)                                                       \
     {                                                                               \
         CUDA_CASE_MACRO((func<uint8_t, second_type>), kUInt8, numel, __VA_ARGS__)   \
+        CUDA_CASE_MACRO((func<uint16_t, second_type>), kUInt16, numel, __VA_ARGS__) \
         CUDA_CASE_MACRO((func<int16_t, second_type>), kInt16, numel, __VA_ARGS__)   \
         CUDA_CASE_MACRO((func<int32_t, second_type>), kInt32, numel, __VA_ARGS__)   \
         CUDA_CASE_MACRO((func<int64_t, second_type>), kLong, numel, __VA_ARGS__)    \

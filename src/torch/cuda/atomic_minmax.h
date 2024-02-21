@@ -24,7 +24,7 @@ struct AtomicCASType
 template <>
 struct AtomicCASType<2>
 {
-    using Type = int;
+    using Type = unsigned short int;
 };
 template <>
 struct AtomicCASType<4>
@@ -42,12 +42,6 @@ template <typename T, typename Op>
 __device__ static T atomic_op_with_cas(T* address, T val, Op op)
 {
     using CAS_TYPE = typename AtomicCASType<sizeof(T)>::Type;
-    //  static_assert(sizeof(T) == sizeof(CAS_TYPE), "match");
-
-    if (std::is_same_v<T, __half>)
-    {
-        CUDA_KERNEL_ASSERT(0);
-    }
 
     CAS_TYPE* address_as_i = (CAS_TYPE*)address;
     CAS_TYPE old           = *address_as_i, assumed;
@@ -87,6 +81,11 @@ template <typename T>
 __device__ inline T atomicAddSelect(T* address, T val)
 {
     return atomicAdd(address, val);
+}
+template <>
+__device__ inline uint16_t atomicAddSelect(uint16_t* address, uint16_t val)
+{
+    return atomic_op_with_cas(address, val, [](auto a, auto b) { return a + b; });
 }
 
 template <>

@@ -182,14 +182,32 @@ template <typename T>
 static void fill_with_infinite(Tensor& a, bool positive_inf)
 {
     double value;
-    if (positive_inf)
+
+
+    if (std::is_integral<T>::value)
     {
-        value = 1000000;  // std::numeric_limits<T>::max();
+        if (positive_inf)
+        {
+            value = (double)std::numeric_limits<T>::max();
+        }
+        else
+        {
+            value =  (double)std::numeric_limits<T>::lowest();
+        }
     }
     else
     {
-        value = -100000;  // std::numeric_limits<T>::lowest();
+        if (positive_inf)
+        {
+            value = 1000000;  // std::numeric_limits<T>::max();
+        }
+        else
+        {
+            value = -100000;  // std::numeric_limits<T>::lowest();
+        }
     }
+
+
     fill(a, value);
 }
 
@@ -209,7 +227,10 @@ static void fill_with_infinite(Tensor& a, bool positive_inf)
             fill_with_infinite<double>(a, positive_inf);
             break;
         case kInt16:
-            fill_with_infinite<short>(a, positive_inf);
+            fill_with_infinite<int16_t>(a, positive_inf);
+            break;
+        case kUInt16:
+            fill_with_infinite<uint16_t>(a, positive_inf);
             break;
         case kInt32:
             fill_with_infinite<int>(a, positive_inf);

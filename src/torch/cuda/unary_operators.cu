@@ -49,43 +49,44 @@ __launch_bounds__(128) static __global__
 }
 
 
-template<typename Op>
+template <typename Op>
 static void unary_operator_forward_helper(Op op, Tensor input, Tensor result)
 {
-    switch (input.scalar_type())                                                                    \
-    {                                                                                               \
-        CUDA_CASE_MACRO((unary_operator_kernel<uint8_t>), kUInt8, input.numel(), op, input, result) \
-        CUDA_CASE_MACRO((unary_operator_kernel<int16_t>), kInt16, input.numel(), op, input, result) \
-        CUDA_CASE_MACRO((unary_operator_kernel<int32_t>), kInt32, input.numel(), op, input, result) \
-        CUDA_CASE_MACRO((unary_operator_kernel<int64_t>), kLong, input.numel(), op, input, result)  \
-        CUDA_CASE_MACRO((unary_operator_kernel<__half>), kHalf, input.numel(), op, input, result)   \
-        CUDA_CASE_MACRO((unary_operator_kernel<float>), kFloat, input.numel(), op, input, result)   \
-        CUDA_CASE_MACRO((unary_operator_kernel<double>), kDouble, input.numel(), op, input, result) \
-        default:                                                                                    \
-            CHECK(false) << "invalid input type " << input.scalar_type();                           \
+    switch (input.scalar_type())
+    {
+        CUDA_CASE_MACRO((unary_operator_kernel<uint8_t>), kUInt8, input.numel(), op, input, result)
+        CUDA_CASE_MACRO((unary_operator_kernel<uint16_t>), kUInt16, input.numel(), op, input, result)
+        CUDA_CASE_MACRO((unary_operator_kernel<int16_t>), kInt16, input.numel(), op, input, result)
+        CUDA_CASE_MACRO((unary_operator_kernel<int32_t>), kInt32, input.numel(), op, input, result)
+        CUDA_CASE_MACRO((unary_operator_kernel<int64_t>), kLong, input.numel(), op, input, result)
+        CUDA_CASE_MACRO((unary_operator_kernel<__half>), kHalf, input.numel(), op, input, result)
+        CUDA_CASE_MACRO((unary_operator_kernel<float>), kFloat, input.numel(), op, input, result)
+        CUDA_CASE_MACRO((unary_operator_kernel<double>), kDouble, input.numel(), op, input, result)
+        default:
+            CHECK(false) << "invalid input type " << input.scalar_type();
     }
 }
-template<typename Op>
+template <typename Op>
 static void unary_operator_backward_helper(Op op, Tensor input, Tensor grad_input, Tensor grad_result)
 {
-    switch (input.scalar_type())                                                                                 \
-    {                                                                                                            \
-        CUDA_CASE_MACRO((unary_operator_backward_kernel<uint8_t>), kUInt8, input.numel(), op, input, grad_input, \
-                        grad_result)                                                                             \
-        CUDA_CASE_MACRO((unary_operator_backward_kernel<int16_t>), kInt16, input.numel(), op, input, grad_input, \
-                        grad_result)                                                                             \
-        CUDA_CASE_MACRO((unary_operator_backward_kernel<int32_t>), kInt32, input.numel(), op, input, grad_input, \
-                        grad_result)                                                                             \
-        CUDA_CASE_MACRO((unary_operator_backward_kernel<int64_t>), kLong, input.numel(), op, input, grad_input,  \
-                        grad_result)                                                                             \
-        CUDA_CASE_MACRO((unary_operator_backward_kernel<__half>), kHalf, input.numel(), op, input, grad_input,   \
-                        grad_result)                                                                             \
-        CUDA_CASE_MACRO((unary_operator_backward_kernel<float>), kFloat, input.numel(), op, input, grad_input,   \
-                        grad_result)                                                                             \
-        CUDA_CASE_MACRO((unary_operator_backward_kernel<double>), kDouble, input.numel(), op, input, grad_input, \
-                        grad_result)                                                                             \
-        default:                                                                                                 \
-            CHECK(false) << "invalid input type " << input.scalar_type();                                        \
+    switch (input.scalar_type())
+    {
+        CUDA_CASE_MACRO((unary_operator_backward_kernel<uint8_t>), kUInt8, input.numel(), op, input, grad_input,
+                        grad_result)
+        CUDA_CASE_MACRO((unary_operator_backward_kernel<int16_t>), kInt16, input.numel(), op, input, grad_input,
+                        grad_result)
+        CUDA_CASE_MACRO((unary_operator_backward_kernel<int32_t>), kInt32, input.numel(), op, input, grad_input,
+                        grad_result)
+        CUDA_CASE_MACRO((unary_operator_backward_kernel<int64_t>), kLong, input.numel(), op, input, grad_input,
+                        grad_result)
+        CUDA_CASE_MACRO((unary_operator_backward_kernel<__half>), kHalf, input.numel(), op, input, grad_input,
+                        grad_result)
+        CUDA_CASE_MACRO((unary_operator_backward_kernel<float>), kFloat, input.numel(), op, input, grad_input,
+                        grad_result)
+        CUDA_CASE_MACRO((unary_operator_backward_kernel<double>), kDouble, input.numel(), op, input, grad_input,
+                        grad_result)
+        default:
+            CHECK(false) << "invalid input type " << input.scalar_type();
     }
 }
 

@@ -297,6 +297,10 @@ T* Tensor::data_ptr() const
     {
         CHECK_EQ(dtype, kUInt8);
     }
+    else if constexpr (std::is_same_v<T, uint16_t>)
+    {
+        CHECK_EQ(dtype, kUInt16);
+    }
     else if constexpr (std::is_same_v<T, int16_t>)
     {
         CHECK_EQ(dtype, kInt16);

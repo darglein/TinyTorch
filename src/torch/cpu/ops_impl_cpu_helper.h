@@ -43,6 +43,7 @@ namespace tinytorch
     {                                                                  \
         CASE_MACRO(func<uint8_t>, kUInt8, __VA_ARGS__)                 \
         CASE_MACRO(func<int16_t>, kInt16, __VA_ARGS__)                 \
+        CASE_MACRO(func<uint16_t>, kUInt16, __VA_ARGS__)               \
         CASE_MACRO(func<int32_t>, kInt32, __VA_ARGS__)                 \
         CASE_MACRO(func<int64_t>, kLong, __VA_ARGS__)                  \
         CASE_MACRO(func<Half>, kHalf, __VA_ARGS__)                     \
@@ -58,6 +59,7 @@ namespace tinytorch
     {                                                                   \
         CASE_MACRO((func<uint8_t, second_type>), kUInt8, __VA_ARGS__)   \
         CASE_MACRO((func<int16_t, second_type>), kInt16, __VA_ARGS__)   \
+        CASE_MACRO((func<uint16_t, second_type>), kUInt16, __VA_ARGS__) \
         CASE_MACRO((func<int32_t, second_type>), kInt32, __VA_ARGS__)   \
         CASE_MACRO((func<int64_t, second_type>), kLong, __VA_ARGS__)    \
         CASE_MACRO((func<Half, second_type>), kHalf, __VA_ARGS__)       \

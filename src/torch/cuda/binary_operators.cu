@@ -1,5 +1,4 @@
 #include "torch/core/ops/ops_impl.h"
-
 #include "torch/cuda/binary_operators.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
 #include <cuda_runtime.h>
@@ -8,13 +7,14 @@
 #define SWITCH_MACRO_BINARY_OPERATOR(op, a, b, result)                                              \
     switch (result.scalar_type())                                                                   \
     {                                                                                               \
-        CUDA_CASE_MACRO(element_wise_operator<uint8_t>, kUInt8, result.numel(), op, a, b, result) \
-        CUDA_CASE_MACRO(element_wise_operator<int16_t>, kInt16, result.numel(), op, a, b, result) \
-        CUDA_CASE_MACRO(element_wise_operator<int32_t>, kInt32, result.numel(), op, a, b, result) \
-        CUDA_CASE_MACRO(element_wise_operator<int64_t>, kInt64, result.numel(), op, a, b, result) \
-        CUDA_CASE_MACRO(element_wise_operator<half>, kHalf, result.numel(), op, a, b, result)     \
-        CUDA_CASE_MACRO(element_wise_operator<float>, kFloat, result.numel(), op, a, b, result)   \
-        CUDA_CASE_MACRO(element_wise_operator<double>, kDouble, result.numel(), op, a, b, result) \
+        CUDA_CASE_MACRO(element_wise_operator<uint8_t>, kUInt8, result.numel(), op, a, b, result)   \
+        CUDA_CASE_MACRO(element_wise_operator<uint16_t>, kUInt16, result.numel(), op, a, b, result) \
+        CUDA_CASE_MACRO(element_wise_operator<int16_t>, kInt16, result.numel(), op, a, b, result)   \
+        CUDA_CASE_MACRO(element_wise_operator<int32_t>, kInt32, result.numel(), op, a, b, result)   \
+        CUDA_CASE_MACRO(element_wise_operator<int64_t>, kInt64, result.numel(), op, a, b, result)   \
+        CUDA_CASE_MACRO(element_wise_operator<half>, kHalf, result.numel(), op, a, b, result)       \
+        CUDA_CASE_MACRO(element_wise_operator<float>, kFloat, result.numel(), op, a, b, result)     \
+        CUDA_CASE_MACRO(element_wise_operator<double>, kDouble, result.numel(), op, a, b, result)   \
         default:                                                                                    \
             CHECK(false) << "invalid input type " << result.scalar_type();                          \
     }
@@ -34,8 +34,8 @@ __launch_bounds__(128) __global__
 
     auto index_result = result.LinearIndexToDimIndex(i);
     // the index clamping allows operations when one tensor has a 1-dimension
-     auto index_a         = a.clamp_index_to_size(index_result);
-     auto index_b         = b.clamp_index_to_size(index_result);
+    auto index_a         = a.clamp_index_to_size(index_result);
+    auto index_b         = b.clamp_index_to_size(index_result);
     result[index_result] = op.forward(a[index_a], b[index_b]);
 }
 
@@ -57,7 +57,8 @@ __launch_bounds__(128) __global__
 }
 
 #ifdef _MSC_VER
-#pragma warning( disable : 4244 ) // warning C4244: 'argument': conversion from 'double' to 'T', possible loss of data
+#    pragma warning( \
+        disable : 4244)  // warning C4244: 'argument': conversion from 'double' to 'T', possible loss of data
 #endif
 
 void add_impl(Tensor a, Tensor b, Tensor result)

@@ -91,6 +91,9 @@ enum ScalarType
     kFloat   = kFloat32,
     kFloat64 = 6,
     kDouble  = kFloat64,
+
+    // unsigned
+    kUInt16 = 7,
 };
 
 TINYTORCH_API std::ostream& operator<<(std::ostream& strm, ScalarType type);
@@ -112,6 +115,8 @@ inline int64_t elementSize(ScalarType type)
         case kFloat64:
             return 8;
         case kHalf:
+            return 2;
+        case kUInt16:
             return 2;
         default:
             CHECK(false);
@@ -135,6 +140,11 @@ template <>
 struct CppTypeToScalarType<uint8_t>
 {
     static constexpr ScalarType value = kUInt8;
+};
+template <>
+struct CppTypeToScalarType<uint16_t>
+{
+    static constexpr ScalarType value = kUInt16;
 };
 template <>
 struct CppTypeToScalarType<int16_t>

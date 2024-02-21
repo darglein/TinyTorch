@@ -4,6 +4,7 @@
  * See LICENSE file for more information.
  */
 
+#include "reduce_helper.h"
 #include "torch/core/ops/ops_impl.h"
 #include "torch/cuda/atomic_minmax.h"
 #include "torch/cuda/ops_impl_cuda.h"
@@ -12,7 +13,6 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
-#include "reduce_helper.h"
 
 namespace tinytorch
 {
@@ -56,7 +56,7 @@ template <typename Op>
 void global_reduce_helper(Tensor a, Tensor result, Op op)
 {
     auto kernel_result = result;
-    if (a.scalar_type() == kHalf)
+    if (a.scalar_type() == kHalf || a.scalar_type() == kUInt16)
     {
         kernel_result = result.to(kFloat);
     }
@@ -77,6 +77,9 @@ void global_reduce_helper(Tensor a, Tensor result, Op op)
             break;
         case kDouble:
             global_reduce_launcher<double, double, Op>(a, kernel_result, op);
+            break;
+        case kUInt16:
+            global_reduce_launcher<uint16_t, float, Op>(a, kernel_result, op);
             break;
         default:
             CHECK(false) << "invalid input type " << a.scalar_type();
