@@ -363,6 +363,7 @@ Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data)
 void index_copy(Tensor& target, int64_t dim, Tensor index, Tensor source)
 {
     CHECK(!target.requires_grad() || !GradMode::is_enabled());
+    CHECK_EQ(target.dtype(), source.dtype());
     TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(target.device(), index_copy_impl, target, dim, index, source);
 }

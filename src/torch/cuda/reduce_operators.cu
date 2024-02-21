@@ -85,7 +85,7 @@ void global_reduce_helper(Tensor a, Tensor result, Op op)
             CHECK(false) << "invalid input type " << a.scalar_type();
     }
 
-    if (a.scalar_type() == kHalf)
+    if (a.scalar_type() == kHalf || a.scalar_type() == kUInt16)
     {
         result.copy_(kernel_result);
     }

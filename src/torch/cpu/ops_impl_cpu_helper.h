@@ -21,6 +21,7 @@ namespace tinytorch
 #define SWITCH_MACRO_INT(real_scalar_type, func, ...)                  \
     switch (real_scalar_type)                                          \
     {                                                                  \
+        CASE_MACRO(func<uint16_t>, kUInt16, __VA_ARGS__)               \
         CASE_MACRO(func<int32_t>, kInt32, __VA_ARGS__)                 \
         CASE_MACRO(func<int64_t>, kInt64, __VA_ARGS__)                 \
         default:                                                       \
