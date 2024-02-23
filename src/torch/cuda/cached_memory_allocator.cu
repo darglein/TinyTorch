@@ -49,12 +49,14 @@ static void* malloc_async(int64_t size)
     {
         size_t mem_free, mem_total;
         cudaMemGetInfo(&mem_free, &mem_total);
-        CHECK_NE(cuda_error, cudaErrorMemoryAllocation)
+        std::cerr
             << " CUDA out of memory!\n"
             << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB\n"
             << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
             << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n"
             << "     Allocated by torch " << (current_allocated_bytes / 1000.0 / 1000.0) << "MB\n";
+
+        throw std::runtime_error(std::string("CUDA memory allocation error. ") + cudaGetErrorString(cuda_error));
     }
     CHECK_CUDA_ERROR(cuda_error);
     CHECK_NOTNULL(ptr);
