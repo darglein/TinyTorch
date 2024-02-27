@@ -44,7 +44,7 @@ struct TensorImpl;
 
 struct CustomClassHolder
 {
-    virtual ~CustomClassHolder() {}
+    TT_HD virtual ~CustomClassHolder() {}
 };
 
 struct TINYTORCH_API SizeType
