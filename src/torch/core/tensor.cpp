@@ -408,6 +408,11 @@ Tensor Tensor::to(Device new_device, bool non_blocking) const
         return *this;
     }
 
+    if (this->device() == new_device)
+    {
+        return *this;
+    }
+
     return tinytorch::to(*this, new_device, non_blocking);
 }
 

@@ -71,6 +71,7 @@ template <typename T>
 static void sort_impl(TensorInfo<T> a, int64_t dim, TensorInfo<T> out_t, TensorInfo<int64_t> out_index)
 {
     using G = typename CpuComputeFloatType<T>::Type;
+#if 0
     std::vector<std::pair<G, int64_t>> data;
     for (int64_t i = 0; i < a.numel(); ++i)
     {
@@ -83,10 +84,33 @@ static void sort_impl(TensorInfo<T> a, int64_t dim, TensorInfo<T> out_t, TensorI
         out_t[i]     = data[i].first;
         out_index[i] = data[i].second;
     }
+#else
+    int64_t size_along_dim = out_t.size(dim);
+
+    std::vector<std::pair<G, int64_t>> data;
+    data.resize(size_along_dim);
+
+    for (int64_t i = 0; i < out_t.numel() / size_along_dim; ++i)
+    {
+        auto index = a.LinearIndexToDimIndexSkipDim(i, dim);
+        for (int64_t o = 0; o < size_along_dim; ++o)
+        {
+            index[dim] = o;
+            data[o]    = {a[index], o};
+        }
+        std::sort(data.begin(), data.end());
+        for (int64_t o = 0; o < size_along_dim; ++o)
+        {
+            index[dim]       = o;
+            out_t[index]     = data[o].first;
+            out_index[index] = data[o].second;
+        }
+    }
+#endif
 }
 void sort_impl(Tensor a, int64_t dim, Tensor& out_t, Tensor& out_index)
 {
-    CHECK_EQ(a.dim(), 1);
+    //CHECK_EQ(a.dim(), 1);
     SWITCH_MACRO_ALL(a.scalar_type(), sort_impl, a, dim, out_t, out_index);
 }
 
