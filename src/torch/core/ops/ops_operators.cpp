@@ -75,7 +75,6 @@ struct SubNode : public FunctionNode<SubNode>
 struct DivNode : public FunctionNode<DivNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
-
     {
         auto [expand_a, expand_b]   = CheckOperatorSizeMatchOneDim(a, b);
         ctx->saved_data["expand_a"] = expand_a;
