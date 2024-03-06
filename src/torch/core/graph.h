@@ -363,6 +363,7 @@ struct FunctionNode : public Node
         // Set the edges of the output to point to this node
         for (int i = 0; i < result.size(); ++i)
         {
+            CHECK(result[i].defined());
             result[i].set_requires_grad(need_grad);
             if (need_grad)
             {
