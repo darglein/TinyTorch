@@ -19,7 +19,7 @@ namespace cuda
 
 std::mutex mu;
 static std::map<void*, int64_t> allocated_blocks;
-static bool debug_print         = false;
+static bool debug_print         = true;
 static int64_t debug_print_size = 1000 * 1000 * 300;
 
 static int64_t current_allocated_bytes = 0;
