@@ -421,7 +421,7 @@ using TensorInfo = TensorInfoBase<T, int64_t, false, MAX_DIMS>;
 
 
 template <typename T, int MAX_DIMS = -1>
-using TensorInfoCuda = TensorInfoBase<T, int, true, MAX_DIMS>;
+using TensorInfoCuda = TensorInfoBase<T, int64_t, true, MAX_DIMS>;
 
 
 }  // namespace tinytorch
