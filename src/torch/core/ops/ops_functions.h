@@ -6,6 +6,7 @@
 
 #pragma once
 #include "torch/core/tensor.h"
+#include <filesystem>
 
 namespace tinytorch
 {
@@ -44,7 +45,7 @@ TINYTORCH_API Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor d
 TINYTORCH_API void index_copy(Tensor& target, int64_t dim, Tensor index, Tensor source);
 TINYTORCH_API Tensor gather(Tensor data, int64_t dim, Tensor index);
 
-inline void load(Tensor&, std::string)
+inline void load(Tensor&, const std::filesystem::path&)
 {
     throw std::runtime_error("not implemented");
 }
