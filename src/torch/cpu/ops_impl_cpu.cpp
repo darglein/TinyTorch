@@ -627,6 +627,11 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
             SWITCH_MACRO_ALL_DUAL(src.scalar_type(), uint8_t, copy_and_convert_impl_kernel, src, target);
             break;
         }
+        case kUInt16:
+        {
+            SWITCH_MACRO_ALL_DUAL(src.scalar_type(), uint16_t, copy_and_convert_impl_kernel, src, target);
+            break;
+        }
         case kInt16:
         {
             SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int16_t, copy_and_convert_impl_kernel, src, target);
