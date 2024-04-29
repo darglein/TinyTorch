@@ -25,6 +25,10 @@ static int64_t debug_print_size = 1000 * 1000 * 300;
 static int64_t current_allocated_bytes = 0;
 static int64_t max_allocated_bytes     = 0;
 
+
+static bool allocator_initialized = false;
+static bool has_malloc_async      = false;
+
 int64_t current_allocated_size()
 {
     return current_allocated_bytes;
@@ -34,14 +38,27 @@ int64_t max_allocated_size()
     return max_allocated_bytes;
 }
 
+static void initialize_allocator()
+{
+    CHECK(!allocator_initialized);
+    allocator_initialized = true;
+
+    int value = 0;
+    CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&value, cudaDevAttrMemoryPoolsSupported, 0));
+
+    if (value == 0)
+    {
+        has_malloc_async = false;
+    }
+    else
+    {
+        has_malloc_async = true;
+    }
+}
+
 
 static void* malloc_async(int64_t size)
 {
-    if (size == 0)
-    {
-        return nullptr;
-    }
-    std::unique_lock l(mu);
     void* ptr;
     auto strm       = cuda::getCurrentCUDAStream();
     auto cuda_error = cudaMallocAsync(&ptr, size, strm);
@@ -49,12 +66,11 @@ static void* malloc_async(int64_t size)
     {
         size_t mem_free, mem_total;
         cudaMemGetInfo(&mem_free, &mem_total);
-        std::cerr
-            << " CUDA out of memory!\n"
-            << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB\n"
-            << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
-            << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n"
-            << "     Allocated by torch " << (current_allocated_bytes / 1000.0 / 1000.0) << "MB\n";
+        std::cerr << " CUDA out of memory!\n"
+                  << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB\n"
+                  << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
+                  << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n"
+                  << "     Allocated by torch " << (current_allocated_bytes / 1000.0 / 1000.0) << "MB\n";
 
         throw std::runtime_error(std::string("CUDA memory allocation error. ") + cudaGetErrorString(cuda_error));
     }
@@ -81,11 +97,6 @@ static void* malloc_async(int64_t size)
 
 static void free_async(void* ptr)
 {
-    if (ptr == nullptr)
-    {
-        return;
-    }
-    std::unique_lock l(mu);
     CHECK(allocated_blocks.find(ptr) != allocated_blocks.end());
     int64_t size = allocated_blocks.find(ptr)->second;
 
@@ -93,8 +104,7 @@ static void free_async(void* ptr)
     {
         if (size > debug_print_size)
         {
-            std::cout << "Free CUDA Memory: " << (size / 1000.0 / 1000.0) << "MB (" << ptr << ")"
-                      << "\n";
+            std::cout << "Free CUDA Memory: " << (size / 1000.0 / 1000.0) << "MB (" << ptr << ")" << "\n";
         }
     }
 
@@ -106,17 +116,52 @@ static void free_async(void* ptr)
 
 void* cuda_cached_malloc(int64_t size)
 {
-    auto ptr = malloc_async(size);
+    if (size == 0)
+    {
+        return nullptr;
+    }
+    std::unique_lock l(mu);
 
+    if (!allocator_initialized)
+    {
+        initialize_allocator();
+    }
+
+    void* ptr;
+
+    if (has_malloc_async)
+    {
+        ptr = malloc_async(size);
+    }
+    else
+    {
+        CHECK_CUDA_ERROR(cudaMalloc(&ptr, size));
+    }
     return ptr;
 }
 void cuda_cached_free(void* ptr)
 {
-    free_async(ptr);
+    if (ptr == nullptr)
+    {
+        return;
+    }
+    CHECK(allocator_initialized);
+
+    std::unique_lock l(mu);
+
+    if (has_malloc_async)
+    {
+        free_async(ptr);
+    }
+    else
+    {
+        cudaFree(ptr);
+    }
 }
 
 void CUDACachingAllocator::emptyCache()
 {
+    CHECK(allocator_initialized);
     // this frees unused values for the async allocator
     CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 }
