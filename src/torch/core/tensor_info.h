@@ -23,9 +23,9 @@
 #include <type_traits>
 
 #if defined(__CUDACC__)
-#define TT_INLINE __forceinline__
+#    define TT_INLINE __forceinline__
 #else
-#define TT_INLINE inline
+#    define TT_INLINE inline
 #endif
 
 namespace tinytorch
@@ -314,9 +314,10 @@ struct TensorInfoBase
             {
 #if TT_DEBUG
 #    if defined(__CUDACC__)
+#        if defined(TT_DEVICE_CODE)
                 CUDA_KERNEL_ASSERT(index[i] >= 0);
                 CUDA_KERNEL_ASSERT(index[i] < sizes[i]);
-
+#        endif
 #    else
                 CHECK_GE(index[i], 0);
                 CHECK_LT(index[i], sizes[i]);

@@ -45,6 +45,10 @@
 #endif
 
 
+#if defined(__CUDACC_) && defined(__CUDA_ARCH__) && __CUDA_ARCH__ > 0
+#define TT_DEVICE_CODE
+#endif
+
 
 #if defined _WIN32
 #    define TT_FUNCTION_NAME __FUNCSIG__
