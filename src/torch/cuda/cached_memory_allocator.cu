@@ -56,24 +56,30 @@ static void initialize_allocator()
     }
 }
 
+static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size)
+{
+    if (cuda_error == cudaErrorMemoryAllocation)
+    {
+        size_t mem_free, mem_total;
+        cudaMemGetInfo(&mem_free, &mem_total);
+        std::cerr << " CUDA out of memory!\n"
+            << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB\n"
+            << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
+            << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n"
+            << "     Allocated by torch " << (current_allocated_bytes / 1000.0 / 1000.0) << "MB\n";
+
+        throw std::runtime_error(std::string("CUDA memory allocation error: ") + cudaGetErrorString(cuda_error));
+    }
+}
 
 static void* malloc_async(int64_t size)
 {
     void* ptr;
     auto strm       = cuda::getCurrentCUDAStream();
     auto cuda_error = cudaMallocAsync(&ptr, size, strm);
-    if (cuda_error == cudaErrorMemoryAllocation)
-    {
-        size_t mem_free, mem_total;
-        cudaMemGetInfo(&mem_free, &mem_total);
-        std::cerr << " CUDA out of memory!\n"
-                  << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB\n"
-                  << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
-                  << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n"
-                  << "     Allocated by torch " << (current_allocated_bytes / 1000.0 / 1000.0) << "MB\n";
 
-        throw std::runtime_error(std::string("CUDA memory allocation error. ") + cudaGetErrorString(cuda_error));
-    }
+    handle_cuda_allocation_error(cuda_error, size);
+
     CHECK_CUDA_ERROR(cuda_error);
     CHECK_NOTNULL(ptr);
 
@@ -114,6 +120,21 @@ static void free_async(void* ptr)
     cudaFreeAsync(ptr, cuda::getCurrentCUDAStream());
 }
 
+static void* malloc_blocking(int64_t size)
+{
+    void* ptr; 
+    cudaError_t cuda_error = cudaMalloc(&ptr, size);
+
+    handle_cuda_allocation_error(cuda_error, size);
+
+    return ptr;
+}
+
+static void free_blocking(void* ptr)
+{
+    cudaFree(ptr);
+}
+
 void* cuda_cached_malloc(int64_t size)
 {
     if (size == 0)
@@ -135,7 +156,7 @@ void* cuda_cached_malloc(int64_t size)
     }
     else
     {
-        CHECK_CUDA_ERROR(cudaMalloc(&ptr, size));
+        ptr = malloc_blocking(size);
     }
     return ptr;
 }
@@ -155,7 +176,7 @@ void cuda_cached_free(void* ptr)
     }
     else
     {
-        cudaFree(ptr);
+        free_blocking(ptr);
     }
 }
 

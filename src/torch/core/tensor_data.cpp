@@ -22,7 +22,17 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions options) : size_(size), opt
 #ifdef TT_HAS_CUDA
         if (options.pinned_memory_)
         {
-            cudaMallocHost(&data_ptr_, size);
+            cudaError_t cuda_error = cudaMallocHost(&data_ptr_, size);
+            if (cuda_error == cudaErrorMemoryAllocation)
+            {
+                size_t mem_free, mem_total;
+                cudaMemGetInfo(&mem_free, &mem_total);
+                std::cerr << " CUDA out of memory!\n"
+                          << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB of pinned memory\n";
+
+                throw std::runtime_error(std::string("CUDA pinned memory allocation error: ") +
+                                         cudaGetErrorString(cuda_error));
+            }
         }
         else
         {
