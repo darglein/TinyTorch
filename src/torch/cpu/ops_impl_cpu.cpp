@@ -346,9 +346,29 @@ template <typename T>
 static void min_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
     using G = typename CpuComputeFloatType<T>::Type;
-    for (int64_t i = 0; i < a.numel(); ++i)
+
+    if (a.numel() < 128)
     {
-        result[0] = std::min(G(a[i]), G(result[0]));
+        for (int64_t i = 0; i < a.numel(); ++i)
+        {
+            result[0] = std::min(G(a[i]), G(result[0]));
+        }
+    }
+    else
+    {
+        G min_val = std::numeric_limits<G>::max();
+
+#pragma omp parallel for reduction(min:min_val)
+        for (int64_t i = 0; i < a.numel(); ++i)
+        {
+            G v = G(a[i]);
+            if (v < min_val)
+            {
+                min_val = v;
+            }
+        }
+
+        result[0] = min_val;
     }
 }
 
@@ -362,9 +382,28 @@ template <typename T>
 static void max_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
     using G = typename CpuComputeFloatType<T>::Type;
-    for (int64_t i = 0; i < a.numel(); ++i)
+    if (a.numel() < 128)
     {
-        result[0] = std::max(G(a[i]), G(result[0]));
+        for (int64_t i = 0; i < a.numel(); ++i)
+        {
+            result[0] = std::max(G(a[i]), G(result[0]));
+        }
+    }
+    else
+    {
+        G max_val = std::numeric_limits<G>::lowest();
+
+#pragma omp parallel for reduction(max:max_val)
+        for (int64_t i = 0; i < a.numel(); ++i)
+        {
+            G v = G(a[i]);
+            if (v > max_val)
+            {
+                max_val = v;
+            }
+        }
+
+        result[0] = max_val;
     }
 }
 
