@@ -33,6 +33,7 @@ TINYTORCH_API Tensor rand(const SizeType& sizes, TensorOptions options = TensorO
 TINYTORCH_API Tensor randint(int low, int high, const SizeType& sizes, TensorOptions options = TensorOptions());
 TINYTORCH_API Tensor rand_like(Tensor t);
 
+// end is inclusive
 TINYTORCH_API Tensor range(double start, double end, double step = 1,  TensorOptions options = TensorOptions());
 
 TINYTORCH_API Tensor from_blob(void* data, const SizeType& sizes, const SizeType& stride, ScalarType type = kFloat);
