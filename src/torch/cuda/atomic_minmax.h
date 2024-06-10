@@ -39,7 +39,7 @@ struct AtomicCASType<8>
 
 
 template <typename T, typename Op>
-__device__ static T atomic_op_with_cas(T* address, T val, Op op)
+__device__ static T atomic_op_with_cas(T* address, Op op)
 {
     using CAS_TYPE = typename AtomicCASType<sizeof(T)>::Type;
 
@@ -49,7 +49,7 @@ __device__ static T atomic_op_with_cas(T* address, T val, Op op)
     {
         assumed                = old;
         T assumed_float        = ((T*)&assumed)[0];
-        T new_value            = op(val, assumed_float);
+        T new_value            = op(assumed_float);
         CAS_TYPE new_value_int = ((CAS_TYPE*)&new_value)[0];
 
         old = ::atomicCAS(address_as_i, assumed, new_value_int);
@@ -59,21 +59,21 @@ __device__ static T atomic_op_with_cas(T* address, T val, Op op)
 }
 
 template <typename T>
-__device__ static T atomicMulSelect(T* address, T val)
+__device__ static T atomicMulSelect(T* address, T a)
 {
-    return atomic_op_with_cas(address, val, [](auto a, auto b) { return a * b; });
+    return atomic_op_with_cas(address, [a](auto b) { return a * b; });
 }
 
 template <typename T>
-__device__ static T atomicMinSelect(T* address, T val)
+__device__ static T atomicMinSelect(T* address, T a)
 {
-    return atomic_op_with_cas(address, val, [](auto a, auto b) { return a < b ? a : b; });
+    return atomic_op_with_cas(address, [a](auto b) { return a < b ? a : b; });
 }
 
 template <typename T>
-__device__ static T atomicMaxSelect(T* address, T val)
+__device__ static T atomicMaxSelect(T* address, T a)
 {
-    return atomic_op_with_cas(address, val, [](auto a, auto b) { return a > b ? a : b; });
+    return atomic_op_with_cas(address, [a](auto b) { return a > b ? a : b; });
 }
 
 
@@ -85,11 +85,11 @@ __device__ inline T atomicAddSelect(T* address, T val)
 template <>
 __device__ inline uint16_t atomicAddSelect(uint16_t* address, uint16_t val)
 {
-    return atomic_op_with_cas(address, val, [](auto a, auto b) { return a + b; });
+    return atomic_op_with_cas(address, [val](auto a) { return a + val; });
 }
 
 template <>
-__device__ inline int64_t atomicAddSelect(int64_t* address, int64_t val)
+__device__ inline int64_t atomicAddSelect(int64_t* address, int64_t a)
 {
-    return atomic_op_with_cas(address, val, [](auto a, auto b) { return a + b; });
+    return atomic_op_with_cas(address, [a](auto b) { return a + b; });
 }
