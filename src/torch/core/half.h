@@ -5,7 +5,7 @@
 namespace tinytorch
 {
 
-struct Half
+struct TINYTORCH_API Half
 {
     uint16_t h;
 
