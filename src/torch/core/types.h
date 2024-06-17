@@ -36,18 +36,12 @@ enum DeviceType
 
 struct TINYTORCH_API Device
 {
-    DeviceType _type  = kCPU;
-    int device_index = 0;
+    DeviceType _type = kCPU;
+    int _index       = 0;
 
-    Device(DeviceType type = kCPU, int index = 0) : _type(type), device_index(index)
-    {
-        if (type == kCPU)
-        {
-            CHECK_EQ(index, 0);
-        }
-    }
-
-     DeviceType type(){ return _type; }
+    Device(DeviceType type = kCPU, int index = -1);
+    DeviceType type() { return _type; }
+    int index() { return _index; }
 };
 
 inline bool operator==(Device device, DeviceType type)
@@ -56,7 +50,7 @@ inline bool operator==(Device device, DeviceType type)
 }
 inline bool operator==(Device d1, Device d2)
 {
-    return d1.type() == d2.type() && d1.device_index == d2.device_index;
+    return d1.type() == d2.type() && d1.index() == d2.index();
 }
 
 

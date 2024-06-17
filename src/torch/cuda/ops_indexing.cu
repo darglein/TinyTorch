@@ -30,7 +30,7 @@ __launch_bounds__(128) static __global__
 template <typename TIndex, int MAX_SIZE>
 static void index_select_helper_dim(Tensor input, int64_t dim, TensorInfoCuda<TIndex, 1> index, Tensor result)
 {
-    CUDA_SWITCH_MACRO_ALL_DUAL(result.scalar_type(), MAX_SIZE, result.numel(), index_select_impl, input, dim, index,
+    CUDA_SWITCH_MACRO_ALL_DUAL(result.device(), result.scalar_type(), MAX_SIZE, result.numel(), index_select_impl, input, dim, index,
                                result);
 }
 
@@ -91,7 +91,7 @@ __launch_bounds__(128) static __global__
 template <typename TIndex>
 static void index_add_helper(Tensor data, int64_t dim, TensorInfoCuda<TIndex> index, Tensor result)
 {
-    CUDA_SWITCH_MACRO_FLOAT(result.scalar_type(), data.numel(), index_add_impl, dim, index, data, result);
+    CUDA_SWITCH_MACRO_FLOAT(result.device(), result.scalar_type(), data.numel(), index_add_impl, dim, index, data, result);
 }
 
 void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor result)
@@ -127,7 +127,7 @@ __launch_bounds__(128) static __global__
 }
 void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor result)
 {
-    CUDA_SWITCH_MACRO_ALL(data.scalar_type(), result.numel(), gather_impl, data, dim, index, result);
+    CUDA_SWITCH_MACRO_ALL(data.device(), data.scalar_type(), result.numel(), gather_impl, data, dim, index, result);
 }
 
 
@@ -156,7 +156,7 @@ __launch_bounds__(128) static __global__
 template <typename TIndex>
 static void index_copy_helper(Tensor& target, int64_t dim, TensorInfoCuda<TIndex> index, Tensor value)
 {
-    CUDA_SWITCH_MACRO_ALL(target.scalar_type(), value.numel(), index_copy_impl, target, dim, index, value);
+    CUDA_SWITCH_MACRO_ALL(target.device(), target.scalar_type(), value.numel(), index_copy_impl, target, dim, index, value);
 }
 
 void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value)
@@ -195,7 +195,7 @@ __launch_bounds__(128) static __global__
 }
 void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor result)
 {
-    CUDA_SWITCH_MACRO_ALL(result.scalar_type(), result.numel(), transpose_impl, input, dim0, dim1, result);
+    CUDA_SWITCH_MACRO_ALL(result.device(), result.scalar_type(), result.numel(), transpose_impl, input, dim0, dim1, result);
 }
 
 

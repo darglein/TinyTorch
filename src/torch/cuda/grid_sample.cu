@@ -564,6 +564,7 @@ void grid_sample_2d_impl(Tensor input, Tensor grid, InterpolationType interpolat
 {
     auto num_batches = input.size(0);
     auto num_samples = grid.size(1) * grid.size(2);
+    cuda::DeviceGuard guard(input.device());
     grid_sample_2d_impl_kernel<float><<<iDivUp(num_batches * num_samples, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
         input, grid, interpolation, padding, align_corners, result);
     CUDA_SYNC_CHECK_ERROR();
@@ -573,6 +574,7 @@ void grid_sample_2d_backward_impl(Tensor input, Tensor grid, InterpolationType i
 {
     auto num_batches = input.size(0);
     auto num_samples = grid.size(1) * grid.size(2);
+    cuda::DeviceGuard guard(input.device());
     grid_sample_2d_backward_impl_kernel<float>
         <<<iDivUp(num_batches * num_samples, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
             input, grid, interpolation, padding, align_corners, grad_input, grad_grid, grad_result);
@@ -586,6 +588,7 @@ void grid_sample_3d_impl(Tensor input, Tensor grid, InterpolationType interpolat
 
     CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 
+    cuda::DeviceGuard guard(input.device());
     switch (input.scalar_type())
     {
         case kHalf:
@@ -618,6 +621,7 @@ void grid_sample_3d_backward_impl(Tensor input, Tensor grid, InterpolationType i
     auto num_samples = grid.size(1) * grid.size(2) * grid.size(3);
 
 
+    cuda::DeviceGuard guard(input.device());
     switch (input.scalar_type())
     {
         case kHalf:

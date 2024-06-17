@@ -22,7 +22,7 @@ __launch_bounds__(128) static __global__ void range_impl(TensorInfoCuda<T> a, do
 
 void range_impl(Tensor a, double start, double end, double step)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), range_impl, a, start, end, step);
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), a.numel(), range_impl, a, start, end, step);
 }
 
 template <typename T>
@@ -60,15 +60,15 @@ void fill_impl(Tensor& a, double value)
         return;
     }
 
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), fill_impl, a, value);
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), a.numel(), fill_impl, a, value);
 }
 void fill_impl(Tensor& a, Tensor value)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), fill_impl, a, value);
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), a.numel(), fill_impl, a, value);
 }
 void fill_impl(Tensor& a, Tensor values, int64_t dim)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), fill_impl, a, values, dim);
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), a.numel(), fill_impl, a, values, dim);
 }
 
 template <typename T>
@@ -92,7 +92,7 @@ __launch_bounds__(128) static __global__
 void permute_impl(Tensor& src, Tensor result, SizeType new_dims)
 {
     CUDA_SYNC_CHECK_ERROR();
-    CUDA_SWITCH_MACRO_ALL(src.scalar_type(), src.numel(), permute_impl, src, result, new_dims.vec());
+    CUDA_SWITCH_MACRO_ALL(src.device(), src.scalar_type(), src.numel(), permute_impl, src, result, new_dims.vec());
 }
 
 template <typename TSource, typename TTarget>
@@ -132,32 +132,32 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
     {
         case kUInt16:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.scalar_type(), uint16_t, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), uint16_t, src.numel(), copy_and_convert_impl, src, target);
             break;
         }
         case kInt32:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int32_t, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), int32_t, src.numel(), copy_and_convert_impl, src, target);
             break;
         }
         case kInt64:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.scalar_type(), int64_t, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), int64_t, src.numel(), copy_and_convert_impl, src, target);
             break;
         }
         case kFloat16:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.scalar_type(), half, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), half, src.numel(), copy_and_convert_impl, src, target);
             break;
         }
         case kFloat32:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.scalar_type(), float, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), float, src.numel(), copy_and_convert_impl, src, target);
             break;
         }
         case kFloat64:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.scalar_type(), double, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), double, src.numel(), copy_and_convert_impl, src, target);
             break;
         }
         default:
@@ -200,7 +200,7 @@ void uniform_impl(Tensor& a, double mi, double ma)
 
     int64_t max_threads = a.numel();
 
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), max_threads, rand_float_impl, a, (float)mi, (float)ma, seed);
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_float_impl, a, (float)mi, (float)ma, seed);
 }
 
 template <typename T>
@@ -218,7 +218,7 @@ void uniform_int_impl(Tensor& a, int low, int high)
 {
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
     uint64_t seed = dist(generator());
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), rand_int_impl, a, low, high, seed);
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), a.numel(), rand_int_impl, a, low, high, seed);
 }
 
 template <typename T>
@@ -237,7 +237,7 @@ __launch_bounds__(128) static __global__ void clamp_impl_(TensorInfoCuda<T> src,
 }
 void clamp_impl_(Tensor& a, double low, double high)
 {
-    CUDA_SWITCH_MACRO_ALL(a.scalar_type(), a.numel(), clamp_impl_, a, low, high);
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), a.numel(), clamp_impl_, a, low, high);
 }
 
 template <typename T>
@@ -253,7 +253,7 @@ __launch_bounds__(128) static __global__
 }
 void repeat_interleave_impl(Tensor input, int64_t count, Tensor result)
 {
-    CUDA_SWITCH_MACRO_ALL(result.scalar_type(), result.numel(), repeat_interleave_impl, input, count, result);
+    CUDA_SWITCH_MACRO_ALL(result.device(), result.scalar_type(), result.numel(), repeat_interleave_impl, input, count, result);
 }
 
 
@@ -274,7 +274,7 @@ __launch_bounds__(128) static __global__ void repeat_impl(TensorInfoCuda<T> src,
 }
 void repeat_impl(Tensor t, SizeType sizes, Tensor result)
 {
-    CUDA_SWITCH_MACRO_ALL(t.scalar_type(), result.numel(), repeat_impl, t, result);
+    CUDA_SWITCH_MACRO_ALL(t.device(), t.scalar_type(), result.numel(), repeat_impl, t, result);
 }
 
 

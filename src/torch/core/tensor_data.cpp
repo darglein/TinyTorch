@@ -8,6 +8,7 @@
 #include "torch/cuda/cached_memory_allocator.h"
 
 #ifdef TT_HAS_CUDA
+#    include "torch/cuda/tt_cuda.h"
 #    include "torch/cuda/ops_impl_cuda_helper.h"
 #    include <cuda_runtime.h>
 #endif
@@ -50,6 +51,8 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions options) : size_(size), opt
     else
     {
 #ifdef TT_HAS_CUDA
+        cuda::DeviceGuard g(options_.device_);
+
         data_ptr_ = cuda::cuda_cached_malloc(size);
 #    if TT_DEBUG
         CHECK_CUDA_ERROR(cudaMemset(data_ptr_, 0xabababab, size));
@@ -91,6 +94,8 @@ StorageImpl::~StorageImpl()
         else
         {
 #ifdef TT_HAS_CUDA
+            cuda::DeviceGuard g(options_.device_);
+
             cuda::cuda_cached_free(data_ptr_);
 #else
             CHECK(false);

@@ -57,10 +57,29 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 
 #define CUDA_CASE_MACRO(...) EXPAND(CUDA_CASE_MACRO_REFINED(128, __VA_ARGS__))
 
-#define CUDA_SWITCH_MACRO_FLOAT(real_scalar_type, numel, func, ...)        \
+#define CUDA_SWITCH_MACRO_FLOAT(device, real_scalar_type, numel, func, ...) \
+    {                                                                       \
+        cuda::DeviceGuard guard(device);                                    \
+        switch (real_scalar_type)                                           \
+        {                                                                   \
+            CUDA_CASE_MACRO(func<half>, kHalf, numel, __VA_ARGS__)          \
+            CUDA_CASE_MACRO(func<float>, kFloat, numel, __VA_ARGS__)        \
+            CUDA_CASE_MACRO(func<double>, kDouble, numel, __VA_ARGS__)      \
+            default:                                                        \
+                CHECK(false) << "invalid input type " << real_scalar_type;  \
+        }                                                                   \
+    }
+
+#define CUDA_SWITCH_MACRO_ALL(device, real_scalar_type, numel, func, ...)  \
     {                                                                      \
+        cuda::DeviceGuard guard(device);                                   \
         switch (real_scalar_type)                                          \
         {                                                                  \
+            CUDA_CASE_MACRO(func<uint8_t>, kUInt8, numel, __VA_ARGS__)     \
+            CUDA_CASE_MACRO(func<uint16_t>, kUInt16, numel, __VA_ARGS__)   \
+            CUDA_CASE_MACRO(func<int16_t>, kInt16, numel, __VA_ARGS__)     \
+            CUDA_CASE_MACRO(func<int32_t>, kInt32, numel, __VA_ARGS__)     \
+            CUDA_CASE_MACRO(func<int64_t>, kLong, numel, __VA_ARGS__)      \
             CUDA_CASE_MACRO(func<half>, kHalf, numel, __VA_ARGS__)         \
             CUDA_CASE_MACRO(func<float>, kFloat, numel, __VA_ARGS__)       \
             CUDA_CASE_MACRO(func<double>, kDouble, numel, __VA_ARGS__)     \
@@ -69,35 +88,22 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
         }                                                                  \
     }
 
-// TODO: Half!
-#define CUDA_SWITCH_MACRO_ALL(real_scalar_type, numel, func, ...)      \
-    switch (real_scalar_type)                                          \
-    {                                                                  \
-        CUDA_CASE_MACRO(func<uint8_t>, kUInt8, numel, __VA_ARGS__)     \
-        CUDA_CASE_MACRO(func<uint16_t>, kUInt16, numel, __VA_ARGS__)   \
-        CUDA_CASE_MACRO(func<int16_t>, kInt16, numel, __VA_ARGS__)     \
-        CUDA_CASE_MACRO(func<int32_t>, kInt32, numel, __VA_ARGS__)     \
-        CUDA_CASE_MACRO(func<int64_t>, kLong, numel, __VA_ARGS__)      \
-        CUDA_CASE_MACRO(func<half>, kHalf, numel, __VA_ARGS__)         \
-        CUDA_CASE_MACRO(func<float>, kFloat, numel, __VA_ARGS__)       \
-        CUDA_CASE_MACRO(func<double>, kDouble, numel, __VA_ARGS__)     \
-        default:                                                       \
-            CHECK(false) << "invalid input type " << real_scalar_type; \
-    }
-
 
 // used for conversion
-#define CUDA_SWITCH_MACRO_ALL_DUAL(real_scalar_type, second_type, numel, func, ...) \
-    switch (real_scalar_type)                                                       \
-    {                                                                               \
-        CUDA_CASE_MACRO((func<uint8_t, second_type>), kUInt8, numel, __VA_ARGS__)   \
-        CUDA_CASE_MACRO((func<uint16_t, second_type>), kUInt16, numel, __VA_ARGS__) \
-        CUDA_CASE_MACRO((func<int16_t, second_type>), kInt16, numel, __VA_ARGS__)   \
-        CUDA_CASE_MACRO((func<int32_t, second_type>), kInt32, numel, __VA_ARGS__)   \
-        CUDA_CASE_MACRO((func<int64_t, second_type>), kLong, numel, __VA_ARGS__)    \
-        CUDA_CASE_MACRO((func<half, second_type>), kHalf, numel, __VA_ARGS__)       \
-        CUDA_CASE_MACRO((func<float, second_type>), kFloat, numel, __VA_ARGS__)     \
-        CUDA_CASE_MACRO((func<double, second_type>), kDouble, numel, __VA_ARGS__)   \
-        default:                                                                    \
-            CHECK(false) << "invalid input type " << real_scalar_type;              \
+#define CUDA_SWITCH_MACRO_ALL_DUAL(device, real_scalar_type, second_type, numel, func, ...) \
+    {                                                                                       \
+        cuda::DeviceGuard guard(device);                                                    \
+        switch (real_scalar_type)                                                           \
+        {                                                                                   \
+            CUDA_CASE_MACRO((func<uint8_t, second_type>), kUInt8, numel, __VA_ARGS__)       \
+            CUDA_CASE_MACRO((func<uint16_t, second_type>), kUInt16, numel, __VA_ARGS__)     \
+            CUDA_CASE_MACRO((func<int16_t, second_type>), kInt16, numel, __VA_ARGS__)       \
+            CUDA_CASE_MACRO((func<int32_t, second_type>), kInt32, numel, __VA_ARGS__)       \
+            CUDA_CASE_MACRO((func<int64_t, second_type>), kLong, numel, __VA_ARGS__)        \
+            CUDA_CASE_MACRO((func<half, second_type>), kHalf, numel, __VA_ARGS__)           \
+            CUDA_CASE_MACRO((func<float, second_type>), kFloat, numel, __VA_ARGS__)         \
+            CUDA_CASE_MACRO((func<double, second_type>), kDouble, numel, __VA_ARGS__)       \
+            default:                                                                        \
+                CHECK(false) << "invalid input type " << real_scalar_type;                  \
+        }                                                                                   \
     }

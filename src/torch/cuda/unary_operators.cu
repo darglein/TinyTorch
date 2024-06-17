@@ -52,6 +52,7 @@ __launch_bounds__(128) static __global__
 template <typename Op>
 static void unary_operator_forward_helper(Op op, Tensor input, Tensor result)
 {
+    cuda::DeviceGuard guard(input.device());
     switch (input.scalar_type())
     {
         CUDA_CASE_MACRO((unary_operator_kernel<uint8_t>), kUInt8, input.numel(), op, input, result)
@@ -69,6 +70,7 @@ static void unary_operator_forward_helper(Op op, Tensor input, Tensor result)
 template <typename Op>
 static void unary_operator_backward_helper(Op op, Tensor input, Tensor grad_input, Tensor grad_result)
 {
+    cuda::DeviceGuard guard(input.device());
     switch (input.scalar_type())
     {
         CUDA_CASE_MACRO((unary_operator_backward_kernel<uint8_t>), kUInt8, input.numel(), op, input, grad_input,

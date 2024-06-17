@@ -134,6 +134,7 @@ void dimensional_reduce_launcher_size_dim(TensorInfoCuda<InputType, MAX_DIMS> a,
 template <typename InputType, typename OutputType, typename Op, int MAX_DIMS>
 void dimensional_reduce_launcher_size(Tensor a, int64_t dim, Tensor result)
 {
+    cuda::DeviceGuard guard(a.device());
     switch (dim)
     {
         case 0:
@@ -165,6 +166,7 @@ void dimensional_reduce_launcher(Tensor a, int64_t dim, Tensor result)
 template <typename Op>
 void dimensional_reduce_helper(Tensor a, int64_t dim, Tensor result)
 {
+    cuda::DeviceGuard guard(a.device());
     // std::cout << "dimensional reduce " << dim << " | " << a.sizes() << " | " << result.sizes() << "\n";
     switch (a.scalar_type())
     {
@@ -325,6 +327,7 @@ void dimensional_scan_launcher(TensorInfoCuda<InputType> a, int64_t dim, TensorI
 template <typename Op>
 void dimensional_scan_helper(Tensor a, int64_t dim, Tensor result)
 {
+    cuda::DeviceGuard guard(a.device());
     switch (a.scalar_type())
     {
         case kHalf:

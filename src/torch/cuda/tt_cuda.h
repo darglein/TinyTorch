@@ -51,5 +51,30 @@ TINYTORCH_API cudaStream_t getCurrentCUDAStream();
 
 TINYTORCH_API void setCUDAStreamForThisThread(cudaStream_t stream);
 
+TINYTORCH_API int getDevice();
+TINYTORCH_API void setDevice(int device_index);
+
+struct TINYTORCH_API DeviceGuard
+{
+	DeviceGuard() = delete;
+	DeviceGuard(Device device)
+	{
+		CHECK_EQ(device.type(), kCUDA);
+
+		original_device_index_ = getDevice();
+		if (device.index() >= 0)
+		{
+			setDevice(device._index);
+		}
+	}
+	DeviceGuard(const DeviceGuard&) = delete;
+	DeviceGuard(DeviceGuard&&) = delete;
+	~DeviceGuard()
+	{
+		setDevice(original_device_index_);
+	}
+
+	int original_device_index_;
+};
 }  // namespace cuda
 }  // namespace tinytorch

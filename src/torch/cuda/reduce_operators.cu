@@ -61,6 +61,7 @@ void global_reduce_helper(Tensor a, Tensor result, Op op)
         kernel_result = result.to(kFloat);
     }
 
+    cuda::DeviceGuard guard(a.device());
     switch (a.scalar_type())
     {
         case kInt32:
@@ -146,13 +147,13 @@ __launch_bounds__(128) static __global__
 }
 void min_impl(Tensor input, int64_t dim, Tensor result, Tensor& indices)
 {
-    CUDA_SWITCH_MACRO_FLOAT(input.scalar_type(), input.numel(), min_max_impl, input, dim, indices, result, true);
+    CUDA_SWITCH_MACRO_FLOAT(input.device(), input.scalar_type(), input.numel(), min_max_impl, input, dim, indices, result, true);
     indices = Tensor();
 }
 
 void max_impl(Tensor input, int64_t dim, Tensor result, Tensor& indices)
 {
-    CUDA_SWITCH_MACRO_FLOAT(input.scalar_type(), input.numel(), min_max_impl, input, dim, indices, result, false);
+    CUDA_SWITCH_MACRO_FLOAT(input.device(), input.scalar_type(), input.numel(), min_max_impl, input, dim, indices, result, false);
     indices = Tensor();
 }
 }  // namespace cuda_impl
