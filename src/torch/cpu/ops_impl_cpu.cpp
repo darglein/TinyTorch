@@ -53,6 +53,8 @@ void to_impl_cpu_cuda(Tensor a, Tensor b, bool async)
     int64_t bytes = a.element_size() * a.numel();
     auto type     = (b.device() == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
 
+    cuda::DeviceGuard guard(a.device() == kCPU ? b.device() : a.device());
+
     if (async)
     {
         CHECK_CUDA_ERROR(cudaMemcpyAsync(b.data_ptr(), a.data_ptr(), bytes, type, cuda::getCurrentCUDAStream()));
