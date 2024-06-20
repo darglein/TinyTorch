@@ -62,7 +62,7 @@ struct TINYTORCH_API DeviceGuard
 		CHECK_EQ(device.type(), kCUDA);
 
 		original_device_index_ = getDevice();
-		if (device.index() >= 0)
+		if (device.index() >= 0 && device.index() != original_device_index_)
 		{
 			setDevice(device._index);
 		}
