@@ -10,18 +10,19 @@
 #include "torch/cpu/ops_impl_cpu.h"
 
 
-#define SWITCH_MACRO_BINARY_OPERATOR(op, a, b, result)                         \
-    switch (result.scalar_type())                                              \
-    {                                                                          \
-        CASE_MACRO((element_wise_operator<uint8_t>), kUInt8, op, a, b, result) \
-        CASE_MACRO((element_wise_operator<int16_t>), kInt16, op, a, b, result) \
-        CASE_MACRO((element_wise_operator<int32_t>), kInt32, op, a, b, result) \
-        CASE_MACRO((element_wise_operator<int64_t>), kLong, op, a, b, result)  \
-        CASE_MACRO((element_wise_operator<Half>), kHalf, op, a, b, result)     \
-        CASE_MACRO((element_wise_operator<float>), kFloat, op, a, b, result)   \
-        CASE_MACRO((element_wise_operator<double>), kDouble, op, a, b, result) \
-        default:                                                               \
-            CHECK(false) << "invalid input type " << result.scalar_type();     \
+#define SWITCH_MACRO_BINARY_OPERATOR(op, a, b, result)                           \
+    switch (result.scalar_type())                                                \
+    {                                                                            \
+        CASE_MACRO((element_wise_operator<uint8_t>), kUInt8, op, a, b, result)   \
+        CASE_MACRO((element_wise_operator<uint16_t>), kUInt16, op, a, b, result) \
+        CASE_MACRO((element_wise_operator<int16_t>), kInt16, op, a, b, result)   \
+        CASE_MACRO((element_wise_operator<int32_t>), kInt32, op, a, b, result)   \
+        CASE_MACRO((element_wise_operator<int64_t>), kLong, op, a, b, result)    \
+        CASE_MACRO((element_wise_operator<Half>), kHalf, op, a, b, result)       \
+        CASE_MACRO((element_wise_operator<float>), kFloat, op, a, b, result)     \
+        CASE_MACRO((element_wise_operator<double>), kDouble, op, a, b, result)   \
+        default:                                                                 \
+            CHECK(false) << "invalid input type " << result.scalar_type();       \
     }
 
 
@@ -61,7 +62,8 @@ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> res
 }
 
 #ifdef _MSC_VER
-#pragma warning( disable : 4244 ) // warning C4244: 'argument': conversion from 'double' to 'T', possible loss of data
+#    pragma warning( \
+        disable : 4244)  // warning C4244: 'argument': conversion from 'double' to 'T', possible loss of data
 #endif
 
 void add_impl(Tensor a, Tensor b, Tensor result)
