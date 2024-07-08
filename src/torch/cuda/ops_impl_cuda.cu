@@ -93,7 +93,8 @@ __launch_bounds__(128) static __global__
 void permute_impl(Tensor& src, Tensor result, SizeType new_dims)
 {
     CUDA_SYNC_CHECK_ERROR();
-    CUDA_SWITCH_MACRO_ALL(src.device(), src.scalar_type(), src.numel(), permute_impl, src, result, new_dims.vec());
+    CUDA_SWITCH_MACRO_ALL(src.device(), src.scalar_type(), src.numel(), permute_impl, src, result,
+                          DimIndexStruct<25, int>(new_dims.vec()));
 }
 
 template <typename TSource, typename TTarget>
@@ -135,32 +136,38 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
     {
         case kUInt16:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), uint16_t, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), uint16_t, src.numel(), copy_and_convert_impl,
+                                       src, target);
             break;
         }
         case kInt32:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), int32_t, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), int32_t, src.numel(), copy_and_convert_impl,
+                                       src, target);
             break;
         }
         case kInt64:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), int64_t, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), int64_t, src.numel(), copy_and_convert_impl,
+                                       src, target);
             break;
         }
         case kFloat16:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), half, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), half, src.numel(), copy_and_convert_impl, src,
+                                       target);
             break;
         }
         case kFloat32:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), float, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), float, src.numel(), copy_and_convert_impl, src,
+                                       target);
             break;
         }
         case kFloat64:
         {
-            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), double, src.numel(), copy_and_convert_impl, src, target);
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), double, src.numel(), copy_and_convert_impl, src,
+                                       target);
             break;
         }
         default:
@@ -180,7 +187,8 @@ inline TT_HD unsigned int xorshift64(unsigned int x)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void rand_float_impl(TensorInfoCuda<T, -1> a, float low, float high, uint64_t seed)
+__launch_bounds__(128) static __global__
+    void rand_float_impl(TensorInfoCuda<T, -1> a, float low, float high, uint64_t seed)
 {
     int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     int64_t grid_size = blockDim.x * gridDim.x;
@@ -191,8 +199,8 @@ __launch_bounds__(128) static __global__ void rand_float_impl(TensorInfoCuda<T, 
     {
         seed2    = xorshift64(seed2);
         float xf = float(seed2) * (1.0f / std::numeric_limits<unsigned int>::max());
-         a[i]     = T(xf * (high - low) + low);
-//        a[i] = 0;
+        a[i]     = T(xf * (high - low) + low);
+        //        a[i] = 0;
     }
 }
 
@@ -256,7 +264,8 @@ __launch_bounds__(128) static __global__
 }
 void repeat_interleave_impl(Tensor input, int64_t count, Tensor result)
 {
-    CUDA_SWITCH_MACRO_ALL(result.device(), result.scalar_type(), result.numel(), repeat_interleave_impl, input, count, result);
+    CUDA_SWITCH_MACRO_ALL(result.device(), result.scalar_type(), result.numel(), repeat_interleave_impl, input, count,
+                          result);
 }
 
 

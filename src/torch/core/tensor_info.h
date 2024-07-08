@@ -118,7 +118,7 @@ struct DimIndexStruct
 
     TT_HD DimIndexStruct() {}
 
-    DimIndexStruct(const std::vector<int64_t>& data)
+    explicit DimIndexStruct(const std::vector<int64_t>& data)
     {
         CHECK_LT(data.size(), DIM);
         for (int i = 0; i < data.size(); ++i)
@@ -128,14 +128,14 @@ struct DimIndexStruct
     }
 
 
-    TT_INLINE constexpr TT_HD DimIndexStruct(std::initializer_list<IndexType> l)
-    {
-        int k = 0;
-        for (auto i : l)
-        {
-            indices[k++] = i;
-        }
-    }
+//    TT_INLINE constexpr TT_HD DimIndexStruct(std::initializer_list<IndexType> l)
+//    {
+//        int k = 0;
+//        for (auto i : l)
+//        {
+//            indices[k++] = i;
+//        }
+//    }
 
     TT_INLINE constexpr TT_HD void set_index(IndexType dim, IndexType value)
     {
