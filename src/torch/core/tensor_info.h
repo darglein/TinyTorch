@@ -164,7 +164,7 @@ struct DimIndexStruct
 
     TT_INLINE constexpr TT_HD IndexType& operator[](IndexType dim)
     {
-#if 1 || defined(__CUDACC__)
+#if defined(TT_DEVICE_CODE)
 #    pragma unroll
         for (int i = 0; i < DIM; ++i)
         {
@@ -181,7 +181,7 @@ struct DimIndexStruct
 
     TT_INLINE constexpr TT_HD IndexType operator[](IndexType dim) const
     {
-#if 1 || defined(__CUDACC__)
+#if defined(TT_DEVICE_CODE)
 #    pragma unroll
         for (int i = 0; i < DIM; ++i)
         {
@@ -297,20 +297,41 @@ struct TensorInfoBase
     TT_INLINE constexpr TT_HD T& operator[](DimIndex index) { return data[IndexToOffset(index)]; }
 
 
+    TT_INLINE constexpr TT_HD T& Get(std::initializer_list<IndexType> indices)
+    {
+        IndexType index = 0;
+        int k           = 0;
+        for (auto i : indices)
+        {
+            index += strides[k] * i;
+            k++;
+        }
+        return data[index];
+    }
+
+
     template <typename... Ts>
     TT_INLINE constexpr TT_HD T& operator()(Ts... args)
     {
-        return operator[](IndexToOffset(DimIndex({args...})));
+        return Get({args...});
+    }
+
+    template <typename... Ts>
+    TT_INLINE constexpr TT_HD T& operator()(DimIndex index)
+    {
+        return operator[](IndexToOffset(index));
     }
 
     TT_INLINE constexpr TT_HD IndexType IndexToOffset(DimIndex index)
     {
         IndexType offset = 0;
 
-#pragma unroll
-        for (int i = 0; i < max_dims; ++i)
+        // #pragma unroll
+        //         for (int i = 0; i < max_dims; ++i)
+        //         {
+        //             if (i < dim())
+        for (int i = 0; i < dim(); ++i)
         {
-            if (i < dim())
             {
 #if TT_DEBUG
 #    if defined(__CUDACC__)
