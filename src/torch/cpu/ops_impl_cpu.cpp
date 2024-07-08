@@ -112,7 +112,7 @@ static void sort_impl(TensorInfo<T> a, int64_t dim, TensorInfo<T> out_t, TensorI
 }
 void sort_impl(Tensor a, int64_t dim, Tensor& out_t, Tensor& out_index)
 {
-    //CHECK_EQ(a.dim(), 1);
+    // CHECK_EQ(a.dim(), 1);
     SWITCH_MACRO_ALL(a.scalar_type(), sort_impl, a, dim, out_t, out_index);
 }
 
@@ -256,7 +256,7 @@ static void abs_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
     for (int64_t i = 0; i < a.numel(); ++i)
     {
-        T v = a[i];
+        T v       = a[i];
         result[0] = result[0] + (v > T(0.) ? T(v) : T(-v));
     }
 }
@@ -360,7 +360,7 @@ static void min_impl(TensorInfo<T> a, TensorInfo<T> result)
     {
         G min_val = std::numeric_limits<G>::max();
 
-#pragma omp parallel for reduction(min:min_val)
+#pragma omp parallel for reduction(min : min_val)
         for (int64_t i = 0; i < a.numel(); ++i)
         {
             G v = G(a[i]);
@@ -395,7 +395,7 @@ static void max_impl(TensorInfo<T> a, TensorInfo<T> result)
     {
         G max_val = std::numeric_limits<G>::lowest();
 
-#pragma omp parallel for reduction(max:max_val)
+#pragma omp parallel for reduction(max : max_val)
         for (int64_t i = 0; i < a.numel(); ++i)
         {
             G v = G(a[i]);
@@ -661,6 +661,12 @@ static void copy_and_convert_impl_kernel(TensorInfo<TSource> src, TensorInfo<TTa
 void copy_and_convert_impl(Tensor src, Tensor& target)
 {
     CHECK_EQ(src.numel(), target.numel());
+    if (src.dtype() == target.dtype() && src.is_contiguous() && target.is_contiguous())
+    {
+        memcpy(target.data_ptr(), src.data_ptr(), src.numel() * src.element_size() );
+        return;
+    }
+
     switch (target.dtype())
     {
         case kUInt8:
