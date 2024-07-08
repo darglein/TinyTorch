@@ -310,10 +310,27 @@ struct TensorInfoBase
     }
 
 
+    template <int DIM, typename FirstT>
+    TT_INLINE constexpr TT_HD void OffsetRec(IndexType& result, FirstT i)
+    {
+        result += strides[DIM] * i;
+    }
+
+    template <int DIM, typename FirstT, typename... Ts>
+    TT_INLINE constexpr TT_HD void OffsetRec(IndexType& result, FirstT i, Ts... args)
+    {
+        result += strides[DIM] * i;
+        OffsetRec<DIM + 1>(result, args...);
+    }
+
     template <typename... Ts>
     TT_INLINE constexpr TT_HD T& operator()(Ts... args)
     {
-        return Get({args...});
+        // return Get({args...});
+
+        IndexType offset = 0;
+        OffsetRec<0>(offset, args...);
+        return data[offset];
     }
 
     template <typename... Ts>
