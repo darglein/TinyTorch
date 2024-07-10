@@ -275,7 +275,7 @@ struct TINYTORCH_API Tensor
     int toInt() const { return item<int>(); }
     bool is_contiguous() const;
     bool is_leaf() const;
-    inline bool is_cuda() const { return device() == kCUDA; }
+    inline bool is_cuda() const { return device().type() == kCUDA; } // Compare only type here, not device_index.
     bool is_cpu() const { return device() == kCPU; }
 
     Tensor contiguous() const;
