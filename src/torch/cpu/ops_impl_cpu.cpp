@@ -71,6 +71,7 @@ void to_impl_cpu_cuda(Tensor a, Tensor b, bool async)
     {
         if (async)
         {
+            cuda::DeviceGuard guard(b.device());
             CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(b.data_ptr(), b.device().index(), a.data_ptr(), a.device().index(),
                                                  bytes, cuda::getCurrentCUDAStream()));
         }
