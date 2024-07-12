@@ -175,3 +175,14 @@ ScalarType dtype()
 }
 
 }  // namespace tinytorch
+
+template <>
+struct std::hash<tinytorch::Device>
+{
+    inline std::size_t operator()(tinytorch::Device device) const
+    {
+        static_assert(sizeof(tinytorch::Device) == sizeof(size_t));
+        size_t d = (size_t&)device;
+        return std::hash<size_t>()(d);
+    }
+};
