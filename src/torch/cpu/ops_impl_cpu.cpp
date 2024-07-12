@@ -51,18 +51,35 @@ void to_impl_cpu_cuda(Tensor a, Tensor b, bool async)
     }
 
     int64_t bytes = a.element_size() * a.numel();
-    auto type     = (b.device() == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
 
-    cuda::DeviceGuard guard(a.device() == kCPU ? b.device() : a.device());
-
-    if (async)
+    if (a.is_cpu() || b.is_cpu())
     {
-        CHECK_CUDA_ERROR(cudaMemcpyAsync(b.data_ptr(), a.data_ptr(), bytes, type, cuda::getCurrentCUDAStream()));
+        auto type = (b.device() == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
+
+        cuda::DeviceGuard guard(a.device() == kCPU ? b.device() : a.device());
+
+        if (async)
+        {
+            CHECK_CUDA_ERROR(cudaMemcpyAsync(b.data_ptr(), a.data_ptr(), bytes, type, cuda::getCurrentCUDAStream()));
+        }
+        else
+        {
+            CHECK_CUDA_ERROR(cudaMemcpy(b.data_ptr(), a.data_ptr(), bytes, type));
+        }
     }
     else
     {
-        CHECK_CUDA_ERROR(cudaMemcpy(b.data_ptr(), a.data_ptr(), bytes, type));
+        if (async)
+        {
+            CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(b.data_ptr(), b.device().index(), a.data_ptr(), a.device().index(),
+                                                 bytes, cuda::getCurrentCUDAStream()));
+        }
+        else
+        {
+            CHECK_CUDA_ERROR(cudaMemcpyPeer(b.data_ptr(), b.device().index(), a.data_ptr(), a.device().index(), bytes));
+        }
     }
+
 
 #else
     CHECK(false);
