@@ -47,7 +47,11 @@ namespace tinytorch
 {
 namespace cuda
 {
+TINYTORCH_API cudaEvent_t getNextEvent();
+
 TINYTORCH_API cudaStream_t getCurrentCUDAStream();
+TINYTORCH_API cudaStream_t getCUDAStream(Device device);
+
 
 TINYTORCH_API void setCUDAStreamForThisThread(cudaStream_t stream);
 

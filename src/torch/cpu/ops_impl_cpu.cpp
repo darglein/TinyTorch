@@ -71,9 +71,16 @@ void to_impl_cpu_cuda(Tensor a, Tensor b, bool async)
     {
         if (async)
         {
-            cuda::DeviceGuard guard(b.device());
+            auto src_buffer_ready = cuda::getNextEvent();
+            cudaEventRecord(src_buffer_ready, cuda::getCUDAStream(a.device()));
+            cudaStreamWaitEvent(cuda::getCUDAStream(b.device()), src_buffer_ready);
+
             CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(b.data_ptr(), b.device().index(), a.data_ptr(), a.device().index(),
-                                                 bytes, cuda::getCurrentCUDAStream()));
+                                                 bytes,cuda::getCUDAStream(b.device())));
+
+            auto mempcy_finished = cuda::getNextEvent();
+            cudaEventRecord(mempcy_finished, cuda::getCUDAStream(b.device()));
+            cudaStreamWaitEvent(cuda::getCUDAStream(a.device()), mempcy_finished);
         }
         else
         {
@@ -681,7 +688,7 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
     CHECK_EQ(src.numel(), target.numel());
     if (src.dtype() == target.dtype() && src.is_contiguous() && target.is_contiguous())
     {
-        memcpy(target.data_ptr(), src.data_ptr(), src.numel() * src.element_size() );
+        memcpy(target.data_ptr(), src.data_ptr(), src.numel() * src.element_size());
         return;
     }
 
