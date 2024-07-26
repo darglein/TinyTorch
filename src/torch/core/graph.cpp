@@ -24,6 +24,24 @@ void GradMode::set_enabled(bool enabled)
 namespace autograd
 {
 NodeCallback* call_back = nullptr;
+
+std::pair<Tensor, Tensor> MakeInplaceGradient(const Tensor& t, bool zero_init)
+{
+    if (!t.defined())
+    {
+        return {Tensor(), Tensor()};
+    }
+    if (InplaceGradientAllowed(t))
+    {
+        return {t.grad(), Tensor()};
+    }
+    else
+    {
+        auto g = zero_init ? zeros_like(t) : empty_like(t);
+        return {g, g};
+    }
+}
+
 AccumulateGrad::AccumulateGrad(std::shared_ptr<TensorImpl> t) : impl_(t)
 {
     num_input_gradients_of_backward = 1;
@@ -62,7 +80,7 @@ std::vector<Tensor> AccumulateGrad::accumulate(const std::vector<Tensor>& input_
 Node::Node()
 {
     static thread_local int64_t current_seq_nr = 0;
-    this->sequence_nr = current_seq_nr++;
+    this->sequence_nr                          = current_seq_nr++;
 }
 
 }  // namespace autograd

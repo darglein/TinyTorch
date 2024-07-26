@@ -397,6 +397,18 @@ struct AccumulateGrad : public Node
     // the weak ptr is important because otherwise we get a cyclic dependency to the owning tensor
     std::weak_ptr<TensorImpl> impl_;
 };
+
+inline bool InplaceGradientAllowed(const Tensor& t)
+{
+    return t.is_leaf() && t.grad().defined();
+}
+
+
+// Returns:
+//    <Cuda write gradient, backward function return gradient>
+//
+TINYTORCH_API std::pair<Tensor,Tensor> MakeInplaceGradient(const Tensor& t, bool zero_init = true);
+
 }  // namespace autograd
 
 }  // namespace tinytorch
