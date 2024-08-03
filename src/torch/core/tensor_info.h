@@ -269,7 +269,7 @@ struct TensorInfoBase
             return max_dims;
         }
     }
-    TT_INLINE constexpr TT_HD IndexType size(int64_t index) { return sizes[index]; }
+    TT_INLINE constexpr TT_HD IndexType size(int64_t index) const { return sizes[index]; }
 
     TT_INLINE constexpr TT_HD IndexType numel()
     {
