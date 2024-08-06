@@ -509,7 +509,7 @@ bool Tensor::allclose(Tensor other, double rtol, double atol) const
         default:
             CHECK(false);
     }
-    return v < atol;
+    return v <= atol;
 }
 void Tensor::backward() const
 {
