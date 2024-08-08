@@ -193,7 +193,7 @@ __launch_bounds__(128) static __global__
     int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     int64_t grid_size = blockDim.x * gridDim.x;
     //    if (i >= a.numel()) return;
-    unsigned int seed2 = seed + (i * 891623501275UL);
+    unsigned int seed2 = seed + (i * 146394585141533LL);
 
     for (; i < a.numel(); i += grid_size)
     {
