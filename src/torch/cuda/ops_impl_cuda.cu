@@ -209,7 +209,7 @@ void uniform_impl(Tensor& a, double mi, double ma)
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
     uint64_t seed = dist(generator());
 
-    int64_t max_threads = a.numel();
+    int64_t max_threads = std::min<int64_t>(a.numel(), int64_t(1024) * 1024 * 1024);
 
     CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_float_impl, a, (float)mi, (float)ma, seed);
 }
