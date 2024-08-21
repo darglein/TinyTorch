@@ -32,59 +32,67 @@ void print_impl(std::ostream& strm, Tensor t)
     print_impl<double>(strm, t.to(kDouble));
 }
 
-void to_impl_cpu_cuda(Tensor a, Tensor b, bool async)
+void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
 {
 #ifdef TT_HAS_CUDA
-    CHECK(a.is_contiguous()) << a.sizes() << " " << a.strides();
-    CHECK(b.is_contiguous()) << b.sizes() << " " << b.strides();
+    CHECK(src.is_contiguous()) << src.sizes() << " " << src.strides();
+    CHECK(dest.is_contiguous()) << dest.sizes() << " " << dest.strides();
 
     if (async)
     {
-        if (a.is_cpu())
+        if (src.is_cpu())
         {
-            CHECK(a.options().pinned_memory_);
+            CHECK(src.options().pinned_memory_);
         }
-        if (b.is_cpu())
+        if (dest.is_cpu())
         {
-            CHECK(b.options().pinned_memory_);
+            CHECK(dest.options().pinned_memory_);
         }
     }
 
-    int64_t bytes = a.element_size() * a.numel();
+    int64_t bytes = src.element_size() * src.numel();
 
-    if (a.is_cpu() || b.is_cpu())
+    if (src.is_cpu() || dest.is_cpu())
     {
-        auto type = (b.device() == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
+        auto type = (dest.device() == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
 
-        cuda::DeviceGuard guard(a.device() == kCPU ? b.device() : a.device());
+        cuda::DeviceGuard guard(src.device() == kCPU ? dest.device() : src.device());
 
         if (async)
         {
-            CHECK_CUDA_ERROR(cudaMemcpyAsync(b.data_ptr(), a.data_ptr(), bytes, type, cuda::getCurrentCUDAStream()));
+            CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, type, cuda::getCurrentCUDAStream()));
         }
         else
         {
-            CHECK_CUDA_ERROR(cudaMemcpy(b.data_ptr(), a.data_ptr(), bytes, type));
+            CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, type));
         }
     }
     else
     {
         if (async)
         {
-            auto src_buffer_ready = cuda::getNextEvent();
-            cudaEventRecord(src_buffer_ready, cuda::getCUDAStream(a.device()));
-            cudaStreamWaitEvent(cuda::getCUDAStream(b.device()), src_buffer_ready);
+            {
+                cuda::DeviceGuard guard(src.device());
 
-            CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(b.data_ptr(), b.device().index(), a.data_ptr(), a.device().index(),
-                                                 bytes,cuda::getCUDAStream(b.device())));
+                auto src_buffer_ready = cuda::getNextEvent();
+                CHECK_CUDA_ERROR(cudaEventRecord(src_buffer_ready, cuda::getCUDAStream(src.device())));
+                CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCUDAStream(dest.device()), src_buffer_ready));
+            }
 
-            auto mempcy_finished = cuda::getNextEvent();
-            cudaEventRecord(mempcy_finished, cuda::getCUDAStream(b.device()));
-            cudaStreamWaitEvent(cuda::getCUDAStream(a.device()), mempcy_finished);
+            CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(), src.device().index(),
+                                                 bytes,cuda::getCUDAStream(dest.device())));
+
+            {
+                cuda::DeviceGuard guard(dest.device());
+
+                auto mempcy_finished = cuda::getNextEvent();
+                CHECK_CUDA_ERROR(cudaEventRecord(mempcy_finished, cuda::getCUDAStream(dest.device())));
+                CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCUDAStream(src.device()), mempcy_finished));
+            }
         }
         else
         {
-            CHECK_CUDA_ERROR(cudaMemcpyPeer(b.data_ptr(), b.device().index(), a.data_ptr(), a.device().index(), bytes));
+            CHECK_CUDA_ERROR(cudaMemcpyPeer(dest.data_ptr(), dest.device().index(), src.data_ptr(), src.device().index(), bytes));
         }
     }
 

@@ -53,12 +53,15 @@ void setDevice(int device_index)
 
 cudaEvent_t getNextEvent()
 {
-    constexpr int MAX_EVENTS                                 = 128;
-    static thread_local int current_event                    = 0;
-    static thread_local cudaEvent_t event_buffer[MAX_EVENTS] = {};
+    constexpr int MAX_EVENTS                                              = 128;
+    static thread_local int current_event[MAX_DEVICES]                    = {};
+    static thread_local cudaEvent_t event_buffer[MAX_DEVICES][MAX_EVENTS] = {};
 
-    cudaEvent_t& event = event_buffer[current_event];
-    current_event      = (current_event + 1) % MAX_EVENTS;
+    int device   = getDevice();
+    int& current = current_event[device];
+    current      = (current + 1) % MAX_EVENTS;
+
+    cudaEvent_t& event = event_buffer[device][current];
 
     if (!event)
     {
