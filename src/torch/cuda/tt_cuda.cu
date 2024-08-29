@@ -65,7 +65,7 @@ cudaEvent_t getNextEvent()
 
     if (!event)
     {
-        cudaEventCreate(&event);
+        CHECK_CUDA_ERROR(cudaEventCreate(&event));
     }
 
     return event;
