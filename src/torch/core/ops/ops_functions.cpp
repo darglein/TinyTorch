@@ -342,8 +342,8 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         int64_t dim = ctx->saved_data["dim"].toInt();
-        auto l     = ctx->get_saved_variables();
-        auto index = l[0];
+        auto l      = ctx->get_saved_variables();
+        auto index  = l[0];
 
         auto grad_data  = index_select(grad[0], dim, index);
         auto grad_input = grad[0];
@@ -468,7 +468,7 @@ struct PermuteNode : public FunctionNode<PermuteNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        auto g = grad[0];
+        auto g      = grad[0];
         auto grad_a = g.permute_view(ctx->saved_data["reverse_indices"].toSizes());
         return {grad_a, {}};
     }
@@ -484,6 +484,18 @@ Tensor permute(Tensor t, const SizeType& size)
 {
     return autograd::PermuteNode::apply(t, size)[0];
 }
+
+
+Tensor flip(Tensor t, const SizeType& size)
+{
+    CHECK(!t.requires_grad());
+    for (auto d : size.vec())
+    {
+        t = t.slice_view(d, t.size(d) - 1, -1, -1).clone();
+    }
+    return t;
+}
+
 
 
 namespace autograd
@@ -655,7 +667,6 @@ Tensor conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding,
 
     return result;
 }
-
 
 Tensor nn::functional::grid_sample(Tensor data, Tensor uv, nn::functional::GridSampleFuncOptions options)
 {

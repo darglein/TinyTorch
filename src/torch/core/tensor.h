@@ -201,7 +201,7 @@ struct TINYTORCH_API Tensor
     void to_(ScalarType new_type);
     void to_(Device new_device);
 
-    Tensor flip(const SizeType& size) const { throw std::runtime_error("not implemented"); }
+    Tensor flip(const SizeType& size) const;
     void resize_(const SizeType& size);
     Tensor permute(const SizeType& size) const;
     Tensor reshape(const SizeType& size) const;

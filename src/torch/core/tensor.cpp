@@ -271,7 +271,7 @@ Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step)
 
     CHECK_GE(dim, 0);
     CHECK_LT(dim, dims);
-    CHECK_LE(start, end);
+    // CHECK_LE(start, end);
     CHECK_LE(end, this->size(dim));
     CHECK_EQ((end - start) % step, 0);
 
@@ -310,7 +310,7 @@ Tensor Tensor::permute_view(const SizeType& index) const
 void Tensor::resize_(const SizeType& size)
 {
     this->impl_->autograd_meta = nullptr;
-    auto new_tensor = empty(size, options());
+    auto new_tensor            = empty(size, options());
 
     int64_t elements_to_copy = std::min(this->numel(), new_tensor.numel());
 
@@ -654,6 +654,10 @@ Tensor Tensor::gather(int64_t dim, Tensor index) const
 Tensor Tensor::prod(int64_t dim, bool keepdim) const
 {
     return tinytorch::prod(*this, dim, keepdim);
+}
+Tensor Tensor::flip(const SizeType& size) const
+{
+    return tinytorch::flip(*this, size);
 }
 
 
