@@ -34,30 +34,74 @@ namespace cpu_impl
 template <typename T, typename Op>
 static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
-    for (int64_t i = 0; i < result.numel(); ++i)
+    if (a.numel() == b.numel() && a.contiguous && b.contiguous)
     {
-        auto index_result = result.LinearIndexToDimIndex(i);
-        // the index clamping allows operations when one tensor has a 1-dimension
-        auto index_a         = a.clamp_index_to_size(index_result);
-        auto index_b         = b.clamp_index_to_size(index_result);
-        result[index_result] = op.forward(a[index_a], b[index_b]);
+        // fast implementation for contiguous case (without dim expansion)
+        T* pa  = a.data;
+        T* pb  = b.data;
+        T* pr  = result.data;
+        auto N = result.numel();
+        for (int64_t i = 0; i < N; ++i)
+        {
+            pr[i] = op.forward(pa[i], pb[i]);
+        }
+    }
+    else
+    {
+        for (int64_t i = 0; i < result.numel(); ++i)
+        {
+            auto index_result = result.LinearIndexToDimIndex(i);
+            // the index clamping allows operations when one tensor has a 1-dimension
+            auto index_a         = a.clamp_index_to_size(index_result);
+            auto index_b         = b.clamp_index_to_size(index_result);
+            result[index_result] = op.forward(a[index_a], b[index_b]);
+        }
     }
 }
 template <typename T, typename Op>
 static void element_wise_operator(Op op, TensorInfo<T> a, T b, TensorInfo<T> result)
 {
     using G = typename CpuComputeFloatType<T>::Type;
-    for (int64_t i = 0; i < result.numel(); ++i)
+
+    if (a.contiguous && result.contiguous)
     {
-        result[i] = T(G(op.forward(G(a[i]), G(b))));
+        // fast implementation for contiguous case (without dim expansion)
+        T* pa  = a.data;
+        T* pr  = result.data;
+        auto N = result.numel();
+        for (int64_t i = 0; i < N; ++i)
+        {
+            pr[i] = T(G(op.forward(G(pa[i]), G(b))));
+        }
+    }
+    else
+    {
+        for (int64_t i = 0; i < result.numel(); ++i)
+        {
+            result[i] = T(G(op.forward(G(a[i]), G(b))));
+        }
     }
 }
 template <typename T, typename Op>
 static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> result)
 {
-    for (int64_t i = 0; i < result.numel(); ++i)
+    if (b.contiguous && result.contiguous)
     {
-        result[i] = op.forward(a, b[i]);
+        // fast implementation for contiguous case (without dim expansion)
+        T* pb  = b.data;
+        T* pr  = result.data;
+        auto N = result.numel();
+        for (int64_t i = 0; i < N; ++i)
+        {
+            pr[i] = op.forward(a, pb[i]);
+        }
+    }
+    else
+    {
+        for (int64_t i = 0; i < result.numel(); ++i)
+        {
+            result[i] = op.forward(a, b[i]);
+        }
     }
 }
 
