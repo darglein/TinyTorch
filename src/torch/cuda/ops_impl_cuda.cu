@@ -134,6 +134,12 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
     CHECK_EQ(src.numel(), target.numel());
     switch (target.dtype())
     {
+        case kUInt8:
+        {
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), uint8_t, src.numel(), copy_and_convert_impl,
+                                       src, target);
+            break;
+        }
         case kUInt16:
         {
             CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), uint16_t, src.numel(), copy_and_convert_impl,
