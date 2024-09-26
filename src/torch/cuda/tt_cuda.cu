@@ -7,6 +7,8 @@
 #include "ops_impl_cuda_helper.h"
 #include "tt_cuda.h"
 
+#include <numeric>
+
 namespace tinytorch
 {
 namespace cuda
