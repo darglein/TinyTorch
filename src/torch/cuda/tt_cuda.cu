@@ -71,5 +71,60 @@ cudaEvent_t getNextEvent()
     return event;
 }
 
+
+std::vector<Device> GetCudaDevicesFromDeviceList(std::vector<int> device_list)
+{
+    int cuda_device_count;
+    CHECK_CUDA_ERROR(cudaGetDeviceCount(&cuda_device_count));
+
+    if (cuda_device_count == 0)
+    {
+        throw std::runtime_error("No CUDA capable device found\n");
+    }
+
+    std::sort(device_list.begin(), device_list.end());
+    device_list.erase(std::unique(device_list.begin(), device_list.end()), device_list.end());
+
+    if (device_list.empty())
+    {
+        std::cout << "Parameter 'device_list' is empty. Defaulting to device 0\n";
+        device_list.push_back(0);
+    }
+    if (device_list[0] == -1)
+    {
+        device_list.resize(cuda_device_count);
+        std::iota(device_list.begin(), device_list.end(), 0);
+    }
+
+    std::vector<Device> result;
+    for (int index : device_list)
+    {
+        if (index < 0)
+        {
+            throw std::runtime_error("Invalid negative device_id " + std::to_string(index) +
+                                   ". Only allowed negative number is -1, in which case all GPUs are used.");
+        }
+
+        if (index < cuda_device_count)
+        {
+            result.push_back(Device(kCUDA, index));
+        }
+        else
+        {
+            std::cout << "Ignoring device id " << index << ". Only " << cuda_device_count << " GPUs are available.\n";
+        }
+    }
+
+    if (result.empty())
+    {
+        throw std::runtime_error("No device id in 'device_list' matches a valid GPU id.");
+    }
+
+
+
+    return result;
+}
+
+
 }  // namespace cuda
 }  // namespace tinytorch

@@ -80,5 +80,10 @@ struct TINYTORCH_API DeviceGuard
 
 	int original_device_index_;
 };
+
+
+
+TINYTORCH_API std::vector<Device> GetCudaDevicesFromDeviceList(std::vector<int> device_list);
+
 }  // namespace cuda
 }  // namespace tinytorch

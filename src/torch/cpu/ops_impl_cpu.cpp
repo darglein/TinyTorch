@@ -60,7 +60,8 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
 
         if (async)
         {
-            CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, type, cuda::getCurrentCUDAStream()));
+            CHECK_CUDA_ERROR(
+                cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, type, cuda::getCurrentCUDAStream()));
         }
         else
         {
@@ -79,8 +80,15 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
                 CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCUDAStream(dest.device()), src_buffer_ready));
             }
 
-            CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(), src.device().index(),
-                                                 bytes,cuda::getCUDAStream(dest.device())));
+            if (1)
+            {
+                CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(),
+                                                     src.device().index(), bytes, cuda::getCUDAStream(dest.device())));
+            }
+            else
+            {
+                CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault));
+            }
 
             {
                 cuda::DeviceGuard guard(dest.device());
@@ -92,7 +100,8 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
         }
         else
         {
-            CHECK_CUDA_ERROR(cudaMemcpyPeer(dest.data_ptr(), dest.device().index(), src.data_ptr(), src.device().index(), bytes));
+            CHECK_CUDA_ERROR(
+                cudaMemcpyPeer(dest.data_ptr(), dest.device().index(), src.data_ptr(), src.device().index(), bytes));
         }
     }
 
