@@ -8,10 +8,28 @@
 #include "torch/cuda/cached_memory_allocator.h"
 
 #ifdef TT_HAS_CUDA
-#    include "torch/cuda/tt_cuda.h"
+#    include <sys/mman.h>
+
 #    include "torch/cuda/ops_impl_cuda_helper.h"
+#    include "torch/cuda/tt_cuda.h"
 #    include <cuda_runtime.h>
 #endif
+
+
+static void* malloc_impl_host(int64_t size)
+{
+    // auto ptr = malloc(size);
+    // auto ptr = calloc(size, 1);
+    auto ptr = mmap(0, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_POPULATE, -1, 0);
+    // memset(ptr,0,size);
+    return ptr;
+}
+
+static void free_impl_host(void* ptr, int64_t size)
+{
+    // free(ptr);
+    munmap(ptr, size);
+}
 
 
 namespace tinytorch
@@ -37,10 +55,10 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions options) : size_(size), opt
         }
         else
         {
-            data_ptr_ = malloc(size);
+            data_ptr_ = malloc_impl_host(size);
         }
 #else
-        data_ptr_ = malloc(size);
+        data_ptr_ = malloc_impl_host(size);
 #endif
 
 #if TT_DEBUG
@@ -85,10 +103,10 @@ StorageImpl::~StorageImpl()
             }
             else
             {
-                free(data_ptr_);
+                free_impl_host(data_ptr_, size_);
             }
 #else
-            free(data_ptr_);
+            free_impl_host(data_ptr_, size_);
 #endif
         }
         else
