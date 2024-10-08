@@ -92,13 +92,19 @@ std::vector<Device> GetCudaDevicesFromDeviceList(std::vector<int> device_list)
         std::cout << "Parameter 'device_list' is empty. Defaulting to device 0\n";
         device_list.push_back(0);
     }
+    if (device_list[0] == -1)
+    {
+        device_list.resize(cuda_device_count);
+        std::iota(device_list.begin(), device_list.end(), 0);
+    }
 
     std::vector<Device> result;
     for (int index : device_list)
     {
         if (index < 0)
         {
-            throw std::runtime_error("Invalid negative device_id " + std::to_string(index) + ".");
+            throw std::runtime_error("Invalid negative device_id " + std::to_string(index) +
+                                   ". Only allowed negative number is -1, in which case all GPUs are used.");
         }
 
         if (index < cuda_device_count)
