@@ -73,8 +73,9 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions options) : size_(size), opt
 
         data_ptr_ = cuda::cuda_cached_malloc(size);
 #    if TT_DEBUG
-        CHECK_CUDA_ERROR(cudaMemset(data_ptr_, 0xabababab, size));
+        CHECK_CUDA_ERROR(cudaMemsetAsync(data_ptr_, 0xabababab, size,cuda::getCurrentCUDAStream()));
 #    endif
+
         has_ownership = true;
 #else
         CHECK(false);

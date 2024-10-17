@@ -72,30 +72,34 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
     {
         if (async)
         {
+            cudaEvent_t src_buffer_ready, mempcy_finished;
             {
                 cuda::DeviceGuard guard(src.device());
-
-                auto src_buffer_ready = cuda::getNextEvent();
-                CHECK_CUDA_ERROR(cudaEventRecord(src_buffer_ready, cuda::getCUDAStream(src.device())));
-                CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCUDAStream(dest.device()), src_buffer_ready));
+                src_buffer_ready = cuda::getNextEvent();
+                CHECK_CUDA_ERROR(cudaEventRecord(src_buffer_ready, cuda::getCurrentCUDAStream()));
             }
 
-            if (1)
-            {
-                CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(),
-                                                     src.device().index(), bytes, cuda::getCUDAStream(dest.device())));
-            }
-            else
-            {
-                CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault));
-            }
 
             {
                 cuda::DeviceGuard guard(dest.device());
+                CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCurrentCUDAStream(), src_buffer_ready));
+                if (1)
+                {
+                    CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(),
+                                                         src.device().index(), bytes,
+                                                         cuda::getCurrentCUDAStream()));
+                }
+                else
+                {
+                    CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault));
+                }
+                mempcy_finished = cuda::getNextEvent();
+                CHECK_CUDA_ERROR(cudaEventRecord(mempcy_finished, cuda::getCurrentCUDAStream()));
+            }
 
-                auto mempcy_finished = cuda::getNextEvent();
-                CHECK_CUDA_ERROR(cudaEventRecord(mempcy_finished, cuda::getCUDAStream(dest.device())));
-                CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCUDAStream(src.device()), mempcy_finished));
+            {
+                cuda::DeviceGuard guard(src.device());
+                CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCurrentCUDAStream(), mempcy_finished));
             }
         }
         else
