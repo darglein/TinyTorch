@@ -8,7 +8,7 @@
 #include "torch/cuda/cached_memory_allocator.h"
 
 #ifdef TT_HAS_CUDA
-//#    include <sys/mman.h>
+// #    include <sys/mman.h>
 
 #    include "torch/cuda/ops_impl_cuda_helper.h"
 #    include "torch/cuda/tt_cuda.h"
@@ -18,17 +18,17 @@
 
 static void* malloc_impl_host(int64_t size)
 {
-     auto ptr = malloc(size);
+    auto ptr = malloc(size);
     // auto ptr = calloc(size, 1);
-//    auto ptr = mmap(0, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_POPULATE, -1, 0);
+    //    auto ptr = mmap(0, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_POPULATE, -1, 0);
     // memset(ptr,0,size);
     return ptr;
 }
 
 static void free_impl_host(void* ptr, int64_t size)
 {
-     free(ptr);
-//    munmap(ptr, size);
+    free(ptr);
+    //    munmap(ptr, size);
 }
 
 
@@ -71,9 +71,9 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions options) : size_(size), opt
 #ifdef TT_HAS_CUDA
         cuda::DeviceGuard g(options_.device_);
 
-        data_ptr_ = cuda::cuda_cached_malloc(size);
+        std::tie(data_ptr_, alloc_info) = cuda::cuda_cached_malloc(size);
 #    if TT_DEBUG
-        CHECK_CUDA_ERROR(cudaMemsetAsync(data_ptr_, 0xabababab, size,cuda::getCurrentCUDAStream()));
+        CHECK_CUDA_ERROR(cudaMemsetAsync(data_ptr_, 0xabababab, size, cuda::getCurrentCUDAStream()));
 #    endif
 
         has_ownership = true;
@@ -115,7 +115,7 @@ StorageImpl::~StorageImpl()
 #ifdef TT_HAS_CUDA
             cuda::DeviceGuard g(options_.device_);
 
-            cuda::cuda_cached_free(data_ptr_);
+            cuda::cuda_cached_free(data_ptr_, alloc_info);
 #else
             CHECK(false);
 #endif

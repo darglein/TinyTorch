@@ -29,6 +29,15 @@ static int64_t max_allocated_bytes     = 0;
 static bool allocator_initialized = false;
 static bool has_malloc_async      = false;
 
+static AllocatorAlgorithm algorithm = AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
+
+
+void set_allocator_algorithm(AllocatorAlgorithm algo)
+{
+    std::unique_lock l(mu);
+    algorithm = algo;
+}
+
 int64_t current_allocated_size()
 {
     return current_allocated_bytes;
@@ -63,10 +72,10 @@ static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size)
         size_t mem_free, mem_total;
         cudaMemGetInfo(&mem_free, &mem_total);
         std::cerr << " CUDA out of memory!\n"
-            << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB\n"
-            << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
-            << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n"
-            << "     Allocated by torch " << (current_allocated_bytes / 1000.0 / 1000.0) << "MB\n";
+                  << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB\n"
+                  << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
+                  << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n"
+                  << "     Allocated by torch " << (current_allocated_bytes / 1000.0 / 1000.0) << "MB\n";
 
         throw std::runtime_error(std::string("CUDA memory allocation error: ") + cudaGetErrorString(cuda_error));
     }
@@ -122,7 +131,7 @@ static void free_async(void* ptr)
 
 static void* malloc_blocking(int64_t size)
 {
-    void* ptr; 
+    void* ptr;
     cudaError_t cuda_error = cudaMalloc(&ptr, size);
 
     handle_cuda_allocation_error(cuda_error, size);
@@ -135,11 +144,11 @@ static void free_blocking(void* ptr)
     cudaFree(ptr);
 }
 
-void* cuda_cached_malloc(int64_t size)
+std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size)
 {
     if (size == 0)
     {
-        return nullptr;
+        return {nullptr, 0};
     }
     std::unique_lock l(mu);
 
@@ -148,35 +157,45 @@ void* cuda_cached_malloc(int64_t size)
         initialize_allocator();
     }
 
-    void* ptr;
+    void* ptr = nullptr;
+    uint64_t info;
 
-    if (has_malloc_async)
+    if (has_malloc_async && algorithm == AllocatorAlgorithm::CUDA_MALLOC_ASYNC)
     {
-        ptr = malloc_async(size);
+        ptr  = malloc_async(size);
+        info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
     }
-    else
+
+    if (!ptr)
     {
-        ptr = malloc_blocking(size);
+        ptr  = malloc_blocking(size);
+        info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC;
     }
-    return ptr;
+    return {ptr, info};
 }
-void cuda_cached_free(void* ptr)
+void cuda_cached_free(void* ptr, uint64_t alloc_info)
 {
     if (ptr == nullptr)
     {
         return;
     }
+
+    auto algo = (AllocatorAlgorithm)alloc_info;
     CHECK(allocator_initialized);
 
     std::unique_lock l(mu);
 
-    if (has_malloc_async)
+    if (algo == AllocatorAlgorithm::CUDA_MALLOC_ASYNC)
     {
         free_async(ptr);
     }
-    else
+    else if (algo == AllocatorAlgorithm::CUDA_MALLOC)
     {
         free_blocking(ptr);
+    }
+    else
+    {
+        CHECK(false);
     }
 }
 

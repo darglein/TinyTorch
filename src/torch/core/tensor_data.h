@@ -7,6 +7,7 @@
 #pragma once
 
 #include "assert.h"
+#include "types.h"
 
 #include <algorithm>
 #include <ctime>
@@ -16,9 +17,8 @@
 #include <random>
 #include <vector>
 
-#include "torch/tiny_torch_config.h"
-#include "types.h"
 #include "tensor_options.h"
+#include "torch/tiny_torch_config.h"
 
 namespace tinytorch
 {
@@ -40,8 +40,9 @@ struct StorageImpl
 
    protected:
     TensorOptions options_;
-    bool has_ownership = false;
-    void* data_ptr_ = nullptr;
+    bool has_ownership   = false;
+    void* data_ptr_      = nullptr;
+    uint64_t alloc_info = 0;
     int64_t size_;
 };
 

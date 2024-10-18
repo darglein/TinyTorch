@@ -11,17 +11,27 @@ namespace tinytorch
 namespace cuda
 {
 
+
+enum class AllocatorAlgorithm
+{
+    CUDA_MALLOC,
+    CUDA_MALLOC_ASYNC,
+};
+TINYTORCH_API void set_allocator_algorithm(AllocatorAlgorithm algo);
+
+
 struct TINYTORCH_API CUDACachingAllocator
 {
     static void emptyCache();
 };
 
 
-void* cuda_cached_malloc(int64_t size);
-void cuda_cached_free(void* ptr);
+
+std::pair<void*,uint64_t> cuda_cached_malloc(int64_t size);
+void cuda_cached_free(void* ptr, uint64_t alloc_info);
 
 TINYTORCH_API int64_t current_allocated_size();
 TINYTORCH_API int64_t max_allocated_size();
 
-}
+}  // namespace cuda
 }  // namespace tinytorch
