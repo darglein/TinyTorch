@@ -60,8 +60,8 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
 
         if (async)
         {
-            CHECK_CUDA_ERROR(
-                cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, type, cuda::getCurrentCUDAStream()));
+            auto strm = cuda::getCurrentCUDAStream();
+            CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, type, strm));
         }
         else
         {
@@ -86,8 +86,7 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
                 if (1)
                 {
                     CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(),
-                                                         src.device().index(), bytes,
-                                                         cuda::getCurrentCUDAStream()));
+                                                         src.device().index(), bytes, cuda::getCurrentCUDAStream()));
                 }
                 else
                 {
