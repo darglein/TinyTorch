@@ -174,6 +174,8 @@ struct TINYTORCH_API Tensor
     bool requires_grad() const;
     int64_t element_size() const;
 
+    uint64_t AllocatorInfo();
+
 
     //  returns a view of the collapsed tensor and the new excluded dim
     std::pair<Tensor, int64_t> collapse_view(int64_t excludeDim = -1) const;

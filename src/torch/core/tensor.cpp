@@ -659,6 +659,11 @@ Tensor Tensor::flip(const SizeType& size) const
 {
     return tinytorch::flip(*this, size);
 }
+uint64_t Tensor::AllocatorInfo()
+{
+    CHECK(impl_);
+    return impl_->storage_->allocinfo();
+}
 
 
 }  // namespace tinytorch

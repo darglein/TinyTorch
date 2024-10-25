@@ -84,7 +84,8 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions options) : size_(size), opt
 }
 
 
-StorageImpl::StorageImpl(void* data_ptr, int64_t size, TensorOptions options) : size_(size), options_(options)
+StorageImpl::StorageImpl(void* data_ptr, int64_t size, uint64_t alloc_info, TensorOptions options)
+    : size_(size), alloc_info(alloc_info), options_(options)
 {
     data_ptr_     = data_ptr;
     has_ownership = false;

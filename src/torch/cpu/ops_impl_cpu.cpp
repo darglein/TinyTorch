@@ -9,6 +9,7 @@
 #include "ops_impl_cpu_helper.h"
 #include "torch/core/ops/ops_impl.h"
 #include "torch/core/tensor_info.h"
+#include "torch/cuda/cached_memory_allocator.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
 
 
@@ -70,6 +71,8 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
     }
     else
     {
+        bool use_uva = dest.AllocatorInfo() == (uint64_t)cuda::AllocatorAlgorithm::CUDA_MALLOC &&
+                       src.AllocatorInfo() == (uint64_t)cuda::AllocatorAlgorithm::CUDA_MALLOC;
         if (async)
         {
             cudaEvent_t src_buffer_ready, mempcy_finished;
@@ -83,14 +86,16 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
             {
                 cuda::DeviceGuard guard(dest.device());
                 CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCurrentCUDAStream(), src_buffer_ready));
-                if (1)
+
+                if (use_uva)
                 {
-                    CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(),
-                                                         src.device().index(), bytes, cuda::getCurrentCUDAStream()));
+                    CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault,
+                                                     cuda::getCurrentCUDAStream()));
                 }
                 else
                 {
-                    CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault));
+                    CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(),
+                                                         src.device().index(), bytes, cuda::getCurrentCUDAStream()));
                 }
                 mempcy_finished = cuda::getNextEvent();
                 CHECK_CUDA_ERROR(cudaEventRecord(mempcy_finished, cuda::getCurrentCUDAStream()));
@@ -103,8 +108,16 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
         }
         else
         {
-            CHECK_CUDA_ERROR(
-                cudaMemcpyPeer(dest.data_ptr(), dest.device().index(), src.data_ptr(), src.device().index(), bytes));
+            cuda::DeviceGuard guard(dest.device());
+            if (use_uva)
+            {
+                CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault));
+            }
+            else
+            {
+                CHECK_CUDA_ERROR(cudaMemcpyPeer(dest.data_ptr(), dest.device().index(), src.data_ptr(),
+                                                src.device().index(), bytes));
+            }
         }
     }
 

@@ -27,7 +27,7 @@ namespace tinytorch
 struct StorageImpl
 {
     StorageImpl(int64_t size, TensorOptions options);
-    StorageImpl(void* data_ptr, int64_t size, TensorOptions options);
+    StorageImpl(void* data_ptr, int64_t size, uint64_t alloc_info, TensorOptions options);
 
     StorageImpl& operator=(StorageImpl&& other) = default;
     StorageImpl& operator=(const StorageImpl&)  = delete;
@@ -38,6 +38,7 @@ struct StorageImpl
 
     uint8_t* byte_ptr() { return (uint8_t*)data_ptr_; }
 
+   uint64_t allocinfo() { return alloc_info; }
    protected:
     TensorOptions options_;
     bool has_ownership   = false;

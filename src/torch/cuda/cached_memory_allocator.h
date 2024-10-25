@@ -14,6 +14,7 @@ namespace cuda
 
 enum class AllocatorAlgorithm
 {
+    UNKNOWN = 0,
     CUDA_MALLOC,
     CUDA_MALLOC_ASYNC,
 };
