@@ -169,7 +169,7 @@ struct TINYTORCH_API Tensor
 
 
     void retain_grad();
-    void set_requires_grad(bool requires_grad);
+    void set_requires_grad(bool requires_grad, bool allocate_grad =false);
 
     bool requires_grad() const;
     int64_t element_size() const;

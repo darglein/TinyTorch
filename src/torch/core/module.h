@@ -118,10 +118,7 @@ class ModuleHolder : ModuleHolderIndicator
 struct Module
 {
     virtual ~Module() {}
-    std::map<std::string, Tensor> named_parameters()
-    {
-        return parameters_;
-    }
+    std::map<std::string, Tensor> named_parameters() { return parameters_; }
 
     void to(Device d)
     {
@@ -173,7 +170,8 @@ struct Module
     void register_buffer(std::string name, Tensor& t) { buffers_[name] = t; }
     void register_parameter(std::string name, Tensor& t)
     {
-        t.set_requires_grad(true);
+        // also allocate gradient
+        t.set_requires_grad(true, true);
         parameters_[name] = t;
     }
 

@@ -42,7 +42,7 @@ struct TensorImpl : public std::enable_shared_from_this<TensorImpl>
     std::shared_ptr<TensorImpl> getptr() { return shared_from_this(); }
 
 
-    void set_requires_grad(bool requires_grad);
+    void set_requires_grad(bool requires_grad, bool allocate_grad );
     bool requires_grad() const;
 
     int64_t dim() const { return sizes_.size(); }

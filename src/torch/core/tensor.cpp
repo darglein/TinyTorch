@@ -55,10 +55,10 @@ void Tensor::SetEdge(std::shared_ptr<Edge> edge)
     CHECK(impl_->autograd_meta);
     impl_->autograd_meta->edge = edge;
 }
-void Tensor::set_requires_grad(bool requires_grad)
+void Tensor::set_requires_grad(bool requires_grad, bool allocate_grad)
 {
     CHECK(impl_);
-    impl_->set_requires_grad(requires_grad);
+    impl_->set_requires_grad(requires_grad, allocate_grad);
 }
 bool Tensor::requires_grad() const
 {

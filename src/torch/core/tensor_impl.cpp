@@ -34,22 +34,24 @@ void TensorImpl::recompute_strides()
     }
 }
 
-void TensorImpl::set_requires_grad(bool requires_grad)
+void TensorImpl::set_requires_grad(bool requires_grad, bool allocate_grad)
 {
-    if (requires_grad == this->requires_grad())
-    {
-        return;
-    }
     if (requires_grad)
     {
-        options_.requires_grad_ = true;
-        autograd_meta           = std::make_unique<AutogradMeta>();
-        autograd_meta->edge     = std::make_shared<Edge>(std::make_shared<autograd::AccumulateGrad>((getptr())), 0);
+        if(!this->requires_grad())
+        {
+            options_.requires_grad_ = true;
+            autograd_meta           = std::make_unique<AutogradMeta>();
+            autograd_meta->edge     = std::make_shared<Edge>(std::make_shared<autograd::AccumulateGrad>((getptr())), 0);
+        }
 
-        // Preallocate grad tensor
-        auto options_cpy = options_;
-        options_cpy.requires_grad(false);
-        autograd_meta->_grad = zeros(sizes_, options_cpy);
+        if (allocate_grad)
+        {
+            // Preallocate grad tensor
+            auto options_cpy = options_;
+            options_cpy.requires_grad(false);
+            autograd_meta->_grad = zeros(sizes_, options_cpy);
+        }
     }
     else
     {
@@ -72,12 +74,14 @@ void TensorImpl::set_data(TensorImpl& other)
     sizes_          = other.sizes_;
     strides_        = other.strides_;
     options_        = other.options_;
-    set_requires_grad(false);
+
+    bool has_grad = requires_grad() && autograd_meta->grad().defined();
+    set_requires_grad(false, false);
 
     // recreate edges and grad tensor
     if (other.requires_grad())
     {
-        set_requires_grad(true);
+        set_requires_grad(true, has_grad);
     }
 }
 
