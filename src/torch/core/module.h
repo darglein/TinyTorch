@@ -120,17 +120,16 @@ struct Module
     virtual ~Module() {}
     std::map<std::string, Tensor> named_parameters()
     {
-        throw std::runtime_error("not implemented");
-        return {};
+        return parameters_;
     }
 
     void to(Device d)
     {
-        for (auto& b : buffers_)
+        for (auto& b : parameters_)
         {
             b.second.to_(d);
         }
-        for (auto& b : parameters_)
+        for (auto& b : buffers_)
         {
             b.second.to_(d);
         }

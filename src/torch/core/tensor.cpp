@@ -116,7 +116,9 @@ ScalarType Tensor::scalar_type() const
 TensorOptions Tensor::options() const
 {
     CHECK(impl_);
-    return impl_->options_;
+    auto options_cpy = impl_->options_;
+    options_cpy.requires_grad(false);
+    return options_cpy;
 }
 
 static void fill_neg_one_dim(SizeType& new_sizes, int64_t old_numel)
@@ -418,13 +420,19 @@ Tensor Tensor::to(Device new_device, bool non_blocking) const
 
 void Tensor::to_(ScalarType new_type)
 {
+    if (scalar_type() == new_type) return;
+
+    NoGradGuard ngg;
     auto result = to(new_type);
     result.set_requires_grad(requires_grad());
     impl_->set_data(*result.impl_);
 }
 void Tensor::to_(Device new_device)
 {
-    auto result = to(new_device);
+    if (device() == new_device) return;
+
+    NoGradGuard ngg;
+    auto result = this->to(new_device);
     result.set_requires_grad(requires_grad());
     impl_->set_data(*result.impl_);
 }
