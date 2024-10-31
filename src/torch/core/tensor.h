@@ -174,7 +174,8 @@ struct TINYTORCH_API Tensor
     bool requires_grad() const;
     int64_t element_size() const;
 
-    uint64_t AllocatorInfo();
+    uint64_t AllocatorInfo() const;
+    bool is_uva() const;
 
 
     //  returns a view of the collapsed tensor and the new excluded dim

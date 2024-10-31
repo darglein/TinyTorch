@@ -38,7 +38,7 @@ struct StorageImpl
 
     uint8_t* byte_ptr() { return (uint8_t*)data_ptr_; }
 
-   uint64_t allocinfo() { return alloc_info; }
+   uint64_t allocinfo() const { return alloc_info; }
    protected:
     TensorOptions options_;
     bool has_ownership   = false;

@@ -29,7 +29,7 @@ static int64_t max_allocated_bytes     = 0;
 static bool allocator_initialized = false;
 static bool has_malloc_async      = false;
 
-static AllocatorAlgorithm algorithm = AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
+static thread_local AllocatorAlgorithm algorithm = AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
 
 
 void set_allocator_algorithm(AllocatorAlgorithm algo)
@@ -126,7 +126,7 @@ static void free_async(void* ptr)
     current_allocated_bytes -= size;
     allocated_blocks.erase(ptr);
 
-    cudaFreeAsync(ptr, cuda::getCurrentCUDAStream());
+    CHECK_CUDA_ERROR(cudaFreeAsync(ptr, cuda::getCurrentCUDAStream()));
 }
 
 static void* malloc_blocking(int64_t size)
@@ -141,7 +141,9 @@ static void* malloc_blocking(int64_t size)
 
 static void free_blocking(void* ptr)
 {
-    cudaFree(ptr);
+    // not quite sure why the cuda device synchronize is needed
+    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+    CHECK_CUDA_ERROR(cudaFree(ptr));
 }
 
 std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size)

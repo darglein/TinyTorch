@@ -71,8 +71,7 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
     }
     else
     {
-        bool use_uva = dest.AllocatorInfo() == (uint64_t)cuda::AllocatorAlgorithm::CUDA_MALLOC &&
-                       src.AllocatorInfo() == (uint64_t)cuda::AllocatorAlgorithm::CUDA_MALLOC;
+        bool use_uva = dest.is_uva() && src.is_uva();
         if (async)
         {
             cudaEvent_t src_buffer_ready, mempcy_finished;

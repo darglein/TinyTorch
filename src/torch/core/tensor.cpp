@@ -667,10 +667,21 @@ Tensor Tensor::flip(const SizeType& size) const
 {
     return tinytorch::flip(*this, size);
 }
-uint64_t Tensor::AllocatorInfo()
+uint64_t Tensor::AllocatorInfo() const
 {
     CHECK(impl_);
     return impl_->storage_->allocinfo();
+}
+bool Tensor::is_uva() const
+{
+    if (is_cpu())
+    {
+        return options().pinned_memory_;
+    }
+    else
+    {
+        return AllocatorInfo() == (uint64_t)cuda::AllocatorAlgorithm::CUDA_MALLOC;
+    }
 }
 
 
