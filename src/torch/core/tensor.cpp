@@ -13,6 +13,7 @@
 
 #include "../tiny_torch_cuda.h"
 #include "torch/core/tensor_impl.h"
+#include "torch/cuda/multi_device.h"
 
 namespace tinytorch
 {
@@ -676,11 +677,11 @@ bool Tensor::is_uva() const
 {
     if (is_cpu())
     {
-        return options().pinned_memory_;
+        return options().pinned_memory_ && cuda::HasP2PCopy();
     }
     else
     {
-        return AllocatorInfo() == (uint64_t)cuda::AllocatorAlgorithm::CUDA_MALLOC;
+        return AllocatorInfo() == (uint64_t)cuda::AllocatorAlgorithm::CUDA_MALLOC && cuda::HasP2PCopy();
     }
 }
 

@@ -6,6 +6,11 @@ namespace tinytorch
 {
 namespace cuda
 {
+static bool has_p2p_copy = false;
+bool HasP2PCopy()
+{
+    return has_p2p_copy;
+}
 
 
 bool IsCudaPeerToPeerAvailable(Device device0, Device device1)
@@ -25,9 +30,6 @@ bool EnableCudaPeerToPeer(Device device0, Device device1)
 {
     if (!IsCudaPeerToPeerAvailable(device0, device1))
     {
-#ifdef QRT_ENABLE_LOGGING
-        std::cout << "CudaPeerToPeer not available " << device0 << " -> " << device1 << std::endl;
-#endif
         return false;
     }
 
@@ -51,16 +53,16 @@ bool EnableCudaPeerToPeer(Device device0, Device device1)
             CHECK_CUDA_ERROR(error);
         }
     }
-
-#ifdef QRT_ENABLE_LOGGING
-    std::cout << "CudaPeerToPeer enabled for device " << device0 << " -> " << device1 << std::endl;
-#endif
-
     return true;
 }
 
 void DisableCudaPeerToPeer(Device device0, Device device1)
 {
+    if (!IsCudaPeerToPeerAvailable(device0, device1))
+    {
+        return;
+    }
+
     CHECK_EQ(device0.type(), kCUDA);
     CHECK_EQ(device1.type(), kCUDA);
     CHECK_NE(device0.index(), device1.index());
@@ -74,7 +76,7 @@ void DisableCudaPeerToPeer(Device device0, Device device1)
         CHECK_CUDA_ERROR(cudaDeviceDisablePeerAccess(device0.index()));
     }
 }
-bool EnableCudaPeerToPeerVec(const std::vector<Device>& devices)
+bool EnableCudaPeerToPeer(const std::vector<Device>& devices)
 {
     bool enabled = true;
     for (int i = 0; i < devices.size(); ++i)
@@ -84,9 +86,10 @@ bool EnableCudaPeerToPeerVec(const std::vector<Device>& devices)
             enabled &= EnableCudaPeerToPeer(devices[i], devices[j]);
         }
     }
+    has_p2p_copy = enabled;
     return enabled;
 }
-void DisableCudaPeerToPeerVec(const std::vector<Device>& devices)
+void DisableCudaPeerToPeer(const std::vector<Device>& devices)
 {
     if (devices.size() >= 2)
     {
@@ -95,6 +98,7 @@ void DisableCudaPeerToPeerVec(const std::vector<Device>& devices)
             DisableCudaPeerToPeer(devices[0], devices[i]);
         }
     }
+    has_p2p_copy = false;
 }
 
 }  // namespace cuda

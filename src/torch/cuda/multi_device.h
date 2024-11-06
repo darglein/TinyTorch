@@ -7,14 +7,13 @@ namespace tinytorch
 namespace cuda
 {
 
+TINYTORCH_API bool HasP2PCopy();
 
 TINYTORCH_API bool IsCudaPeerToPeerAvailable(Device device0, Device device1);
 
-TINYTORCH_API bool EnableCudaPeerToPeerVec(const std::vector<Device>& devices);
-TINYTORCH_API void DisableCudaPeerToPeerVec(const std::vector<Device>& devices);
-
-TINYTORCH_API bool EnableCudaPeerToPeer(Device device0, Device device1);
-TINYTORCH_API void DisableCudaPeerToPeer(Device device0, Device device1);
+// Must be called for all active devices to enable torch-p2p copies
+TINYTORCH_API bool EnableCudaPeerToPeer(const std::vector<Device>& devices);
+TINYTORCH_API void DisableCudaPeerToPeer(const std::vector<Device>& devices);
 
 
 }
