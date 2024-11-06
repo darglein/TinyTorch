@@ -71,7 +71,7 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions options) : size_(size), opt
 #ifdef TT_HAS_CUDA
         cuda::DeviceGuard g(options_.device_);
 
-        std::tie(data_ptr_, alloc_info) = cuda::cuda_cached_malloc(size);
+        std::tie(data_ptr_, alloc_info) = cuda::cuda_cached_malloc(size, options.device_.index());
 #    if TT_DEBUG
         CHECK_CUDA_ERROR(cudaMemsetAsync(data_ptr_, 0xabababab, size, cuda::getCurrentCUDAStream()));
 #    endif
@@ -116,7 +116,7 @@ StorageImpl::~StorageImpl()
 #ifdef TT_HAS_CUDA
             cuda::DeviceGuard g(options_.device_);
 
-            cuda::cuda_cached_free(data_ptr_, alloc_info);
+            cuda::cuda_cached_free(data_ptr_, alloc_info, options_.device_.index());
 #else
             CHECK(false);
 #endif

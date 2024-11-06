@@ -28,11 +28,11 @@ struct TINYTORCH_API CUDACachingAllocator
 
 
 
-std::pair<void*,uint64_t> cuda_cached_malloc(int64_t size);
-void cuda_cached_free(void* ptr, uint64_t alloc_info);
+std::pair<void*,uint64_t> cuda_cached_malloc(int64_t size, int device_id);
+void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id);
 
-TINYTORCH_API int64_t current_allocated_size();
-TINYTORCH_API int64_t max_allocated_size();
+TINYTORCH_API int64_t current_allocated_size(int device_id);
+TINYTORCH_API int64_t max_allocated_size(int device_id);
 
 }  // namespace cuda
 }  // namespace tinytorch
