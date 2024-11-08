@@ -113,7 +113,7 @@ std::vector<Device> GetCudaDevicesFromDeviceList(std::vector<int> device_list)
         }
         else
         {
-            std::cout << "Ignoring device id " << index << ". Only " << cuda_device_count << " GPUs are available.\n";
+            throw std::runtime_error("Invalid device id " + std::to_string(index));
         }
     }
 
