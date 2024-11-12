@@ -515,6 +515,9 @@ bool Tensor::allclose(Tensor other, double rtol, double atol) const
         case kDouble:
             v = diff.toDouble();
             break;
+        case kInt:
+            v = diff.toInt();
+            break;
         default:
             CHECK(false);
     }
