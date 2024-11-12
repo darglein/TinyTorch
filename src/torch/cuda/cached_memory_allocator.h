@@ -20,6 +20,11 @@ enum class AllocatorAlgorithm
 };
 TINYTORCH_API void set_allocator_algorithm(AllocatorAlgorithm algo);
 
+// 0: on_error
+// 1: on_out_of_memory
+// 2: info
+TINYTORCH_API void set_allocator_log_level(int level);
+
 
 struct TINYTORCH_API CUDACachingAllocator
 {

@@ -22,8 +22,6 @@ static constexpr int MAX_DEVICES = 8;
 static std::mutex mu;
 static bool allocator_initialized = false;
 static bool has_malloc_async      = false;
-static bool debug_print           = false;
-static int64_t debug_print_size   = 25 * 1024 * 1024;
 
 struct PerDeviceMemoryData
 {
@@ -43,12 +41,19 @@ static PerDeviceMemoryData& DeviceData(int device_id)
 
 
 static thread_local AllocatorAlgorithm algorithm = AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
+static int log_level                             = 1;
 
 
 void set_allocator_algorithm(AllocatorAlgorithm algo)
 {
     std::unique_lock l(mu);
     algorithm = algo;
+}
+
+void set_allocator_log_level(int level)
+{
+    std::unique_lock l(mu);
+    log_level = level;
 }
 
 int64_t current_allocated_size(int device_id)
@@ -84,12 +89,16 @@ static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size, i
     {
         size_t mem_free, mem_total;
         cudaMemGetInfo(&mem_free, &mem_total);
-        std::cerr << " CUDA out of memory!\n"
-                  << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB\n"
-                  << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
-                  << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n"
-                  << "     Allocated by torch " << (DeviceData(device_id).current_allocated_bytes / 1000.0 / 1000.0)
-                  << "MB\n";
+
+        if (log_level >= 1)
+        {
+            std::cout << " CUDA out of memory!\n"
+                      << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB\n"
+                      << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
+                      << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n"
+                      << "     Allocated by torch " << (DeviceData(device_id).current_allocated_bytes / 1000.0 / 1000.0)
+                      << "MB" << std::endl;
+        }
 
         throw std::runtime_error(std::string("CUDA memory allocation error: ") + cudaGetErrorString(cuda_error));
     }
@@ -169,14 +178,11 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
         d.max_allocated_bytes = std::max(d.current_allocated_bytes, d.max_allocated_bytes);
         CHECK(d.allocated_blocks.find(ptr) != d.allocated_blocks.end());
 
-        if (debug_print)
+        if (log_level >= 2)
         {
-            if (size > debug_print_size)
-            {
-                std::cout << "Allocate CUDA Memory with algo= " << info << " on device " << getDevice()
-                          << " size: " << (size / 1024.0 / 1024.0) << "MiB (" << ptr
-                          << ") Curr. Alloc: " << (d.current_allocated_bytes / (1024.0 * 1024.0)) << " MiB\n";
-            }
+            std::cout << "Allocate CUDA Memory with algo= " << info << " on device " << getDevice()
+                      << " size: " << (size / 1024.0 / 1024.0) << "MiB (" << ptr
+                      << ") Curr. Alloc: " << (d.current_allocated_bytes / (1024.0 * 1024.0)) << " MiB\n";
         }
     }
 
@@ -199,13 +205,10 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
         auto& d = DeviceData(device_id);
         CHECK(d.allocated_blocks.find(ptr) != d.allocated_blocks.end());
         int64_t size = d.allocated_blocks.find(ptr)->second;
-        if (debug_print)
+        if (log_level >= 2)
         {
-            if (size > debug_print_size)
-            {
-                std::cout << "Free CUDA Memory with algo= " << (int)algo << " size " << (size / 1024.0 / 1024.0)
-                          << "MiB (" << ptr << ")" << "\n";
-            }
+            std::cout << "Free CUDA Memory with algo= " << (int)algo << " size " << (size / 1024.0 / 1024.0) << "MiB ("
+                      << ptr << ")" << "\n";
         }
 
         d.current_allocated_bytes -= size;
