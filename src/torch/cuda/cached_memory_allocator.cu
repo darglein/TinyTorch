@@ -50,6 +50,11 @@ void set_allocator_algorithm(AllocatorAlgorithm algo)
     algorithm = algo;
 }
 
+AllocatorAlgorithm get_allocator_algorithm()
+{
+    return algorithm;
+}
+
 void set_allocator_log_level(int level)
 {
     std::unique_lock l(mu);

@@ -19,6 +19,7 @@ enum class AllocatorAlgorithm
     CUDA_MALLOC_ASYNC,
 };
 TINYTORCH_API void set_allocator_algorithm(AllocatorAlgorithm algo);
+TINYTORCH_API AllocatorAlgorithm get_allocator_algorithm();
 
 // 0: on_error
 // 1: on_out_of_memory
