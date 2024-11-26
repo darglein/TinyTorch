@@ -4,10 +4,10 @@
  * See LICENSE file for more information.
  */
 
+#include <numeric>
+
 #include "ops_impl_cuda_helper.h"
 #include "tt_cuda.h"
-
-#include <numeric>
 
 namespace tinytorch
 {
@@ -53,6 +53,14 @@ void setDevice(int device_index)
     CHECK_CUDA_ERROR(cudaSetDevice(device_index));
 }
 
+
+int& getTotalNumEventsUsed()
+{
+    static thread_local int n = 0;
+    return n;
+}
+
+
 cudaEvent_t getNextEvent()
 {
     constexpr int MAX_EVENTS                                              = 128;
@@ -69,6 +77,8 @@ cudaEvent_t getNextEvent()
     {
         CHECK_CUDA_ERROR(cudaEventCreate(&event));
     }
+
+    getTotalNumEventsUsed()++;
 
     return event;
 }
@@ -104,7 +114,7 @@ std::vector<Device> GetCudaDevicesFromDeviceList(std::vector<int> device_list)
         if (index < 0)
         {
             throw std::runtime_error("Invalid negative device_id " + std::to_string(index) +
-                                   ". Only allowed negative number is -1, in which case all GPUs are used.");
+                                     ". Only allowed negative number is -1, in which case all GPUs are used.");
         }
 
         if (index < cuda_device_count)
@@ -126,7 +136,6 @@ std::vector<Device> GetCudaDevicesFromDeviceList(std::vector<int> device_list)
 
     return result;
 }
-
 
 }  // namespace cuda
 }  // namespace tinytorch
