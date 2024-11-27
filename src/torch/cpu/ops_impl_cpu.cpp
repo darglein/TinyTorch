@@ -71,6 +71,7 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
     }
     else
     {
+        // p2p copy
         bool use_uva = dest.is_uva() && src.is_uva();
         if (async)
         {
