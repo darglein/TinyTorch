@@ -9,6 +9,8 @@
 
 #include <map>
 
+#include "torch/cuda/multi_device.h"
+
 
 namespace tinytorch
 {
@@ -73,6 +75,7 @@ struct TINYTORCH_API IValue
     IValue(int32_t i) : v_int64(i) {}
     IValue(int64_t i) : v_int64(i) {}
     IValue(Tensor t) : v_tensor(t) {}
+    IValue(const cuda::MultiDeviceTensor& t) : v_tensor(Tensor(t)) {}
     IValue(SizeType s) : v_size(s) {}
     IValue(Device d) : v_device(d) {}
 

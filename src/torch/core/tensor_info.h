@@ -21,6 +21,7 @@
 #include "torch/tiny_torch_config.h"
 #include "torch/tiny_torch_cuda.h"
 #include <type_traits>
+#include <torch/cuda/multi_device.h>
 
 #if defined(__CUDACC__)
 #    define TT_INLINE __forceinline__
@@ -258,6 +259,15 @@ struct TensorInfoBase
         }
     }
 
+//#if defined(__CUDACC__)
+    TensorInfoBase(const cuda::MultiDeviceTensor& t) : TensorInfoBase(Tensor(t))
+    {
+    }
+//#endif
+
+
+    TT_INLINE constexpr bool defined() { return data != nullptr; }
+
     TT_INLINE constexpr TT_HD int dim()
     {
         if constexpr (is_dynamic)
@@ -459,8 +469,8 @@ template <typename T, int MAX_DIMS = -1>
 using TensorInfo = TensorInfoBase<T, int64_t, false, MAX_DIMS>;
 
 
-template <typename T, int MAX_DIMS = -1>
-using TensorInfoCuda = TensorInfoBase<T, int64_t, true, MAX_DIMS>;
+template <typename T, int MAX_DIMS = -1, typename IndexType=int64_t>
+using TensorInfoCuda = TensorInfoBase<T, IndexType, true, MAX_DIMS>;
 
 
 }  // namespace tinytorch
