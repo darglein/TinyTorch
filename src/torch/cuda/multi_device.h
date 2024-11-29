@@ -17,19 +17,53 @@ TINYTORCH_API void DisableCudaPeerToPeer(const std::vector<Device>& devices);
 
 
 
-struct MultiDeviceTensor
+struct TINYTORCH_API MultiDeviceTensor
 {
+    std::vector<Device> devices;
     std::vector<Tensor> data;
+    Tensor cpu_data;
 
     // Init with undefined tensor
     MultiDeviceTensor() { data.push_back({}); }
     MultiDeviceTensor(Tensor d) { data.push_back(d); }
+    MultiDeviceTensor(std::vector<Device> _devices) : devices(_devices) { data.resize(devices.size()); }
 
     Tensor* operator->() { return &data.front(); }
 
     // implicit cast to main_device tensor, to make use of existing functions
     operator Tensor&() { return data.front(); }
     operator const Tensor&() const { return data.front(); }
+
+
+    Tensor& Main() { return data.front(); }
+
+    void SetMain(Tensor t);
+    void MainToCPU();
+    void CPUToOthers(cudaEvent_t wait_event);
+
+    void zero_()
+    {
+        for (auto& d : data)
+        {
+            d.zero_();
+        }
+    }
+
+
+    Tensor operator[](Device d)
+    {
+        for (int i = 0; i < devices.size(); ++i)
+        {
+            if (devices[i] == d)
+            {
+                return data[i];
+            }
+        }
+        CHECK(false) << "Device " << d << " not found!";
+        return {};
+    }
+
+    void SetMainAndCopyToOthers(Tensor t);
 };
 
 

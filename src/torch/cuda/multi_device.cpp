@@ -1,6 +1,7 @@
 #include "multi_device.h"
 
 #include "ops_impl_cuda_helper.h"
+#include "torch/core/ops/ops_tensor_creation.h"
 
 namespace tinytorch
 {
@@ -99,6 +100,68 @@ void DisableCudaPeerToPeer(const std::vector<Device>& devices)
         }
     }
     has_p2p_copy = false;
+}
+
+void MultiDeviceTensor::SetMain(Tensor t)
+{
+    data.front() = t;
+
+    for (int local_device_id = 1; local_device_id < devices.size(); ++local_device_id)
+    {
+        auto d    = devices[local_device_id];
+        auto& dst = data[local_device_id];
+        if (!dst.defined())
+        {
+            dst = empty_like(t, t.options().device(d));
+        }
+    }
+}
+
+void MultiDeviceTensor::MainToCPU()
+{
+    if (!Main().defined())
+    {
+        cpu_data = {};
+        return;
+    }
+
+    if (!cpu_data.defined())
+    {
+        cpu_data = empty_like(Main(), Main().options().device(kCPU).pinned_memory(true));
+    }
+    cpu_data.copy_(Main(), true);
+}
+
+void MultiDeviceTensor::CPUToOthers(cudaEvent_t wait_event)
+{
+    for (int local_device_id = 1; local_device_id < devices.size(); ++local_device_id)
+    {
+        auto d    = devices[local_device_id];
+        auto& dst = data[local_device_id];
+        cuda::DeviceGuard dg(d);
+
+        if (!cpu_data.defined())
+        {
+            dst = {};
+            continue;
+        }
+
+        cudaStreamWaitEvent(getCurrentCUDAStream(), wait_event);
+
+        dst.copy_(cpu_data, true);
+    }
+}
+
+
+void MultiDeviceTensor::SetMainAndCopyToOthers(Tensor t)
+{
+    SetMain(t);
+    MainToCPU();
+
+    auto on_cpu_event = getNextEvent();
+    cudaEventRecord(on_cpu_event, getCurrentCUDAStream());
+
+    CPUToOthers(on_cpu_event);
 }
 
 }  // namespace cuda
