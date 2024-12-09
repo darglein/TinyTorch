@@ -112,7 +112,14 @@ void MultiDeviceTensor::SetMain(Tensor t)
         auto& dst = data[local_device_id];
         if (!dst.defined())
         {
-            dst = empty_like(t, t.options().device(d));
+            if (t.defined())
+            {
+                dst = empty_like(t, t.options().device(d));
+            }
+            else
+            {
+                dst = {};
+            }
         }
     }
 }
