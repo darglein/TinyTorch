@@ -34,27 +34,27 @@ static void free_impl_host(void* ptr, int64_t size)
 
 namespace tinytorch
 {
-StorageImpl::StorageImpl(int64_t size, TensorOptions options) : size_(size), options_(options)
+StorageImpl::StorageImpl(int64_t size, TensorOptions __options) : size_(size), options_(__options)
 {
     if (options_.device_ == kCPU)
     {
 #ifdef TT_HAS_CUDA
-        if (options.pinned_memory_)
+        if (options_.pinned_memory_)
         {
             cudaError_t cuda_error = cudaMallocHost(&data_ptr_, size);
             if (cuda_error != cudaSuccess)
             {
                 size_t mem_free, mem_total;
                 cudaMemGetInfo(&mem_free, &mem_total);
-                std::cerr << " CUDA out of memory! " << cudaGetErrorString(cuda_error) << "\n"
-                          << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB of pinned memory\n";
-
-                throw std::runtime_error(std::string("CUDA pinned memory allocation error: ") +
-                                         cudaGetErrorString(cuda_error));
+                std::cout << " Pinned memory allocation of " << (size / 1024.0 / 1024.0)
+                          << "MiB failed. Falling back to non-pinned memory...\n";
+                options_.pinned_memory_ = false;
             }
         }
-        else
+
+        if (!options_.pinned_memory_)
         {
+            CHECK(!data_ptr_);
             data_ptr_ = malloc_impl_host(size);
         }
 #else
@@ -71,7 +71,7 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions options) : size_(size), opt
 #ifdef TT_HAS_CUDA
         cuda::DeviceGuard g(options_.device_);
 
-        std::tie(data_ptr_, alloc_info) = cuda::cuda_cached_malloc(size, options.device_.index());
+        std::tie(data_ptr_, alloc_info) = cuda::cuda_cached_malloc(size, options_.device_.index());
 #    if TT_DEBUG
         CHECK_CUDA_ERROR(cudaMemsetAsync(data_ptr_, 0xabababab, size, cuda::getCurrentCUDAStream()));
 #    endif
