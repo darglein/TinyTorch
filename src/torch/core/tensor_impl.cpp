@@ -14,12 +14,14 @@ TensorImpl::TensorImpl(const SizeType& sizes, TensorOptions options) : sizes_(si
 {
     recompute_strides();
     storage_ = std::make_shared<StorageImpl>(elementSize(options.dtype_) * numel(), options);
+    options_.pinned_memory_ = storage_->options().pinned_memory_;
 }
 
 TensorImpl::TensorImpl(std::shared_ptr<StorageImpl> storage, int64_t storage_offset, const SizeType& sizes,
                        const SizeType& strides, TensorOptions options)
     : storage_(storage), storage_offset_(storage_offset), sizes_(sizes), strides_(strides), options_(options)
 {
+    options_.pinned_memory_ = storage_->options().pinned_memory_;
 }
 
 
