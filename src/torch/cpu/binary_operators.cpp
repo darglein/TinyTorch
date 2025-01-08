@@ -41,6 +41,7 @@ static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, Tenso
         T* pb  = b.data;
         T* pr  = result.data;
         auto N = result.numel();
+#pragma omp parallel for num_threads(get_num_threads())
         for (int64_t i = 0; i < N; ++i)
         {
             pr[i] = op.forward(pa[i], pb[i]);
@@ -48,6 +49,7 @@ static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, Tenso
     }
     else
     {
+#pragma omp parallel for num_threads(get_num_threads())
         for (int64_t i = 0; i < result.numel(); ++i)
         {
             auto index_result = result.LinearIndexToDimIndex(i);
@@ -69,6 +71,7 @@ static void element_wise_operator(Op op, TensorInfo<T> a, T b, TensorInfo<T> res
         T* pa  = a.data;
         T* pr  = result.data;
         auto N = result.numel();
+#pragma omp parallel for num_threads(get_num_threads())
         for (int64_t i = 0; i < N; ++i)
         {
             pr[i] = T(G(op.forward(G(pa[i]), G(b))));
@@ -76,6 +79,7 @@ static void element_wise_operator(Op op, TensorInfo<T> a, T b, TensorInfo<T> res
     }
     else
     {
+#pragma omp parallel for num_threads(get_num_threads())
         for (int64_t i = 0; i < result.numel(); ++i)
         {
             result[i] = T(G(op.forward(G(a[i]), G(b))));
@@ -91,6 +95,7 @@ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> res
         T* pb  = b.data;
         T* pr  = result.data;
         auto N = result.numel();
+#pragma omp parallel for num_threads(get_num_threads())
         for (int64_t i = 0; i < N; ++i)
         {
             pr[i] = op.forward(a, pb[i]);
@@ -98,6 +103,7 @@ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> res
     }
     else
     {
+#pragma omp parallel for num_threads(get_num_threads())
         for (int64_t i = 0; i < result.numel(); ++i)
         {
             result[i] = op.forward(a, b[i]);

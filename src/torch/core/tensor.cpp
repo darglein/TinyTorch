@@ -14,9 +14,31 @@
 #include "../tiny_torch_cuda.h"
 #include "torch/core/tensor_impl.h"
 #include "torch/cuda/multi_device.h"
+#include <thread>
 
 namespace tinytorch
 {
+
+int& internal_num_threads(){
+
+    static thread_local int num_threads = -1;
+    return num_threads;
+}
+
+void set_num_threads(int n)
+{
+    internal_num_threads() = n;
+}
+int get_num_threads()
+{
+    int n = internal_num_threads();
+    if (n <= 0)
+    {
+        n = std::thread::hardware_concurrency();
+    }
+    return n;
+}
+
 int64_t Tensor::numel() const
 {
     CHECK(defined());

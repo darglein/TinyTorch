@@ -25,6 +25,9 @@
 namespace tinytorch
 {
 
+TINYTORCH_API void set_num_threads(int n);
+TINYTORCH_API int get_num_threads();
+
 struct TensorImpl;
 }
 namespace std
