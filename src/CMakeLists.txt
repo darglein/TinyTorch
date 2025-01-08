@@ -41,12 +41,19 @@ target_include_directories(torch PUBLIC ".")
 target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_suppress=186>) # pointless comparison of unsigned integer with zero
 target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_suppress=1394>) # field of class type without a DLL interface used in a class with a DLL interface
 
+
+if(OPENMP_FOUND)
+    target_include_directories(torch PRIVATE ${OPENMP_INCLUDE_DIRS})
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${OpenMP_CXX_FLAGS}>)
+endif()
+
 if (UNIX)
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wno-absolute-value>)
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-absolute-value>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fvisibility=hidden>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fvisibility=hidden>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--generate-line-info>) # for profiling
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
 endif ()
 
 
@@ -60,6 +67,7 @@ if (WIN32)
     # unknown pragma 'unroll'
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd4068>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4068>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
 
 endif ()
 
@@ -67,6 +75,9 @@ endif ()
 
 
 target_link_libraries(torch PUBLIC glog::glog)
+#target_link_libraries(torch PRIVATE "${OpenMP_CXX_LIB_NAMES}")
+
+
 
 if (TT_HAS_CUDA)
     target_link_libraries(torch PUBLIC CUDA::cudart)

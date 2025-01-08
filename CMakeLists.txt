@@ -21,6 +21,8 @@ else ()
 endif ()
 
 
+find_package(OpenMP REQUIRED)
+
 #### Submodules ####
 
 if (NOT TARGET glog::glog)
