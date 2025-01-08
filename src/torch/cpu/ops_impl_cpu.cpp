@@ -703,6 +703,7 @@ void max_backward_impl(Tensor grad_output, Tensor& grad_a, Tensor& grad_b)
 template <typename TSource, typename TTarget>
 static void copy_and_convert_impl_kernel(TensorInfo<TSource> src, TensorInfo<TTarget> target)
 {
+#pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < src.numel(); ++i)
     {
         if constexpr (std::is_same_v<TTarget, Half>)
@@ -775,13 +776,13 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
 template <typename T>
 static void clamp_impl_(TensorInfo<T> src, double low, double high)
 {
-    using G  = typename CpuComputeFloatType<T>::Type;
-    T low_t  = std::isfinite(low) ? T(low) : std::numeric_limits<T>::lowest();
-    T high_t = std::isfinite(high) ? T(high) : std::numeric_limits<T>::max();
-
+    using G        = typename CpuComputeFloatType<T>::Type;
+    const G low_t  = G(std::isfinite(low) ? T(low) : std::numeric_limits<T>::lowest());
+    const G high_t = G(std::isfinite(high) ? T(high) : std::numeric_limits<T>::max());
+#pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < src.numel(); ++i)
     {
-        src[i] = std::min(G(high_t), std::max(G(src[i]), G(low_t)));
+        src[i] = std::min(high_t, std::max(G(src[i]), low_t));
     }
 }
 void clamp_impl_(Tensor& a, double low, double high)
@@ -793,6 +794,7 @@ void clamp_impl_(Tensor& a, double low, double high)
 template <typename T>
 static void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInfo<T> result)
 {
+#pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < result.numel(); ++i)
     {
         auto index_result    = result.LinearIndexToDimIndex(i);
@@ -811,6 +813,7 @@ void repeat_interleave_impl(Tensor input, int64_t count, Tensor result)
 template <typename T>
 static void repeat_impl(TensorInfo<T> src, TensorInfo<T> result)
 {
+#pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < result.numel(); ++i)
     {
         auto index_result = result.LinearIndexToDimIndex(i);

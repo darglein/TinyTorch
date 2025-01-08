@@ -6,9 +6,8 @@
 
 #include "unary_operators.h"
 
-#include "torch/core/ops/ops_impl.h"
-
 #include "ops_impl_cpu_helper.h"
+#include "torch/core/ops/ops_impl.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cpu/ops_impl_cpu.h"
 
@@ -21,24 +20,60 @@ template <typename T, typename Op>
 static void unary_operator_kernel(Op op, TensorInfo<T> a, TensorInfo<T> result)
 {
     using G = typename CpuComputeFloatType<T>::Type;
-    for (int64_t i = 0; i < result.numel(); ++i)
+    auto N  = result.numel();
+    if (a.contiguous && result.contiguous)
     {
-        G input   = G(a[i]);
-        G output  = op.forward(input);
-        result[i] = T(output);
+        T* pa = a.data;
+        T* pr = result.data;
+#pragma omp parallel for num_threads(get_num_threads())
+        for (int64_t i = 0; i < N; ++i)
+        {
+            G input  = G(pa[i]);
+            G output = op.forward(input);
+            pr[i]    = T(output);
+        }
+    }
+    else
+    {
+#pragma omp parallel for num_threads(get_num_threads())
+        for (int64_t i = 0; i < N; ++i)
+        {
+            G input   = G(a[i]);
+            G output  = op.forward(input);
+            result[i] = T(output);
+        }
     }
 }
 template <typename T, typename Op>
-static void unary_operator_backward_kernel(Op op, TensorInfo<T> a, TensorInfo<T> grad_a,
-                                           TensorInfo<T> grad_result)
+static void unary_operator_backward_kernel(Op op, TensorInfo<T> a, TensorInfo<T> grad_a, TensorInfo<T> grad_result)
 {
     using G = typename CpuComputeFloatType<T>::Type;
-    for (int64_t i = 0; i < grad_a.numel(); ++i)
+    auto N  = grad_a.numel();
+
+    if (a.contiguous && grad_a.contiguous && grad_result.contiguous)
     {
-        G input       = G(a[i]);
-        G grad_output = G(grad_result[i]);
-        G grad_input  = op.backward(input, grad_output);
-        grad_a[i]     = T(grad_input);
+        T* pa  = a.data;
+        T* pga = grad_a.data;
+        T* pgr = grad_result.data;
+#pragma omp parallel for num_threads(get_num_threads())
+        for (int64_t i = 0; i < N; ++i)
+        {
+            G input       = G(pa[i]);
+            G grad_output = G(pgr[i]);
+            G grad_input  = op.backward(input, grad_output);
+            pga[i]        = T(grad_input);
+        }
+    }
+    else
+    {
+#pragma omp parallel for num_threads(get_num_threads())
+        for (int64_t i = 0; i < N; ++i)
+        {
+            G input       = G(a[i]);
+            G grad_output = G(grad_result[i]);
+            G grad_input  = op.backward(input, grad_output);
+            grad_a[i]     = T(grad_input);
+        }
     }
 }
 
@@ -49,7 +84,7 @@ static void unary_operator_backward_kernel(Op op, TensorInfo<T> a, TensorInfo<T>
         CASE_MACRO((unary_operator_kernel<int16_t>), kInt16, op, input, output) \
         CASE_MACRO((unary_operator_kernel<int32_t>), kInt32, op, input, output) \
         CASE_MACRO((unary_operator_kernel<int64_t>), kLong, op, input, output)  \
-        CASE_MACRO((unary_operator_kernel<Half>), kHalf, op, input, output)   \
+        CASE_MACRO((unary_operator_kernel<Half>), kHalf, op, input, output)     \
         CASE_MACRO((unary_operator_kernel<float>), kFloat, op, input, output)   \
         CASE_MACRO((unary_operator_kernel<double>), kDouble, op, input, output) \
         default:                                                                \
@@ -57,17 +92,17 @@ static void unary_operator_backward_kernel(Op op, TensorInfo<T> a, TensorInfo<T>
     }
 
 #define SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(op, input, grad_input, grad_result)                          \
-    switch (input.scalar_type())                                                \
-    {                                                                           \
+    switch (input.scalar_type())                                                                          \
+    {                                                                                                     \
         CASE_MACRO((unary_operator_backward_kernel<uint8_t>), kUInt8, op, input, grad_input, grad_result) \
         CASE_MACRO((unary_operator_backward_kernel<int16_t>), kInt16, op, input, grad_input, grad_result) \
         CASE_MACRO((unary_operator_backward_kernel<int32_t>), kInt32, op, input, grad_input, grad_result) \
         CASE_MACRO((unary_operator_backward_kernel<int64_t>), kLong, op, input, grad_input, grad_result)  \
-        CASE_MACRO((unary_operator_backward_kernel<Half>), kHalf, op, input, grad_input, grad_result)   \
+        CASE_MACRO((unary_operator_backward_kernel<Half>), kHalf, op, input, grad_input, grad_result)     \
         CASE_MACRO((unary_operator_backward_kernel<float>), kFloat, op, input, grad_input, grad_result)   \
         CASE_MACRO((unary_operator_backward_kernel<double>), kDouble, op, input, grad_input, grad_result) \
-        default:                                                                \
-            CHECK(false) << "invalid input type " << input.scalar_type();       \
+        default:                                                                                          \
+            CHECK(false) << "invalid input type " << input.scalar_type();                                 \
     }
 
 void abs_impl(Tensor a, Tensor result)
