@@ -418,7 +418,7 @@ static void min_impl(TensorInfo<T> a, TensorInfo<T> result)
     {
         G min_val = std::numeric_limits<G>::max();
 
-#pragma omp parallel for reduction(min : min_val)
+//#pragma omp parallel for reduction(min : min_val)
         for (int64_t i = 0; i < a.numel(); ++i)
         {
             G v = G(a[i]);
@@ -453,7 +453,7 @@ static void max_impl(TensorInfo<T> a, TensorInfo<T> result)
     {
         G max_val = std::numeric_limits<G>::lowest();
 
-#pragma omp parallel for reduction(max : max_val)
+//#pragma omp parallel for reduction(max : max_val)
         for (int64_t i = 0; i < a.numel(); ++i)
         {
             G v = G(a[i]);
