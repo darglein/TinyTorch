@@ -45,6 +45,7 @@ target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_s
 if(OPENMP_FOUND)
     target_include_directories(torch PRIVATE ${OPENMP_INCLUDE_DIRS})
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${OpenMP_CXX_FLAGS}>)
+    target_link_libraries(torch PRIVATE "${OpenMP_CXX_FLAGS}")
 endif()
 
 if (UNIX)

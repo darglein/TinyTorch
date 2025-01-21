@@ -112,6 +112,10 @@ __launch_bounds__(128) static __global__
     {
         b[i] = TTarget((long long)a[i]);
     }
+    else if constexpr (std::is_same_v<TTarget, uint8_t>)
+    {
+        b[i] = TTarget((int)a[i]);
+    }
     else
     {
         b[i] = TTarget(a[i]);
