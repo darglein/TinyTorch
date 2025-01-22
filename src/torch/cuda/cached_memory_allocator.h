@@ -17,6 +17,7 @@ enum class AllocatorAlgorithm
     UNKNOWN = 0,
     CUDA_MALLOC,
     CUDA_MALLOC_ASYNC,
+    CUDA_MALLOC_ASYNC_SYNC,
 };
 TINYTORCH_API void set_allocator_algorithm(AllocatorAlgorithm algo);
 TINYTORCH_API AllocatorAlgorithm get_allocator_algorithm();

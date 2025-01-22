@@ -135,6 +135,7 @@ static void* malloc_blocking(int64_t size, int device_id)
 
     handle_cuda_allocation_error(cuda_error, size, device_id);
 
+
     return ptr;
 }
 
@@ -165,9 +166,12 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
     {
         ptr  = malloc_async(size, device_id);
         info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
-    }
-
-    if (!ptr)
+    }else if (has_malloc_async && algorithm == AllocatorAlgorithm::CUDA_MALLOC_ASYNC_SYNC)
+    {
+        ptr = malloc_async(size, device_id);
+        info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
+        CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+    }else if (!ptr)
     {
         ptr  = malloc_blocking(size, device_id);
         info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC;
