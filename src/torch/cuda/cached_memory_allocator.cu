@@ -139,6 +139,18 @@ static void* malloc_blocking(int64_t size, int device_id)
     return ptr;
 }
 
+static void* malloc_blocking_check_free(int64_t size, int device_id)
+{
+    size_t free, total;
+    cudaMemGetInfo(&free, &total);
+    if (free < size * 1.1)
+    {
+        handle_cuda_allocation_error(cudaErrorMemoryAllocation, size, device_id);
+    }
+
+    return malloc_blocking(size, device_id);
+}
+
 static void free_blocking(void* ptr)
 {
     // not quite sure why the cuda device synchronize is needed
@@ -166,12 +178,13 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
     {
         ptr  = malloc_async(size, device_id);
         info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
-    }else if (has_malloc_async && algorithm == AllocatorAlgorithm::CUDA_MALLOC_ASYNC_SYNC)
+    }
+    else if (algorithm == AllocatorAlgorithm::CUDA_MALLOC_CHECK_FREE)
     {
-        ptr = malloc_async(size, device_id);
-        info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
-        CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-    }else if (!ptr)
+        ptr  = malloc_blocking_check_free(size, device_id);
+        info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC;
+    }
+    else
     {
         ptr  = malloc_blocking(size, device_id);
         info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC;
