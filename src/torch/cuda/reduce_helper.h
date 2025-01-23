@@ -47,7 +47,7 @@ struct ReduceAbsAdd
     template <typename T>
     TT_HD T load_op(T a)
     {
-        return a > 0 ? a : -a;
+        return a > T(0) ? a : -a;
     }
 
     template <typename T>

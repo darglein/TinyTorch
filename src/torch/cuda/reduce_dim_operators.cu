@@ -46,7 +46,7 @@ static __global__ void dimensional_reduce_single_thread(TensorInfoCuda<InputType
         for (IndexType k = 0; k < size_to_reduce; ++k)
         {
             index_input.set_index(dim, k);
-            OutputType local_value = OutputType(a[index_input]);
+            OutputType local_value = op.load_op(OutputType(a[index_input]));
             value                  = op(value, local_value);
         }
         result[tid] = value;
@@ -75,7 +75,7 @@ static __global__ void dimensional_reduce(TensorInfoCuda<InputType, MAX_DIMS> a,
         {
             IndexType i = k * REDUCE_BLOCK_SIZE + threadIdx.x;
             index_input.set_index(dim, i);
-            OutputType local_value = i < size_to_reduce ? OutputType(a[index_input]) : default_value;
+            OutputType local_value = i < size_to_reduce ? op.load_op(OutputType(a[index_input])) : default_value;
 
             if constexpr (REDUCE_BLOCK_SIZE <= 32)
             {
@@ -184,6 +184,10 @@ void dimensional_reduce_helper(Tensor a, int64_t dim, Tensor result)
     }
 }
 
+void abs_sum_impl(Tensor a, int64_t dim, Tensor result)
+{
+    dimensional_reduce_helper<ReduceAbsAdd>(a, dim, result);
+}
 void sum_impl(Tensor a, int64_t dim, Tensor result)
 {
     dimensional_reduce_helper<ReduceAdd>(a, dim, result);

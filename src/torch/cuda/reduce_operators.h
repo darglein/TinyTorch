@@ -23,10 +23,11 @@ TINYTORCH_API void max_impl(Tensor a, Tensor result);
 void std_helper_impl(Tensor a,Tensor mean, Tensor result);
 
 // 1D reductions
-void min_impl(Tensor a, int64_t dim, Tensor result, Tensor& indices);
-void sum_impl(Tensor a, int64_t dim, Tensor result);
-void max_impl(Tensor a, int64_t dim, Tensor result, Tensor& indices);
-void prod_impl(Tensor a, int64_t dim, Tensor result);
+TINYTORCH_API void abs_sum_impl(Tensor a, int64_t dim, Tensor result);
+TINYTORCH_API void min_impl(Tensor a, int64_t dim, Tensor result, Tensor& indices);
+TINYTORCH_API void sum_impl(Tensor a, int64_t dim, Tensor result);
+TINYTORCH_API void max_impl(Tensor a, int64_t dim, Tensor result, Tensor& indices);
+TINYTORCH_API void prod_impl(Tensor a, int64_t dim, Tensor result);
 
 // Scans
 void cumprod_impl(Tensor a, int64_t dim, Tensor result);
