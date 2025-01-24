@@ -15,6 +15,7 @@ TINYTORCH_API Tensor reshape(Tensor t, SizeType sizes);
 TINYTORCH_API Tensor repeat(Tensor t, SizeType sizes);
 TINYTORCH_API Tensor repeat_interleave(Tensor t, int64_t count);
 TINYTORCH_API Tensor transpose(Tensor t, int64_t dim0, int64_t dim1);
+TINYTORCH_API void transpose(Tensor src, Tensor dst, int64_t dim0, int64_t dim1);
 
 TINYTORCH_API Tensor permute(Tensor t, const SizeType& size);
 TINYTORCH_API Tensor flip(Tensor t, const SizeType& size);

@@ -139,6 +139,16 @@ Tensor transpose(Tensor t, int64_t dim0, int64_t dim1)
     return result;
 }
 
+void transpose(Tensor src, Tensor dst, int64_t dim0, int64_t dim1)
+{
+    CHECK(!src.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
+    CHECK_EQ(src.dim(), dst.dim());
+    CHECK_EQ(src.size(dim0), dst.size(dim1));
+    CHECK_EQ(src.size(dim1), dst.size(dim0));
+    SELECT_DEVICE(src.device(), transpose_impl, src, dim0, dim1, dst);
+}
+
 void fill(Tensor& t, double value)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
