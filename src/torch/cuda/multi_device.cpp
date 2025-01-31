@@ -166,13 +166,32 @@ void MultiDeviceTensor::SetMainAndCopyToOthers(Tensor t)
     MainToOthers();
 }
 
-void MultiDeviceTensor::MainToOthers() {
+void MultiDeviceTensor::MainToOthers()
+{
     MainToCPU();
 
     auto on_cpu_event = getNextEvent();
     cudaEventRecord(on_cpu_event, getCurrentCUDAStream());
 
-    CPUToOthers(on_cpu_event);}
+    CPUToOthers(on_cpu_event);
+}
+
+MultiDeviceTensor MultiDeviceTensor::slice(int64_t d, int64_t start, int64_t end) const
+{
+    MultiDeviceTensor result = *this;
+    if (cpu_data.defined())
+    {
+        result.cpu_data = cpu_data.slice(d, start, end);
+    }
+    for (int i = 0; i < data.size(); ++i)
+    {
+        if (data[i].defined())
+        {
+            result.data[i] = data[i].slice(d, start, end);
+        }
+    }
+    return result;
+}
 
 }  // namespace cuda
 }  // namespace tinytorch
