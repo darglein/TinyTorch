@@ -163,13 +163,16 @@ void MultiDeviceTensor::CPUToOthers(cudaEvent_t wait_event)
 void MultiDeviceTensor::SetMainAndCopyToOthers(Tensor t)
 {
     SetMain(t);
+    MainToOthers();
+}
+
+void MultiDeviceTensor::MainToOthers() {
     MainToCPU();
 
     auto on_cpu_event = getNextEvent();
     cudaEventRecord(on_cpu_event, getCurrentCUDAStream());
 
-    CPUToOthers(on_cpu_event);
-}
+    CPUToOthers(on_cpu_event);}
 
 }  // namespace cuda
 }  // namespace tinytorch

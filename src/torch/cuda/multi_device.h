@@ -64,6 +64,7 @@ struct TINYTORCH_API MultiDeviceTensor
     }
 
     void SetMainAndCopyToOthers(Tensor t);
+    void MainToOthers();
 };
 
 
