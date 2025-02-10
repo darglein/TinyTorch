@@ -26,6 +26,7 @@ TINYTORCH_API AllocatorAlgorithm get_allocator_algorithm();
 // 1: on_out_of_memory
 // 2: info
 TINYTORCH_API void set_allocator_log_level(int level);
+TINYTORCH_API int get_allocator_log_level();
 
 
 struct TINYTORCH_API CUDACachingAllocator

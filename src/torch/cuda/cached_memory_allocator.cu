@@ -42,6 +42,7 @@ static PerDeviceMemoryData& DeviceData(int device_id)
 
 static thread_local AllocatorAlgorithm algorithm = AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
 static int log_level                             = 1;
+const int64_t log_level_size_th                  = 10 * 1024 * 1024;
 
 
 void set_allocator_algorithm(AllocatorAlgorithm algo)
@@ -59,6 +60,12 @@ void set_allocator_log_level(int level)
 {
     std::unique_lock l(mu);
     log_level = level;
+}
+
+int get_allocator_log_level()
+{
+    std::unique_lock l(mu);
+    return log_level;
 }
 
 int64_t current_allocated_size(int device_id)
@@ -200,11 +207,11 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
         d.max_allocated_bytes = std::max(d.current_allocated_bytes, d.max_allocated_bytes);
         CHECK(d.allocated_blocks.find(ptr) != d.allocated_blocks.end());
 
-        if (log_level >= 2)
+        if (log_level >= 3 || (log_level >= 2 && size >= log_level_size_th))
         {
-            std::cout << "Allocate CUDA Memory with algo= " << info << " on device " << getDevice()
-                      << " size: " << (size / 1024.0 / 1024.0) << "MiB (" << ptr
-                      << ") Curr. Alloc: " << (d.current_allocated_bytes / (1024.0 * 1024.0)) << " MiB\n";
+            std::cout << "[Allocate] CUDA:" << getDevice() << " " << (size / 1024.0 / 1024.0) << "MiB (" << ptr
+                      << ") Curr. Alloc: " << (d.current_allocated_bytes / (1024.0 * 1024.0)) << " MiB";
+            std::cout << std::endl;
         }
     }
 
@@ -227,7 +234,7 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
         auto& d = DeviceData(device_id);
         CHECK(d.allocated_blocks.find(ptr) != d.allocated_blocks.end());
         int64_t size = d.allocated_blocks.find(ptr)->second;
-        if (log_level >= 2)
+        if (log_level >= 3 || (log_level >= 2 && size >= log_level_size_th))
         {
             std::cout << "Free CUDA Memory with algo= " << (int)algo << " size " << (size / 1024.0 / 1024.0) << "MiB ("
                       << ptr << ")" << "\n";
@@ -252,6 +259,7 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
         CHECK(false);
     }
 }
+
 
 void CUDACachingAllocator::emptyCache()
 {
