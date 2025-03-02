@@ -105,10 +105,10 @@ static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size, i
         if (log_level >= 1)
         {
             std::cout << " CUDA out of memory!\n"
-                      << "     Tried to allocate " << (size / 1000.0 / 1000.0) << "MB\n"
-                      << "     Free memory " << (mem_free / 1000.0 / 1000.0) << "MB\n"
-                      << "     Total memory " << (mem_total / 1000.0 / 1000.0) << "MB\n"
-                      << "     Allocated by torch " << (DeviceData(device_id).current_allocated_bytes / 1000.0 / 1000.0)
+                      << "     Tried to allocate " << (size / 1024.0 / 1024.0) << "MiB\n"
+                      << "     Free memory " << (mem_free / 1024.0 / 1024.0) << "MiB\n"
+                      << "     Total memory " << (mem_total / 1024.0 / 1024.0) << "MiB\n"
+                      << "     Allocated by torch " << (DeviceData(device_id).current_allocated_bytes / 1024.0 / 1024.0)
                       << "MB" << std::endl;
         }
 
