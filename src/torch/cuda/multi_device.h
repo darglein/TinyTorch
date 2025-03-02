@@ -28,14 +28,30 @@ struct TINYTORCH_API MultiDeviceTensor
     MultiDeviceTensor(Tensor d) { data.push_back(d); }
     MultiDeviceTensor(std::vector<Device> _devices) : devices(_devices) { data.resize(devices.size()); }
 
-    Tensor* operator->() { return &data.front(); }
+    Tensor* operator->()
+    {
+        CHECK(!data.empty());
+        return &data.front();
+    }
 
     // implicit cast to main_device tensor, to make use of existing functions
-    operator Tensor&() { return data.front(); }
-    operator const Tensor&() const { return data.front(); }
+    operator Tensor&()
+    {
+        CHECK(!data.empty());
+        return data.front();
+    }
+    operator const Tensor&() const
+    {
+        CHECK(!data.empty());
+        return data.front();
+    }
 
 
-    Tensor& Main() { return data.front(); }
+    Tensor& Main()
+    {
+        CHECK(!data.empty());
+        return data.front();
+    }
 
     void SetMain(Tensor t);
     void MainToCPU();
