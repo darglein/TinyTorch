@@ -59,6 +59,7 @@ TINYTORCH_API std::ostream& operator<<(std::ostream& strm, Device type);
 enum PaddingMode
 {
     kBorder,
+    kZero,
 };
 enum InterpolationType
 {

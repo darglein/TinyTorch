@@ -211,6 +211,18 @@ static __global__ void grid_sample_3d_impl_kernel(TensorInfoCuda<T, 5> input, Te
     float bsw = (ix_tne - ix) * (iy - iy_tne) * (iz - iz_tne);
     float bse = (ix - ix_tnw) * (iy - iy_tnw) * (iz - iz_tnw);
 
+    if (padding == PaddingMode::kZero)
+    {
+        if (ix_tnw < 0) tnw = 0, tsw = 0, bnw = 0, bsw = 0;
+        if (ix_tne >= IW) tne = 0, tse = 0, bne = 0, bse = 0;
+
+        if (iy_tnw < 0) tnw = 0, tne = 0, bnw = 0, bne = 0;
+        if (iy_tsw >= IH) tsw = 0, tse = 0, bsw = 0, bse = 0;
+
+        if (iz_tnw < 0) tnw = 0, tne = 0, tsw = 0, tse = 0;
+        if (iz_bnw >= ID) bnw = 0, bne = 0, bsw = 0, bse = 0;
+    }
+
     CLIP_COORDINATES(ix_tnw, ix_tnw, IW);
     CLIP_COORDINATES(iy_tnw, iy_tnw, IH);
     CLIP_COORDINATES(iz_tnw, iz_tnw, ID);
@@ -235,6 +247,8 @@ static __global__ void grid_sample_3d_impl_kernel(TensorInfoCuda<T, 5> input, Te
     CLIP_COORDINATES(ix_bse, ix_bse, IW);
     CLIP_COORDINATES(iy_bse, iy_bse, IH);
     CLIP_COORDINATES(iz_bse, iz_bse, ID);
+
+
 
     for (int c = 0; c < C; ++c)
     {
@@ -358,8 +372,8 @@ static __global__ void grid_sample_2d_backward_impl_kernel(TensorInfoCuda<T, 4> 
     }
     else
     {
-        gix = gix * (IW)*0.5f;
-        giy = giy * (IH)*0.5f;
+        gix = gix * (IW) * 0.5f;
+        giy = giy * (IH) * 0.5f;
     }
 
 
@@ -401,7 +415,7 @@ static __global__ void grid_sample_3d_backward_impl_kernel(TensorInfoCuda<T, 5> 
     // CUDA_KERNEL_ASSERT(v >= 0 && v <= 1);
     // CUDA_KERNEL_ASSERT(w >= 0 && w <= 1);
 
-    //int C  = input.sizes[1];
+    // int C  = input.sizes[1];
     int ID = input.sizes[2];
     int IH = input.sizes[3];
     int IW = input.sizes[4];
@@ -549,9 +563,9 @@ static __global__ void grid_sample_3d_backward_impl_kernel(TensorInfoCuda<T, 5> 
     }
     else
     {
-        gix = gix * (IW)*0.5f;
-        giy = giy * (IH)*0.5f;
-        giz = giz * (ID)*0.5f;
+        gix = gix * (IW) * 0.5f;
+        giy = giy * (IH) * 0.5f;
+        giz = giz * (ID) * 0.5f;
     }
 
     grad_grid(b, sample_i, sample_j, sample_k, 0) = gix;

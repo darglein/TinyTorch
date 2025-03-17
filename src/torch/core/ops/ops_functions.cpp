@@ -558,7 +558,7 @@ struct GridsampleNode : public FunctionNode<GridsampleNode>
 
         InterpolationType interpolation = (InterpolationType)_interpolation.toInt();
         PaddingMode padding             = (PaddingMode)_padding.toInt();
-        CHECK_EQ(padding, PaddingMode::kBorder);
+        // CHECK_EQ(padding, PaddingMode::kBorder);
         bool align_corners = _align_corners.toBool();
         auto size_out      = input.sizes();
         size_out[2]        = grid.size(1);
