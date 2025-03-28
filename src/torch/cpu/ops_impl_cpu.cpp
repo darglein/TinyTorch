@@ -41,13 +41,21 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
 
     if (async)
     {
-        if (src.is_cpu())
+        //        if (src.is_cpu())
+        //        {
+        //            CHECK(src.options().pinned_memory_);
+        //        }
+        //        if (dest.is_cpu())
+        //        {
+        //            CHECK(dest.options().pinned_memory_);
+        //        }
+        if (src.is_cpu() && !src.options().pinned_memory_)
         {
-            CHECK(src.options().pinned_memory_);
+            async = false;
         }
-        if (dest.is_cpu())
+        if (dest.is_cpu() && !dest.options().pinned_memory_)
         {
-            CHECK(dest.options().pinned_memory_);
+            async = false;
         }
     }
 
@@ -418,7 +426,7 @@ static void min_impl(TensorInfo<T> a, TensorInfo<T> result)
     {
         G min_val = std::numeric_limits<G>::max();
 
-//#pragma omp parallel for reduction(min : min_val)
+        // #pragma omp parallel for reduction(min : min_val)
         for (int64_t i = 0; i < a.numel(); ++i)
         {
             G v = G(a[i]);
@@ -453,7 +461,7 @@ static void max_impl(TensorInfo<T> a, TensorInfo<T> result)
     {
         G max_val = std::numeric_limits<G>::lowest();
 
-//#pragma omp parallel for reduction(max : max_val)
+        // #pragma omp parallel for reduction(max : max_val)
         for (int64_t i = 0; i < a.numel(); ++i)
         {
             G v = G(a[i]);

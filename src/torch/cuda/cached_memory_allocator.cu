@@ -259,6 +259,27 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
         CHECK(false);
     }
 }
+void* cuda_malloc_pinned(int64_t size)
+{
+    void* ptr              = nullptr;
+    cudaError_t cuda_error = cudaMallocHost(&ptr, size);
+//        cudaError_t cuda_error = cudaErrorInvalidValue;
+    if (cuda_error != cudaSuccess)
+    {
+        if (log_level >= 3)
+        {
+            std::cout << " Pinned memory allocation of " << (size / 1024.0 / 1024.0)
+                      << "MiB failed. Falling back to non-pinned memory...\n";
+        }
+        ptr = nullptr;
+    }
+    return ptr;
+}
+
+void cuda_pinned_free(void* ptr)
+{
+    CHECK_CUDA_ERROR(cudaFreeHost(ptr));
+}
 
 
 void CUDACachingAllocator::emptyCache()

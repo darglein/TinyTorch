@@ -41,13 +41,9 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions __options) : size_(size), o
 #ifdef TT_HAS_CUDA
         if (options_.pinned_memory_)
         {
-            cudaError_t cuda_error = cudaMallocHost(&data_ptr_, size);
-            if (cuda_error != cudaSuccess)
+            data_ptr_ = cuda::cuda_malloc_pinned(size);
+            if (!data_ptr_)
             {
-                size_t mem_free, mem_total;
-                cudaMemGetInfo(&mem_free, &mem_total);
-                std::cout << " Pinned memory allocation of " << (size / 1024.0 / 1024.0)
-                          << "MiB failed. Falling back to non-pinned memory...\n";
                 options_.pinned_memory_ = false;
             }
         }
@@ -101,7 +97,7 @@ StorageImpl::~StorageImpl()
 #ifdef TT_HAS_CUDA
             if (options_.pinned_memory_)
             {
-                CHECK_CUDA_ERROR(cudaFreeHost(data_ptr_));
+                cuda::cuda_pinned_free(data_ptr_);
             }
             else
             {
