@@ -92,12 +92,12 @@ struct TINYTORCH_API IValue
         return result;
     }
 
-    bool toBool() { return v_bool; }
-    double toDouble() { return v_double; }
-    int64_t toInt() { return v_int64; }
-    Tensor toTensor() { return v_tensor; }
-    SizeType toSizes() { return v_size; }
-    Device toDevice() { return v_device; }
+    bool& toBool() { return v_bool; }
+    double& toDouble() { return v_double; }
+    int64_t& toInt() { return v_int64; }
+    Tensor& toTensor() { return v_tensor; }
+    SizeType& toSizes() { return v_size; }
+    Device& toDevice() { return v_device; }
 
     bool v_bool;
     double v_double;
