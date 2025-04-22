@@ -89,6 +89,9 @@ enum ScalarType
 
     // unsigned
     kUInt16 = 7,
+
+    //
+    kUnknown,
 };
 
 TINYTORCH_API std::ostream& operator<<(std::ostream& strm, ScalarType type);

@@ -27,7 +27,7 @@ std::ostream& operator<<(std::ostream& strm, Device type)
 std::ostream& operator<<(std::ostream& strm, ScalarType type)
 {
     std::vector<std::string> type_names = {
-        "kUint8", "kInt16", "kInt32", "kInt64", "kFloat16", "float", "double", "kUInt16",
+        "kUint8", "kInt16", "kInt32", "kInt64", "kFloat16", "float", "double", "kUInt16", "kUnknown",
     };
     strm << type_names[(int)type];
     return strm;
