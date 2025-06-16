@@ -61,30 +61,37 @@ TINYTORCH_API void setDevice(int device_index);
 
 struct TINYTORCH_API DeviceGuard
 {
-	DeviceGuard() = delete;
-	DeviceGuard(Device device)
-	{
-		CHECK_EQ(device.type(), kCUDA);
+    DeviceGuard() = delete;
+    DeviceGuard(Device device)
+    {
+        CHECK_EQ(device.type(), kCUDA);
 
-		original_device_index_ = getDevice();
-		if (device.index() >= 0 && device.index() != original_device_index_)
-		{
-			setDevice(device._index);
-		}
-	}
-	DeviceGuard(const DeviceGuard&) = delete;
-	DeviceGuard(DeviceGuard&&) = delete;
-	~DeviceGuard()
-	{
-		setDevice(original_device_index_);
-	}
+        original_device_index_ = getDevice();
+        if (device.index() >= 0 && device.index() != original_device_index_)
+        {
+            setDevice(device._index);
+        }
+    }
+    DeviceGuard(const DeviceGuard&) = delete;
+    DeviceGuard(DeviceGuard&&)      = delete;
+    ~DeviceGuard() { setDevice(original_device_index_); }
 
-	int original_device_index_;
+    int original_device_index_;
 };
 
 
 
 TINYTORCH_API std::vector<Device> GetCudaDevicesFromDeviceList(std::vector<int> device_list);
 
+TINYTORCH_API void ReportCudaError(cudaError_t cudaErrorCode, std::string function);
 }  // namespace cuda
 }  // namespace tinytorch
+
+#define TT_CHECK_CUDA_ERROR(cudaFunction)                                   \
+    {                                                                       \
+        cudaError_t cudaErrorCode = cudaFunction;                           \
+        if (cudaErrorCode != cudaSuccess)                                   \
+        {                                                                   \
+            tinytorch::cuda::ReportCudaError(cudaErrorCode, #cudaFunction); \
+        }                                                                   \
+    }

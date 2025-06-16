@@ -600,7 +600,7 @@ void grid_sample_3d_impl(Tensor input, Tensor grid, InterpolationType interpolat
     auto num_batches = input.size(0);
     auto num_samples = grid.size(1) * grid.size(2) * grid.size(3);
 
-    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+    TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 
     cuda::DeviceGuard guard(input.device());
     switch (input.scalar_type())
@@ -623,7 +623,7 @@ void grid_sample_3d_impl(Tensor input, Tensor grid, InterpolationType interpolat
         default:
             CHECK(false);
     }
-    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+    TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 
     CUDA_SYNC_CHECK_ERROR();
 }

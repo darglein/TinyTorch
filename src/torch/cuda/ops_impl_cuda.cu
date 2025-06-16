@@ -57,7 +57,7 @@ void fill_impl(Tensor& a, double value)
     if (value == 0 && a.is_contiguous())
     {
         cuda::DeviceGuard guard(a.device());
-        CHECK_CUDA_ERROR(cudaMemsetAsync(a.data_ptr(), 0, a.numel() * a.element_size(), cuda::getCurrentCUDAStream()));
+        TT_CHECK_CUDA_ERROR(cudaMemsetAsync(a.data_ptr(), 0, a.numel() * a.element_size(), cuda::getCurrentCUDAStream()));
         return;
     }
 
@@ -130,7 +130,7 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
     {
         // trivial copy without conversion
         cuda::DeviceGuard guard(src.device());
-        CHECK_CUDA_ERROR(cudaMemcpyAsync(target.data_ptr(), src.data_ptr(), src.numel() * src.element_size(),
+        TT_CHECK_CUDA_ERROR(cudaMemcpyAsync(target.data_ptr(), src.data_ptr(), src.numel() * src.element_size(),
                                          cudaMemcpyDeviceToDevice, cuda::getCurrentCUDAStream()));
         return;
     }

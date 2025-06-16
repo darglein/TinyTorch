@@ -62,10 +62,10 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions __options) : size_(size), o
 #endif
         has_ownership = true;
 
-
         if (!data_ptr_)
         {
-            throw std::runtime_error(std::string("CPU memory allocation failed. Out of memory."));
+            throw TinyTorchException(std::string("CPU memory allocation failed. Out of memory.") ,
+                                     TinyTorchExceptionStatus::OutOfMemoryCPU);
         }
     }
     else
@@ -75,7 +75,7 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions __options) : size_(size), o
 
         std::tie(data_ptr_, alloc_info) = cuda::cuda_cached_malloc(size, options_.device_.index());
 #    if TT_DEBUG
-        CHECK_CUDA_ERROR(cudaMemsetAsync(data_ptr_, 0xabababab, size, cuda::getCurrentCUDAStream()));
+        TT_CHECK_CUDA_ERROR(cudaMemsetAsync(data_ptr_, 0xabababab, size, cuda::getCurrentCUDAStream()));
 #    endif
 
         has_ownership = true;

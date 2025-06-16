@@ -43,14 +43,14 @@ void setCUDAStreamForThisThread(cudaStream_t stream)
 int getDevice()
 {
     int device_index;
-    CHECK_CUDA_ERROR(cudaGetDevice(&device_index));
+    TT_CHECK_CUDA_ERROR(cudaGetDevice(&device_index));
     CHECK_LT(device_index, MAX_DEVICES);
     return device_index;
 }
 
 void setDevice(int device_index)
 {
-    CHECK_CUDA_ERROR(cudaSetDevice(device_index));
+    TT_CHECK_CUDA_ERROR(cudaSetDevice(device_index));
 }
 
 
@@ -75,7 +75,7 @@ cudaEvent_t getNextEvent()
 
     if (!event)
     {
-        CHECK_CUDA_ERROR(cudaEventCreate(&event));
+        TT_CHECK_CUDA_ERROR(cudaEventCreate(&event));
     }
 
     getTotalNumEventsUsed()++;
@@ -87,7 +87,7 @@ cudaEvent_t getNextEvent()
 std::vector<Device> GetCudaDevicesFromDeviceList(std::vector<int> device_list)
 {
     int cuda_device_count;
-    CHECK_CUDA_ERROR(cudaGetDeviceCount(&cuda_device_count));
+    TT_CHECK_CUDA_ERROR(cudaGetDeviceCount(&cuda_device_count));
 
     if (cuda_device_count == 0)
     {
@@ -135,6 +135,16 @@ std::vector<Device> GetCudaDevicesFromDeviceList(std::vector<int> device_list)
 
 
     return result;
+}
+void ReportCudaError(cudaError_t cudaErrorCode, std::string function)
+{
+    auto error_string = std::string(cudaGetErrorString(cudaErrorCode)) + " in function " + function;
+
+    if (cudaErrorCode == cudaErrorMemoryAllocation)
+    {
+        throw TinyTorchException(std::string("CUDA OutOfMemory ") + error_string, TinyTorchExceptionStatus::OutOfMemoryGPU);
+    }
+    throw TinyTorchException(std::string("CUDA Error ") + error_string, TinyTorchExceptionStatus::CUDAError);
 }
 
 }  // namespace cuda

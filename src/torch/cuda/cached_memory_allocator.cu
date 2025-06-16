@@ -83,7 +83,7 @@ static void initialize_allocator()
     allocator_initialized = true;
 
     int value = 0;
-    CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&value, cudaDevAttrMemoryPoolsSupported, 0));
+    TT_CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&value, cudaDevAttrMemoryPoolsSupported, 0));
 
     if (value == 0)
     {
@@ -99,11 +99,10 @@ static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size, i
 {
     if (cuda_error == cudaErrorMemoryAllocation)
     {
-        size_t mem_free, mem_total;
-        cudaMemGetInfo(&mem_free, &mem_total);
-
         if (log_level >= 1)
         {
+            size_t mem_free, mem_total;
+            cudaMemGetInfo(&mem_free, &mem_total);
             std::cout << " CUDA out of memory!\n"
                       << "     Tried to allocate " << (size / 1024.0 / 1024.0) << "MiB\n"
                       << "     Free memory " << (mem_free / 1024.0 / 1024.0) << "MiB\n"
@@ -112,8 +111,9 @@ static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size, i
                       << "MB" << std::endl;
         }
 
-        throw std::runtime_error(std::string("CUDA memory allocation error: ") + cudaGetErrorString(cuda_error));
+        ReportCudaError(cuda_error, "cuda_allocator");
     }
+    ReportCudaError(cudaErrorMemoryAllocation, "cuda_allocator");
 }
 
 static void* malloc_async(int64_t size, int device_id)
@@ -124,7 +124,7 @@ static void* malloc_async(int64_t size, int device_id)
 
     handle_cuda_allocation_error(cuda_error, size, device_id);
 
-    CHECK_CUDA_ERROR(cuda_error);
+    TT_CHECK_CUDA_ERROR(cuda_error);
     CHECK_NOTNULL(ptr);
 
     return ptr;
@@ -132,7 +132,7 @@ static void* malloc_async(int64_t size, int device_id)
 
 static void free_async(void* ptr)
 {
-    CHECK_CUDA_ERROR(cudaFreeAsync(ptr, cuda::getCurrentCUDAStream()));
+    TT_CHECK_CUDA_ERROR(cudaFreeAsync(ptr, cuda::getCurrentCUDAStream()));
 }
 
 static void* malloc_blocking(int64_t size, int device_id)
@@ -161,8 +161,8 @@ static void* malloc_blocking_check_free(int64_t size, int device_id)
 static void free_blocking(void* ptr)
 {
     // not quite sure why the cuda device synchronize is needed
-    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-    CHECK_CUDA_ERROR(cudaFree(ptr));
+    TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+    TT_CHECK_CUDA_ERROR(cudaFree(ptr));
 }
 
 std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
@@ -263,7 +263,7 @@ void* cuda_malloc_pinned(int64_t size)
 {
     void* ptr              = nullptr;
     cudaError_t cuda_error = cudaMallocHost(&ptr, size);
-//        cudaError_t cuda_error = cudaErrorInvalidValue;
+    //        cudaError_t cuda_error = cudaErrorInvalidValue;
     if (cuda_error != cudaSuccess)
     {
         if (log_level >= 3)
@@ -278,7 +278,7 @@ void* cuda_malloc_pinned(int64_t size)
 
 void cuda_pinned_free(void* ptr)
 {
-    CHECK_CUDA_ERROR(cudaFreeHost(ptr));
+    TT_CHECK_CUDA_ERROR(cudaFreeHost(ptr));
 }
 
 
@@ -286,7 +286,7 @@ void CUDACachingAllocator::emptyCache()
 {
     CHECK(allocator_initialized);
     // this frees unused values for the async allocator
-    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+    TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 }
 
 }  // namespace cuda

@@ -26,18 +26,12 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
 #    undef CUDA_DEBUG
 #endif
 
-#define CHECK_CUDA_ERROR(cudaFunction)                                                               \
-    {                                                                                                \
-        cudaError_t cudaErrorCode = cudaFunction;                                                    \
-        CHECK_EQ(cudaErrorCode, cudaSuccess)                                                         \
-            << ": " << cudaGetErrorString(cudaErrorCode) << " in function " << #cudaFunction << "\n" \
-            << tinytorch::printCurrentStack();                                                       \
-    }
+
 
 #if defined(CUDA_DEBUG) && TT_DEBUG
-#    define CUDA_SYNC_CHECK_ERROR()                    \
-        {                                              \
-            CHECK_CUDA_ERROR(cudaDeviceSynchronize()); \
+#    define CUDA_SYNC_CHECK_ERROR()                       \
+        {                                                 \
+            TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize()); \
         }
 #else
 #    define CUDA_SYNC_CHECK_ERROR() (static_cast<void>(0))

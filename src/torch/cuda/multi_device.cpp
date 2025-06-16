@@ -21,8 +21,8 @@ bool IsCudaPeerToPeerAvailable(Device device0, Device device1)
     CHECK_NE(device0.index(), device1.index());
 
     int canAccessPeer01, canAccessPeer10;
-    CHECK_CUDA_ERROR(cudaDeviceCanAccessPeer(&canAccessPeer01, device0.index(), device1.index()));
-    CHECK_CUDA_ERROR(cudaDeviceCanAccessPeer(&canAccessPeer10, device1.index(), device0.index()));
+    TT_CHECK_CUDA_ERROR(cudaDeviceCanAccessPeer(&canAccessPeer01, device0.index(), device1.index()));
+    TT_CHECK_CUDA_ERROR(cudaDeviceCanAccessPeer(&canAccessPeer10, device1.index(), device0.index()));
 
     return canAccessPeer01 && canAccessPeer10;
 }
@@ -43,7 +43,7 @@ bool EnableCudaPeerToPeer(Device device0, Device device1)
         auto error = cudaDeviceEnablePeerAccess(device1.index(), 0);
         if (error != cudaErrorPeerAccessAlreadyEnabled)
         {
-            CHECK_CUDA_ERROR(error);
+            TT_CHECK_CUDA_ERROR(error);
         }
     }
     {
@@ -51,7 +51,7 @@ bool EnableCudaPeerToPeer(Device device0, Device device1)
         auto error = cudaDeviceEnablePeerAccess(device0.index(), 0);
         if (error != cudaErrorPeerAccessAlreadyEnabled)
         {
-            CHECK_CUDA_ERROR(error);
+            TT_CHECK_CUDA_ERROR(error);
         }
     }
     return true;
@@ -70,11 +70,11 @@ void DisableCudaPeerToPeer(Device device0, Device device1)
 
     {
         cuda::DeviceGuard guard(device0);
-        CHECK_CUDA_ERROR(cudaDeviceDisablePeerAccess(device1.index()));
+        TT_CHECK_CUDA_ERROR(cudaDeviceDisablePeerAccess(device1.index()));
     }
     {
         cuda::DeviceGuard guard(device1);
-        CHECK_CUDA_ERROR(cudaDeviceDisablePeerAccess(device0.index()));
+        TT_CHECK_CUDA_ERROR(cudaDeviceDisablePeerAccess(device0.index()));
     }
 }
 bool EnableCudaPeerToPeer(const std::vector<Device>& devices)

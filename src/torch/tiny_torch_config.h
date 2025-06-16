@@ -1,12 +1,13 @@
 /**
-* Copyright (c) 2022 Darius Rückert
-* Licensed under the MIT License.
-* See LICENSE file for more information.
+ * Copyright (c) 2022 Darius Rückert
+ * Licensed under the MIT License.
+ * See LICENSE file for more information.
  */
 
 #pragma once
 
 #include "glog/logging.h"
+
 #include "torch/tiny_torch_build_config.h"
 
 // Generic helper definitions for shared library support
@@ -34,7 +35,7 @@
 #endif
 
 #ifndef TINY_TORCH_NAMESPACE
-#define TINY_TORCH_NAMESPACE tinytorch
+#    define TINY_TORCH_NAMESPACE tinytorch
 #endif
 
 #ifdef TT_HAS_CUDA
@@ -46,7 +47,7 @@
 
 
 #if defined(__CUDACC_) && defined(__CUDA_ARCH__) && __CUDA_ARCH__ > 0
-#define TT_DEVICE_CODE
+#    define TT_DEVICE_CODE
 #endif
 
 
@@ -71,7 +72,25 @@
 
 
 #ifdef NDEBUG
-#define TT_DEBUG 0
+#    define TT_DEBUG 0
 #else
-#define TT_DEBUG 1
+#    define TT_DEBUG 1
 #endif
+
+
+enum class TinyTorchExceptionStatus
+{
+    UnknownError   = 0,
+    OutOfMemoryCPU = 1,
+    OutOfMemoryGPU = 2,
+    CUDAError = 3,
+};
+
+struct TinyTorchException : std::runtime_error
+{
+    TinyTorchException(const std::string& msg, TinyTorchExceptionStatus status)
+        : std::runtime_error(msg), status(status)
+    {
+    }
+    TinyTorchExceptionStatus status;
+};

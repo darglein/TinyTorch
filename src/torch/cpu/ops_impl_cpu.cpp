@@ -70,11 +70,11 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
         if (async)
         {
             auto strm = cuda::getCurrentCUDAStream();
-            CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, type, strm));
+            TT_CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, type, strm));
         }
         else
         {
-            CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, type));
+            TT_CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, type));
         }
     }
     else
@@ -87,31 +87,31 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
             {
                 cuda::DeviceGuard guard(src.device());
                 src_buffer_ready = cuda::getNextEvent();
-                CHECK_CUDA_ERROR(cudaEventRecord(src_buffer_ready, cuda::getCurrentCUDAStream()));
+                TT_CHECK_CUDA_ERROR(cudaEventRecord(src_buffer_ready, cuda::getCurrentCUDAStream()));
             }
 
 
             {
                 cuda::DeviceGuard guard(dest.device());
-                CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCurrentCUDAStream(), src_buffer_ready));
+                TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCurrentCUDAStream(), src_buffer_ready));
 
                 if (use_uva)
                 {
-                    CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault,
+                    TT_CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault,
                                                      cuda::getCurrentCUDAStream()));
                 }
                 else
                 {
-                    CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(),
+                    TT_CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(),
                                                          src.device().index(), bytes, cuda::getCurrentCUDAStream()));
                 }
                 mempcy_finished = cuda::getNextEvent();
-                CHECK_CUDA_ERROR(cudaEventRecord(mempcy_finished, cuda::getCurrentCUDAStream()));
+                TT_CHECK_CUDA_ERROR(cudaEventRecord(mempcy_finished, cuda::getCurrentCUDAStream()));
             }
 
             {
                 cuda::DeviceGuard guard(src.device());
-                CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCurrentCUDAStream(), mempcy_finished));
+                TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCurrentCUDAStream(), mempcy_finished));
             }
         }
         else
@@ -119,11 +119,11 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
             cuda::DeviceGuard guard(dest.device());
             if (use_uva)
             {
-                CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault));
+                TT_CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault));
             }
             else
             {
-                CHECK_CUDA_ERROR(cudaMemcpyPeer(dest.data_ptr(), dest.device().index(), src.data_ptr(),
+                TT_CHECK_CUDA_ERROR(cudaMemcpyPeer(dest.data_ptr(), dest.device().index(), src.data_ptr(),
                                                 src.device().index(), bytes));
             }
         }
