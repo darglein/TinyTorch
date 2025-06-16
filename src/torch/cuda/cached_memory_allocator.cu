@@ -113,7 +113,6 @@ static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size, i
 
         ReportCudaError(cuda_error, "cuda_allocator");
     }
-    ReportCudaError(cudaErrorMemoryAllocation, "cuda_allocator");
 }
 
 static void* malloc_async(int64_t size, int device_id)
