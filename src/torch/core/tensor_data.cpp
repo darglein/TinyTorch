@@ -61,6 +61,12 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions __options) : size_(size), o
         memset(data_ptr_, 0xabababab, size);
 #endif
         has_ownership = true;
+
+
+        if (!data_ptr_)
+        {
+            throw std::runtime_error(std::string("CPU memory allocation failed. Out of memory."));
+        }
     }
     else
     {
