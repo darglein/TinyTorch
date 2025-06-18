@@ -38,6 +38,7 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
 #ifdef TT_HAS_CUDA
     CHECK(src.is_contiguous()) << src.sizes() << " " << src.strides();
     CHECK(dest.is_contiguous()) << dest.sizes() << " " << dest.strides();
+    CHECK_EQ(src.numel(), dest.numel());
 
     if (async)
     {
