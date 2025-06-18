@@ -450,6 +450,7 @@ void free_preallocate_vram()
         cuda_cached_free(data.full_ptr, data.full_alloc_info, device_id);
         data.full_ptr  = nullptr;
         data.full_size = 0;
+        data.free_blocks.clear();
     }
 }
 } // namespace cuda
