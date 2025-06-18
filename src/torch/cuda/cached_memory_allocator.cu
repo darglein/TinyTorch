@@ -159,10 +159,11 @@ static void* premalloc(int64_t size, int device_id)
         {
             auto return_ptr = f.first;
             data.alloc_blocks.emplace_back(return_ptr, size);
-            f.second -= size;
             f.first += size;
+            f.second -= size;
 
-            std::cout << "premalloc " << (void*)return_ptr << " " << (size / (1024.0 * 1024)) << "MiB" << std::endl;
+            // std::cout << "premalloc " << (void*)return_ptr << " " << (size / (1024.0 * 1024)) << "MiB" << " free size: "
+                // << data.free_blocks.size() << std::endl;
             return return_ptr;
         }
     }
@@ -183,8 +184,7 @@ static void prefree(void* ptr, int device_id)
             break;
         }
     }
-    // std::cout << "prefree " << data.alloc_blocks[alloc_block_id].first << " " << (
-    // data.alloc_blocks[alloc_block_id].second / (1024.0 * 1024)) << "MiB" << std::endl;
+
     CHECK_GE(alloc_block_id, 0);
     data.free_blocks.emplace_back(data.alloc_blocks[alloc_block_id]);
     data.alloc_blocks.erase(data.alloc_blocks.begin() + alloc_block_id);
@@ -193,8 +193,10 @@ static void prefree(void* ptr, int device_id)
 
     for (int i = 1; i < data.free_blocks.size(); i++)
     {
-        if (data.free_blocks[i - 1].first + data.free_blocks[i - 1].second == data.alloc_blocks[i].first)
+        if (data.free_blocks[i - 1].first + data.free_blocks[i - 1].second == data.free_blocks[i].first)
         {
+            // std::cout << "merge " << (void*)data.free_blocks[i - 1].first << " + " << (void*)data.free_blocks[i].first
+            //     << std::endl;
             // merge from (i-1) -> i
             data.free_blocks[i].first = data.free_blocks[i - 1].first;
             data.free_blocks[i].second += data.free_blocks[i - 1].second;
@@ -207,6 +209,10 @@ static void prefree(void* ptr, int device_id)
     {
         return pair.second == 0;
     }), data.free_blocks.end());
+
+    // std::cout << "prefree " << ptr
+        // << " free size: "
+        // << data.free_blocks.size() << std::endl;
 }
 
 static void free_async(void* ptr)
@@ -442,7 +448,7 @@ void free_preallocate_vram()
     {
         std::cout << "free_preallocate_vram\n";
         cuda_cached_free(data.full_ptr, data.full_alloc_info, device_id);
-        data.full_ptr = nullptr;
+        data.full_ptr  = nullptr;
         data.full_size = 0;
     }
 }
