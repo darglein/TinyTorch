@@ -18,6 +18,7 @@ enum class AllocatorAlgorithm
     CUDA_MALLOC,
     CUDA_MALLOC_ASYNC,
     CUDA_MALLOC_CHECK_FREE,
+    CUDA_PRE_ALLOCATE,
 };
 TINYTORCH_API void set_allocator_algorithm(AllocatorAlgorithm algo);
 TINYTORCH_API AllocatorAlgorithm get_allocator_algorithm();
@@ -27,6 +28,11 @@ TINYTORCH_API AllocatorAlgorithm get_allocator_algorithm();
 // 2: info
 TINYTORCH_API void set_allocator_log_level(int level);
 TINYTORCH_API int get_allocator_log_level();
+
+// If needed is larger, than it can fit into VRAM, less is allocated and the amount of actual allocate VRAM is returned.
+TINYTORCH_API int64_t pre_allocate_vram(int64_t needed);
+TINYTORCH_API void  free_preallocate_vram();
+TINYTORCH_API void  free_preallocate_vram();
 
 
 struct TINYTORCH_API CUDACachingAllocator

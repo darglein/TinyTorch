@@ -11,6 +11,12 @@ TT_HD constexpr uint32_t iDivUp(int64_t a, int64_t b)
     return (uint32_t)((a + b - 1) / b);
 }
 
+TT_HD constexpr int64_t iAlignUp(int64_t a, int64_t b)
+{
+    return (a % b != 0) ? (a - a % b + b) : a;
+}
+
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 

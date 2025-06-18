@@ -8,6 +8,7 @@
 #include <mutex>
 
 #include "cached_memory_allocator.h"
+
 #include "torch/cuda/ops_impl_cuda_helper.h"
 #include <cuda_runtime.h>
 
@@ -16,10 +17,9 @@ namespace tinytorch
 {
 namespace cuda
 {
-
 static constexpr int MAX_DEVICES = 8;
 
-static std::mutex mu;
+static std::recursive_mutex mu;
 static bool allocator_initialized = false;
 static bool has_malloc_async      = false;
 
@@ -36,6 +36,23 @@ static PerDeviceMemoryData& DeviceData(int device_id)
     CHECK_GE(device_id, 0);
     CHECK_LT(device_id, MAX_DEVICES);
     static PerDeviceMemoryData data[MAX_DEVICES];
+    return data[device_id];
+}
+
+struct PreallocPerDeviceMemoryData
+{
+    uint8_t* full_ptr       = nullptr;
+    int64_t full_size       = 0;
+    int64_t full_alloc_info = 0;
+    std::vector<std::pair<uint8_t*, int64_t>> free_blocks;
+    std::vector<std::pair<uint8_t*, int64_t>> alloc_blocks;
+};
+
+static PreallocPerDeviceMemoryData& PreallocDeviceData(int device_id)
+{
+    CHECK_GE(device_id, 0);
+    CHECK_LT(device_id, MAX_DEVICES);
+    static PreallocPerDeviceMemoryData data[MAX_DEVICES];
     return data[device_id];
 }
 
@@ -68,10 +85,12 @@ int get_allocator_log_level()
     return log_level;
 }
 
+
 int64_t current_allocated_size(int device_id)
 {
     return DeviceData(device_id).current_allocated_bytes;
 }
+
 int64_t max_allocated_size(int device_id)
 {
     return DeviceData(device_id).max_allocated_bytes;
@@ -104,11 +123,11 @@ static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size, i
             size_t mem_free, mem_total;
             cudaMemGetInfo(&mem_free, &mem_total);
             std::cout << " CUDA out of memory!\n"
-                      << "     Tried to allocate " << (size / 1024.0 / 1024.0) << "MiB\n"
-                      << "     Free memory " << (mem_free / 1024.0 / 1024.0) << "MiB\n"
-                      << "     Total memory " << (mem_total / 1024.0 / 1024.0) << "MiB\n"
-                      << "     Allocated by torch " << (DeviceData(device_id).current_allocated_bytes / 1024.0 / 1024.0)
-                      << "MB" << std::endl;
+                << "     Tried to allocate " << (size / 1024.0 / 1024.0) << "MiB\n"
+                << "     Free memory " << (mem_free / 1024.0 / 1024.0) << "MiB\n"
+                << "     Total memory " << (mem_total / 1024.0 / 1024.0) << "MiB\n"
+                << "     Allocated by torch " << (DeviceData(device_id).current_allocated_bytes / 1024.0 / 1024.0)
+                << "MB" << std::endl;
         }
 
         ReportCudaError(cuda_error, "cuda_allocator");
@@ -127,6 +146,67 @@ static void* malloc_async(int64_t size, int device_id)
     CHECK_NOTNULL(ptr);
 
     return ptr;
+}
+
+static void* premalloc(int64_t size, int device_id)
+{
+    size       = iAlignUp(size, 1024);
+    auto& data = PreallocDeviceData(device_id);
+
+    for (auto& f : data.free_blocks)
+    {
+        if (f.second >= size)
+        {
+            auto return_ptr = f.first;
+            data.alloc_blocks.emplace_back(return_ptr, size);
+            f.second -= size;
+            f.first += size;
+
+            std::cout << "premalloc " << (void*)return_ptr << " " << (size / (1024.0 * 1024)) << "MiB" << std::endl;
+            return return_ptr;
+        }
+    }
+
+    handle_cuda_allocation_error(cudaErrorMemoryAllocation, size, device_id);
+    return nullptr;
+}
+
+static void prefree(void* ptr, int device_id)
+{
+    auto& data         = PreallocDeviceData(device_id);
+    int alloc_block_id = -1;
+    for (int i = 0; i < data.alloc_blocks.size(); i++)
+    {
+        if (data.alloc_blocks[i].first == ptr)
+        {
+            alloc_block_id = i;
+            break;
+        }
+    }
+    // std::cout << "prefree " << data.alloc_blocks[alloc_block_id].first << " " << (
+    // data.alloc_blocks[alloc_block_id].second / (1024.0 * 1024)) << "MiB" << std::endl;
+    CHECK_GE(alloc_block_id, 0);
+    data.free_blocks.emplace_back(data.alloc_blocks[alloc_block_id]);
+    data.alloc_blocks.erase(data.alloc_blocks.begin() + alloc_block_id);
+    std::sort(data.free_blocks.begin(), data.free_blocks.end());
+
+
+    for (int i = 1; i < data.free_blocks.size(); i++)
+    {
+        if (data.free_blocks[i - 1].first + data.free_blocks[i - 1].second == data.alloc_blocks[i].first)
+        {
+            // merge from (i-1) -> i
+            data.free_blocks[i].first = data.free_blocks[i - 1].first;
+            data.free_blocks[i].second += data.free_blocks[i - 1].second;
+            data.free_blocks[i - 1].second = 0;
+        }
+    }
+
+    // remove empty free blocks
+    data.free_blocks.erase(std::remove_if(data.free_blocks.begin(), data.free_blocks.end(), [](auto pair)
+    {
+        return pair.second == 0;
+    }), data.free_blocks.end());
 }
 
 static void free_async(void* ptr)
@@ -190,14 +270,23 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
         ptr  = malloc_blocking_check_free(size, device_id);
         info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC;
     }
-    else
+    else if (algorithm == AllocatorAlgorithm::CUDA_MALLOC)
     {
         ptr  = malloc_blocking(size, device_id);
         info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC;
     }
+    else if (algorithm == AllocatorAlgorithm::CUDA_PRE_ALLOCATE)
+    {
+        ptr  = premalloc(size, device_id);
+        info = (uint64_t)AllocatorAlgorithm::CUDA_PRE_ALLOCATE;
+    }
+    else
+    {
+        CHECK(false);
+    }
 
 
-    if (ptr)
+    if (ptr && algorithm != AllocatorAlgorithm::CUDA_PRE_ALLOCATE)
     {
         auto& d = DeviceData(device_id);
         CHECK(d.allocated_blocks.find(ptr) == d.allocated_blocks.end());
@@ -209,13 +298,14 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
         if (log_level >= 3 || (log_level >= 2 && size >= log_level_size_th))
         {
             std::cout << "[Allocate] CUDA:" << getDevice() << " " << (size / 1024.0 / 1024.0) << "MiB (" << ptr
-                      << ") Curr. Alloc: " << (d.current_allocated_bytes / (1024.0 * 1024.0)) << " MiB";
+                << ") Curr. Alloc: " << (d.current_allocated_bytes / (1024.0 * 1024.0)) << " MiB";
             std::cout << std::endl;
         }
     }
 
     return {ptr, info};
 }
+
 void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
 {
     if (ptr == nullptr)
@@ -229,6 +319,7 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
     std::unique_lock l(mu);
 
 
+    if (algo != AllocatorAlgorithm::CUDA_PRE_ALLOCATE)
     {
         auto& d = DeviceData(device_id);
         CHECK(d.allocated_blocks.find(ptr) != d.allocated_blocks.end());
@@ -236,7 +327,7 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
         if (log_level >= 3 || (log_level >= 2 && size >= log_level_size_th))
         {
             std::cout << "Free CUDA Memory with algo= " << (int)algo << " size " << (size / 1024.0 / 1024.0) << "MiB ("
-                      << ptr << ")" << "\n";
+                << ptr << ")" << "\n";
         }
 
         d.current_allocated_bytes -= size;
@@ -253,11 +344,16 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
     {
         free_blocking(ptr);
     }
+    else if (algo == AllocatorAlgorithm::CUDA_PRE_ALLOCATE)
+    {
+        prefree(ptr, device_id);
+    }
     else
     {
         CHECK(false);
     }
 }
+
 void* cuda_malloc_pinned(int64_t size)
 {
     void* ptr              = nullptr;
@@ -268,7 +364,7 @@ void* cuda_malloc_pinned(int64_t size)
         if (log_level >= 3)
         {
             std::cout << " Pinned memory allocation of " << (size / 1024.0 / 1024.0)
-                      << "MiB failed. Falling back to non-pinned memory...\n";
+                << "MiB failed. Falling back to non-pinned memory...\n";
         }
         ptr = nullptr;
     }
@@ -283,11 +379,72 @@ void cuda_pinned_free(void* ptr)
 
 void CUDACachingAllocator::emptyCache()
 {
+    std::unique_lock l(mu);
     CHECK(allocator_initialized);
     // this frees unused values for the async allocator
     TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 }
 
-}  // namespace cuda
 
-}  // namespace tinytorch
+int64_t pre_allocate_vram(int64_t requested)
+{
+    std::unique_lock l(mu);
+    int64_t allocated = requested;
+    CHECK_NE((int)algorithm, (int)AllocatorAlgorithm::CUDA_PRE_ALLOCATE);
+
+    auto device_id = getDevice();
+    auto& data     = PreallocDeviceData(device_id);
+    CHECK_EQ(data.full_ptr, nullptr);
+
+
+    auto old_log = log_level;
+    log_level    = 0;
+    while (true)
+    {
+        try
+        {
+            auto [ptr, info] = cuda_cached_malloc(allocated, device_id);
+
+
+            if (ptr)
+            {
+                data.full_ptr        = (uint8_t*)ptr;
+                data.full_size       = allocated;
+                data.full_alloc_info = info;
+                break;
+            }
+        }
+        catch (TinyTorchException e)
+        {
+            allocated -= 500 * (1024 * 1024);
+        }
+    }
+
+    log_level = old_log;
+
+
+    data.free_blocks.push_back({data.full_ptr, data.full_size});
+
+
+    std::cout << "pre_allocate_vram requested " << ((double)requested / (1024 * 1024)) << "MiB allocated " << (
+        (double)allocated / (1024 * 1024)) << "MiB" << std::endl;
+    return allocated;
+}
+
+void free_preallocate_vram()
+{
+    std::unique_lock l(mu);
+    auto device_id = getDevice();
+    auto& data     = PreallocDeviceData(device_id);
+    CHECK(data.alloc_blocks.empty());
+
+    if (data.full_ptr)
+    {
+        std::cout << "free_preallocate_vram\n";
+        cuda_cached_free(data.full_ptr, data.full_alloc_info, device_id);
+        data.full_ptr = nullptr;
+        data.full_size = 0;
+    }
+}
+} // namespace cuda
+} // namespace tinytorch
