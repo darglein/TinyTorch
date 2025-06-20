@@ -422,7 +422,7 @@ int64_t pre_allocate_vram(int64_t requested)
 
     auto device_id = getDevice();
     auto& data     = PreallocDeviceData(device_id);
-    CHECK_EQ(data.full_ptr, nullptr);
+    CHECK_EQ((void*)data.full_ptr, nullptr);
 
 
     auto old_log = log_level;
