@@ -475,5 +475,26 @@ void free_preallocate_vram()
         data.free_blocks.clear();
     }
 }
+
+int64_t prealloc_free_list_size()
+{
+    std::unique_lock l(mu);
+    auto device_id = getDevice();
+    auto& data     = PreallocDeviceData(device_id);
+    return data.free_blocks.size();
+}
+
+int64_t prealloc_free_memory()
+{
+    std::unique_lock l(mu);
+    auto device_id = getDevice();
+    auto& data     = PreallocDeviceData(device_id);
+    int64_t sum = 0;
+    for (auto& b : data.free_blocks)
+    {
+        sum += b.second;
+    }
+    return sum;
+}
 }  // namespace cuda
 }  // namespace tinytorch

@@ -32,7 +32,8 @@ TINYTORCH_API int get_allocator_log_level();
 // If needed is larger, than it can fit into VRAM, less is allocated and the amount of actual allocate VRAM is returned.
 TINYTORCH_API int64_t pre_allocate_vram(int64_t needed);
 TINYTORCH_API void  free_preallocate_vram();
-TINYTORCH_API void  free_preallocate_vram();
+TINYTORCH_API int64_t prealloc_free_list_size();
+TINYTORCH_API int64_t prealloc_free_memory();
 
 
 struct TINYTORCH_API CUDACachingAllocator
