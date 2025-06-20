@@ -31,6 +31,9 @@ struct TINYTORCH_API MultiDeviceTensor
     }
     MultiDeviceTensor(Tensor d, std::vector<Device> _devices) : devices(_devices)
     {
+        CHECK(d.defined());
+        CHECK(!devices.empty());
+        CHECK_EQ(d.device() , devices.front());
         data.resize(devices.size());
         SetMainAndCopyToOthers(d);
     }
