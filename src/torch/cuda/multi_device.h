@@ -24,9 +24,17 @@ struct TINYTORCH_API MultiDeviceTensor
     Tensor cpu_data;
 
     // Init with undefined tensor
-    MultiDeviceTensor() { data.push_back({}); }
-    MultiDeviceTensor(Tensor d) { data.push_back(d); }
-    MultiDeviceTensor(std::vector<Device> _devices) : devices(_devices) { data.resize(devices.size()); }
+    MultiDeviceTensor()
+    {
+        // data.push_back({});
+        // devices.push_back({});
+    }
+    MultiDeviceTensor(Tensor d, std::vector<Device> _devices) : devices(_devices)
+    {
+        data.resize(devices.size());
+        SetMainAndCopyToOthers(d);
+    }
+    //    MultiDeviceTensor(std::vector<Device> _devices) : MultiDeviceTensor(Tensor(), _devices) {}
 
     Tensor* operator->()
     {
@@ -52,6 +60,8 @@ struct TINYTORCH_API MultiDeviceTensor
         CHECK(!data.empty());
         return data.front();
     }
+
+    bool Initialized() const { return !data.empty(); }
 
     void SetMain(Tensor t);
     void MainToCPU();

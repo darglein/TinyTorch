@@ -1,5 +1,7 @@
 #include "multi_device.h"
 
+#include "torch/core/graph.h"
+
 #include "ops_impl_cuda_helper.h"
 #include "torch/core/ops/ops_tensor_creation.h"
 
@@ -104,7 +106,11 @@ void DisableCudaPeerToPeer(const std::vector<Device>& devices)
 
 void MultiDeviceTensor::SetMain(Tensor t)
 {
-    data.front() = t;
+    Main() = t;
+    if (t.defined())
+    {
+        devices.front() = t.device();
+    }
 
     for (int local_device_id = 1; local_device_id < devices.size(); ++local_device_id)
     {
@@ -126,6 +132,7 @@ void MultiDeviceTensor::SetMain(Tensor t)
 
 void MultiDeviceTensor::MainToCPU()
 {
+    NoGradGuard ngg;
     if (!Main().defined())
     {
         cpu_data = {};
