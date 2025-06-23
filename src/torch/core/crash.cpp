@@ -8,6 +8,7 @@
 
 
 #include <iostream>
+#include <sstream>
 
 
 #if defined(_WIN32)
