@@ -70,6 +70,7 @@ if (WIN32)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4068>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
 
+    target_link_libraries(torch PRIVATE DbgHelp)
 endif ()
 
 
