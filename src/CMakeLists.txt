@@ -60,6 +60,9 @@ endif ()
 
 
 if (WIN32)
+#    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/fp:fast>)
+#    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/fp:fast>)
+
 
     # '...' needs to have dll-interface to be used by clients of struct '...'
     target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CXX>:/wd4251>)
