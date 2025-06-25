@@ -100,12 +100,12 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
                 if (use_uva)
                 {
                     TT_CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault,
-                                                     cuda::getCurrentCUDAStream()));
+                                                        cuda::getCurrentCUDAStream()));
                 }
                 else
                 {
                     TT_CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(),
-                                                         src.device().index(), bytes, cuda::getCurrentCUDAStream()));
+                                                            src.device().index(), bytes, cuda::getCurrentCUDAStream()));
                 }
                 mempcy_finished = cuda::getNextEvent();
                 TT_CHECK_CUDA_ERROR(cudaEventRecord(mempcy_finished, cuda::getCurrentCUDAStream()));
@@ -126,7 +126,7 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
             else
             {
                 TT_CHECK_CUDA_ERROR(cudaMemcpyPeer(dest.data_ptr(), dest.device().index(), src.data_ptr(),
-                                                src.device().index(), bytes));
+                                                   src.device().index(), bytes));
             }
         }
     }
@@ -272,13 +272,27 @@ template <typename T>
 static void rand_float_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, float low, float high)
 {
     float scale = (1.f / float(std::numeric_limits<uint32_t>::max())) * (high - low);
-
     std::uniform_real_distribution<float> dist{low, high};
-    for (int64_t i = 0; i < t.numel(); ++i)
+
+    auto N = t.numel();
+    if (t.contiguous)
     {
-        uint32_t value = (uint32_t)mersenne_engine.operator()();
-        float xf       = float(value) * scale;
-        t[i]           = T(xf + low);
+        T* pt = t.data;
+        for (int64_t i = 0; i < N; ++i)
+        {
+            uint32_t value = (uint32_t)mersenne_engine.operator()();
+            float xf       = float(value) * scale;
+            pt[i]          = T(xf + low);
+        }
+    }
+    else
+    {
+        for (int64_t i = 0; i < N; ++i)
+        {
+            uint32_t value = (uint32_t)mersenne_engine.operator()();
+            float xf       = float(value) * scale;
+            t[i]           = T(xf + low);
+        }
     }
 }
 

@@ -64,11 +64,11 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions __options) : size_(size), o
 
         if (!data_ptr_)
         {
-            throw TinyTorchException(std::string("CPU memory allocation failed. Out of memory.") ,
+            throw TinyTorchException(std::string("CPU memory allocation failed. Out of memory."),
                                      TinyTorchExceptionStatus::OutOfMemoryCPU);
         }
     }
-    else
+    else if (options_.device_ == kCUDA)
     {
 #ifdef TT_HAS_CUDA
         cuda::DeviceGuard g(options_.device_);
@@ -82,6 +82,10 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions __options) : size_(size), o
 #else
         CHECK(false);
 #endif
+    }
+    else
+    {
+        CHECK(false) << "invalid device type " << options_.device_;
     }
 }
 

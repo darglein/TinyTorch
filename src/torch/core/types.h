@@ -30,7 +30,8 @@ namespace tinytorch
 enum DeviceType
 {
     kCPU,
-    kCUDA
+    kCUDA,
+    kUndefined
 };
 
 

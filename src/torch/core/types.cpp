@@ -15,6 +15,7 @@ std::ostream& operator<<(std::ostream& strm, Device type)
     std::vector<std::string> type_names = {
         "cpu",
         "cuda",
+        "undefined",
     };
     strm << type_names[(int)type.type()];
     if (type.type() == kCUDA)

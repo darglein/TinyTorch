@@ -56,9 +56,9 @@ static PreallocPerDeviceMemoryData& PreallocDeviceData(int device_id)
 }
 
 
-static thread_local AllocatorAlgorithm algorithm = AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
-static int log_level                             = 1;
-const int64_t log_level_size_th                  = 10 * 1024 * 1024;
+static AllocatorAlgorithm algorithm = AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
+static int log_level                = 1;
+const int64_t log_level_size_th     = 10 * 1024 * 1024;
 
 
 void set_allocator_algorithm(AllocatorAlgorithm algo)
@@ -147,46 +147,10 @@ static void* malloc_async(int64_t size, int device_id)
     return ptr;
 }
 
-static void* premalloc(int64_t size, int device_id)
-{
-    size       = iAlignUp(size, 1024);
+static void CleanFreeList(int device_id){
+
     auto& data = PreallocDeviceData(device_id);
 
-    for (auto& f : data.free_blocks)
-    {
-        if (f.second >= size)
-        {
-            auto return_ptr = f.first;
-            data.alloc_blocks.emplace_back(return_ptr, size);
-            f.first += size;
-            f.second -= size;
-
-            // std::cout << "premalloc " << (void*)return_ptr << " " << (size / (1024.0 * 1024)) << "MiB" << " free
-            // size: "
-            // << data.free_blocks.size() << std::endl;
-            return return_ptr;
-        }
-    }
-
-    return nullptr;
-}
-
-static void prefree(void* ptr, int device_id)
-{
-    auto& data         = PreallocDeviceData(device_id);
-    int alloc_block_id = -1;
-    for (int i = 0; i < data.alloc_blocks.size(); i++)
-    {
-        if (data.alloc_blocks[i].first == ptr)
-        {
-            alloc_block_id = i;
-            break;
-        }
-    }
-
-    CHECK_GE(alloc_block_id, 0);
-    data.free_blocks.emplace_back(data.alloc_blocks[alloc_block_id]);
-    data.alloc_blocks.erase(data.alloc_blocks.begin() + alloc_block_id);
     std::sort(data.free_blocks.begin(), data.free_blocks.end());
 
 
@@ -212,6 +176,63 @@ static void prefree(void* ptr, int device_id)
     // std::cout << "prefree " << ptr
     // << " free size: "
     // << data.free_blocks.size() << std::endl;
+}
+
+static void* premalloc(int64_t size, int device_id)
+{
+    size       = iAlignUp(size, 1024);
+    auto& data = PreallocDeviceData(device_id);
+
+    void* result_ptr = nullptr;
+    for (auto& f : data.free_blocks)
+    {
+        if (f.second >= size)
+        {
+            auto remaining = f.second - size;
+            if (remaining < 1024 * 8 && remaining > 0)
+            {
+                // std::cout << "free block small " << remaining << std::endl;
+                // use complete block if the free block would be too small to avoid fragmentation
+                size = f.second;
+            }
+
+
+            auto return_ptr = f.first;
+            data.alloc_blocks.emplace_back(return_ptr, size);
+            f.first += size;
+            f.second -= size;
+
+
+
+            // std::cout << "premalloc " << (void*)return_ptr << " " << (size / (1024.0 * 1024)) << "MiB" << " free
+            // size: "
+            // << data.free_blocks.size() << std::endl;
+            result_ptr = return_ptr;
+            break;
+        }
+    }
+
+    CleanFreeList(device_id);
+    return result_ptr;
+}
+
+static void prefree(void* ptr, int device_id)
+{
+    auto& data         = PreallocDeviceData(device_id);
+    int alloc_block_id = -1;
+    for (int i = 0; i < data.alloc_blocks.size(); i++)
+    {
+        if (data.alloc_blocks[i].first == ptr)
+        {
+            alloc_block_id = i;
+            break;
+        }
+    }
+
+    CHECK_GE(alloc_block_id, 0);
+    data.free_blocks.emplace_back(data.alloc_blocks[alloc_block_id]);
+    data.alloc_blocks.erase(data.alloc_blocks.begin() + alloc_block_id);
+    CleanFreeList(device_id);
 }
 
 static void free_async(void* ptr)
@@ -489,7 +510,7 @@ int64_t prealloc_free_memory()
     std::unique_lock l(mu);
     auto device_id = getDevice();
     auto& data     = PreallocDeviceData(device_id);
-    int64_t sum = 0;
+    int64_t sum    = 0;
     for (auto& b : data.free_blocks)
     {
         sum += b.second;
