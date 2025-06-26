@@ -474,9 +474,11 @@ int64_t pre_allocate_vram(int64_t requested)
 
     data.free_blocks.push_back({data.full_ptr, data.full_size});
 
-
-    std::cout << "pre_allocate_vram requested " << ((double)requested / (1024 * 1024)) << "MiB allocated "
-              << ((double)allocated / (1024 * 1024)) << "MiB" << std::endl;
+    if(log_level > 3)
+    {
+        std::cout << "pre_allocate_vram requested " << ((double)requested / (1024 * 1024)) << "MiB allocated "
+                  << ((double)allocated / (1024 * 1024)) << "MiB" << std::endl;
+    }
     return allocated;
 }
 
@@ -489,7 +491,10 @@ void free_preallocate_vram()
 
     if (data.full_ptr)
     {
-        std::cout << "free_preallocate_vram\n";
+        if(log_level > 3)
+        {
+            std::cout << "free_preallocate_vram\n";
+        }
         cuda_cached_free(data.full_ptr, data.full_alloc_info, device_id);
         data.full_ptr  = nullptr;
         data.full_size = 0;
