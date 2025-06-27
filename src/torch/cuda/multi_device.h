@@ -69,6 +69,7 @@ struct TINYTORCH_API MultiDeviceTensor
     void SetMain(Tensor t);
     void MainToCPU();
     void CPUToOthers(cudaEvent_t wait_event);
+    int size() const { return data.size();}
 
     void zero_()
     {
