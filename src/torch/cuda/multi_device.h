@@ -21,7 +21,7 @@ struct TINYTORCH_API MultiDeviceTensor
 {
     std::vector<Device> devices;
     std::vector<Tensor> data;
-    Tensor cpu_data;
+    std::vector<Tensor> cpu_data;
 
     // Init with undefined tensor
     MultiDeviceTensor()
@@ -35,6 +35,7 @@ struct TINYTORCH_API MultiDeviceTensor
         CHECK(!devices.empty());
         CHECK_EQ(d.device() , devices.front());
         data.resize(devices.size());
+        cpu_data.resize(devices.size());
         SetMainAndCopyToOthers(d);
     }
     //    MultiDeviceTensor(std::vector<Device> _devices) : MultiDeviceTensor(Tensor(), _devices) {}
@@ -68,8 +69,12 @@ struct TINYTORCH_API MultiDeviceTensor
 
     void SetMain(Tensor t);
     void MainToCPU();
-    void CPUToOthers(cudaEvent_t wait_event);
+    void AllToCPU();
+    void ReduceSumOnCPUToMain();
+
+    void MainCPUToOthers(cudaEvent_t wait_event, bool include_to_main_gpu );
     int size() const { return data.size();}
+
 
     void zero_()
     {

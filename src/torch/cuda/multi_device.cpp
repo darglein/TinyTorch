@@ -1,6 +1,7 @@
 #include "multi_device.h"
 
 #include "torch/core/graph.h"
+#include "torch/core/ops/ops_operators.h"
 
 #include "ops_impl_cuda_helper.h"
 #include "torch/core/ops/ops_tensor_creation.h"
@@ -139,30 +140,65 @@ void MultiDeviceTensor::MainToCPU()
         return;
     }
 
-    if (!cpu_data.defined())
+    if (!cpu_data.front().defined())
     {
-        cpu_data = empty_like(Main(), Main().options().device(kCPU).pinned_memory(true));
+        cpu_data.front() = empty_like(Main(), Main().options().device(kCPU).pinned_memory(true));
     }
-    cpu_data.copy_(Main(), true);
+    cpu_data.front().copy_(Main(), true);
 }
 
-void MultiDeviceTensor::CPUToOthers(cudaEvent_t wait_event)
+
+void MultiDeviceTensor::AllToCPU()
 {
-    for (int local_device_id = 1; local_device_id < devices.size(); ++local_device_id)
+    NoGradGuard ngg;
+
+    for (int i = 0; i < data.size(); ++i)
+    {
+        if (!data[i].defined())
+        {
+            cpu_data[i] = {};
+            continue;
+        }
+        if (!cpu_data[i].defined())
+        {
+            cpu_data[i] = empty_like(data[i], data[i].options().device(kCPU).pinned_memory(true));
+        }
+        cpu_data[i].copy_(data[i], true);
+    }
+}
+
+
+void MultiDeviceTensor::ReduceSumOnCPUToMain()
+{
+    NoGradGuard ngg;
+    for (int i = 1; i < cpu_data.size(); ++i)
+    {
+        cpu_data[0] += cpu_data[i];
+    }
+}
+
+
+void MultiDeviceTensor::MainCPUToOthers(cudaEvent_t wait_event, bool include_to_main_gpu )
+{
+    int start_id = include_to_main_gpu ? 0 : 1;
+    for (int local_device_id = start_id; local_device_id < devices.size(); ++local_device_id)
     {
         auto d    = devices[local_device_id];
         auto& dst = data[local_device_id];
         cuda::DeviceGuard dg(d);
 
-        if (!cpu_data.defined())
+        if (!cpu_data.front().defined())
         {
             dst = {};
             continue;
         }
 
-        cudaStreamWaitEvent(getCurrentCUDAStream(), wait_event);
+        if(wait_event)
+        {
+            TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(getCurrentCUDAStream(), wait_event));
+        }
 
-        dst.copy_(cpu_data, true);
+        dst.copy_(cpu_data.front(), true);
     }
 }
 
@@ -175,23 +211,27 @@ void MultiDeviceTensor::SetMainAndCopyToOthers(Tensor t)
 
 void MultiDeviceTensor::MainToOthers()
 {
+    if(devices.size() == 1){
+        return;
+    }
     MainToCPU();
 
     auto on_cpu_event = getNextEvent();
     cudaEventRecord(on_cpu_event, getCurrentCUDAStream());
 
-    CPUToOthers(on_cpu_event);
+    MainCPUToOthers(on_cpu_event, false);
 }
 
 MultiDeviceTensor MultiDeviceTensor::slice(int64_t d, int64_t start, int64_t end) const
 {
     MultiDeviceTensor result = *this;
-    if (cpu_data.defined())
-    {
-        result.cpu_data = cpu_data.slice(d, start, end);
-    }
+
     for (int i = 0; i < data.size(); ++i)
     {
+        if (cpu_data[i].defined())
+        {
+            result.cpu_data[i] = cpu_data[i].slice(d, start, end);
+        }
         if (data[i].defined())
         {
             result.data[i] = data[i].slice(d, start, end);
@@ -199,6 +239,7 @@ MultiDeviceTensor MultiDeviceTensor::slice(int64_t d, int64_t start, int64_t end
     }
     return result;
 }
+
 
 }  // namespace cuda
 }  // namespace tinytorch
