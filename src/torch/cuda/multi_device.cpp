@@ -1,9 +1,9 @@
 #include "multi_device.h"
 
 #include "torch/core/graph.h"
-#include "torch/core/ops/ops_operators.h"
 
 #include "ops_impl_cuda_helper.h"
+#include "torch/core/ops/ops_operators.h"
 #include "torch/core/ops/ops_tensor_creation.h"
 
 namespace tinytorch
@@ -178,7 +178,7 @@ void MultiDeviceTensor::ReduceSumOnCPUToMain()
 }
 
 
-void MultiDeviceTensor::MainCPUToOthers(cudaEvent_t wait_event, bool include_to_main_gpu )
+void MultiDeviceTensor::MainCPUToOthers(cudaEvent_t wait_event, bool include_to_main_gpu)
 {
     int start_id = include_to_main_gpu ? 0 : 1;
     for (int local_device_id = start_id; local_device_id < devices.size(); ++local_device_id)
@@ -193,7 +193,7 @@ void MultiDeviceTensor::MainCPUToOthers(cudaEvent_t wait_event, bool include_to_
             continue;
         }
 
-        if(wait_event)
+        if (wait_event)
         {
             TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(getCurrentCUDAStream(), wait_event));
         }
@@ -201,6 +201,13 @@ void MultiDeviceTensor::MainCPUToOthers(cudaEvent_t wait_event, bool include_to_
         dst.copy_(cpu_data.front(), true);
     }
 }
+
+void MultiDeviceTensor::MainCPUToMainGPU()
+{
+    cuda::DeviceGuard dg(devices[0]);
+    data[0].copy_(cpu_data[0], true);
+}
+
 
 
 void MultiDeviceTensor::SetMainAndCopyToOthers(Tensor t)
@@ -211,7 +218,8 @@ void MultiDeviceTensor::SetMainAndCopyToOthers(Tensor t)
 
 void MultiDeviceTensor::MainToOthers()
 {
-    if(devices.size() == 1){
+    if (devices.size() == 1)
+    {
         return;
     }
     MainToCPU();
@@ -239,7 +247,20 @@ MultiDeviceTensor MultiDeviceTensor::slice(int64_t d, int64_t start, int64_t end
     }
     return result;
 }
-
+void MultiDeviceTensor::AllocateFullCPU() {
+    for (int i = 0; i < data.size(); ++i)
+    {
+        if (!data[i].defined())
+        {
+            cpu_data[i] = {};
+            continue;
+        }
+        if (!cpu_data[i].defined())
+        {
+            cpu_data[i] = empty_like(data[i], data[i].options().device(kCPU).pinned_memory(true));
+        }
+    }
+}
 
 }  // namespace cuda
 }  // namespace tinytorch

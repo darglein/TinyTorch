@@ -57,6 +57,12 @@ if (UNIX)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
 endif ()
 
+if (UNIX OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.1>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mfma>)
+endif()
 
 
 if (MSVC)

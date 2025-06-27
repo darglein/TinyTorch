@@ -67,12 +67,18 @@ struct TINYTORCH_API MultiDeviceTensor
 
     bool Initialized() const { return !data.empty(); }
 
+
+    void AllocateFullCPU();
+
     void SetMain(Tensor t);
     void MainToCPU();
     void AllToCPU();
     void ReduceSumOnCPUToMain();
 
     void MainCPUToOthers(cudaEvent_t wait_event, bool include_to_main_gpu );
+    void MainCPUToMainGPU();
+
+
     int size() const { return data.size();}
 
 
