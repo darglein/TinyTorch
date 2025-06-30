@@ -11,16 +11,17 @@
 #include "torch/core/ops/all.h"
 #include "torch/core/tensor.h"
 
+#include <thread>
+
 #include "../tiny_torch_cuda.h"
 #include "torch/core/tensor_impl.h"
 #include "torch/cuda/multi_device.h"
-#include <thread>
 
 namespace tinytorch
 {
 
-int& internal_num_threads(){
-
+int& internal_num_threads()
+{
     static thread_local int num_threads = -1;
     return num_threads;
 }
@@ -706,7 +707,9 @@ bool Tensor::is_uva() const
     }
     else
     {
-        return AllocatorInfo() == (uint64_t)cuda::AllocatorAlgorithm::CUDA_MALLOC && cuda::HasP2PCopy();
+        bool uva_malloc = AllocatorInfo() == (uint64_t)cuda::AllocatorAlgorithm::CUDA_MALLOC ||
+                          AllocatorInfo() == (uint64_t)cuda::AllocatorAlgorithm::CUDA_PRE_ALLOCATE;
+        return uva_malloc && cuda::HasP2PCopy();
     }
 }
 
