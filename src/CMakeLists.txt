@@ -68,8 +68,15 @@ endif()
 if (MSVC)
 #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/fp:fast>)
 #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/fp:fast>)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    # make sure libopenmp is used also for the .cu files instead of the msvc openmp
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp:llvm>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp:llvm>)
+else()
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
+endif ()
 
     target_link_libraries(torch PRIVATE OpenMP::OpenMP_CXX)
 
