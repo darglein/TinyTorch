@@ -42,11 +42,11 @@ target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_
 target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_suppress=1394>) # field of class type without a DLL interface used in a class with a DLL interface
 
 
-if(OPENMP_FOUND)
+if (OPENMP_FOUND)
     target_include_directories(torch PRIVATE ${OPENMP_INCLUDE_DIRS})
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${OpenMP_CXX_FLAGS}>)
     target_link_libraries(torch PRIVATE "${OpenMP_CXX_FLAGS}")
-endif()
+endif ()
 
 if (UNIX)
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wno-absolute-value>)
@@ -62,21 +62,20 @@ if (UNIX OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mfma>)
-endif()
+endif ()
 
 
 if (MSVC)
-#    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/fp:fast>)
-#    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/fp:fast>)
+    #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/fp:fast>)
+    #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/fp:fast>)
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    # make sure libopenmp is used also for the .cu files instead of the msvc openmp
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp:llvm>)
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp:llvm>)
-else()
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp>)
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
-endif ()
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        # make sure libopenmp is used also for the .cu files instead of the msvc openmp
+        target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp:llvm>)
+    else ()
+        target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
+    endif ()
 
     target_link_libraries(torch PRIVATE OpenMP::OpenMP_CXX)
 
@@ -84,21 +83,18 @@ endif ()
     # '...' needs to have dll-interface to be used by clients of struct '...'
     target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CXX>:/wd4251>)
     target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4251>)
-    
+
     # unknown pragma 'unroll'
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd4068>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4068>)
-#    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
+    #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
 
     target_link_libraries(torch PRIVATE DbgHelp)
 endif ()
 
 
-
-
 target_link_libraries(torch PUBLIC glog::glog)
 #target_link_libraries(torch PRIVATE "${OpenMP_CXX_LIB_NAMES}")
-
 
 
 if (TT_HAS_CUDA)
