@@ -57,6 +57,7 @@ Tensor Tensor::grad() const
 
 Tensor& Tensor::mutable_grad()
 {
+    CHECK(impl_);
     CHECK(impl_->autograd_meta);
     CHECK(impl_->autograd_meta->mutable_grad().defined());
     return impl_->autograd_meta->mutable_grad();
