@@ -16,7 +16,8 @@ namespace tinytorch
 {
 namespace cuda
 {
-static constexpr int MAX_DEVICES = 8;
+static constexpr int MAX_DEVICES            = 8;
+static constexpr int64_t prealloc_alignment = 1024;
 
 static std::recursive_mutex mu;
 static bool allocator_initialized = false;
@@ -147,8 +148,8 @@ static void* malloc_async(int64_t size, int device_id)
     return ptr;
 }
 
-static void CleanFreeList(int device_id){
-
+static void CleanFreeList(int device_id)
+{
     auto& data = PreallocDeviceData(device_id);
 
     std::sort(data.free_blocks.begin(), data.free_blocks.end());
@@ -180,7 +181,7 @@ static void CleanFreeList(int device_id){
 
 static void* premalloc(int64_t size, int device_id)
 {
-    size       = iAlignUp(size, 1024);
+    size       = iAlignUp(size, prealloc_alignment);
     auto& data = PreallocDeviceData(device_id);
 
     void* result_ptr = nullptr;
@@ -201,6 +202,12 @@ static void* premalloc(int64_t size, int device_id)
             data.alloc_blocks.emplace_back(return_ptr, size);
             f.first += size;
             f.second -= size;
+
+            // make sure the pointer is really aligned
+            CHECK_EQ(((uintptr_t)return_ptr) % prealloc_alignment, 0);
+
+            // make sure remaining size is also aligned
+            CHECK_EQ(f.second % prealloc_alignment, 0);
 
 
 
@@ -452,11 +459,14 @@ int64_t pre_allocate_vram(int64_t requested)
     {
         try
         {
+            allocated        = iAlignUp(allocated, prealloc_alignment);
             auto [ptr, info] = cuda_cached_malloc(allocated, device_id);
+
 
 
             if (ptr)
             {
+                CHECK_EQ(((uintptr_t)ptr) % prealloc_alignment, 0);
                 data.full_ptr        = (uint8_t*)ptr;
                 data.full_size       = allocated;
                 data.full_alloc_info = info;
@@ -474,11 +484,12 @@ int64_t pre_allocate_vram(int64_t requested)
 
     data.free_blocks.push_back({data.full_ptr, data.full_size});
 
-    if(log_level > 3)
+    if (log_level > 3)
     {
         std::cout << "pre_allocate_vram requested " << ((double)requested / (1024 * 1024)) << "MiB allocated "
                   << ((double)allocated / (1024 * 1024)) << "MiB" << std::endl;
     }
+    prealloc_print_debug_line();
     return allocated;
 }
 
@@ -491,7 +502,7 @@ void free_preallocate_vram()
 
     if (data.full_ptr)
     {
-        if(log_level > 3)
+        if (log_level > 3)
         {
             std::cout << "free_preallocate_vram\n";
         }
@@ -521,6 +532,11 @@ int64_t prealloc_free_memory()
         sum += b.second;
     }
     return sum;
+}
+void prealloc_print_debug_line()
+{
+    std::cout << "pre_allocate: device " << getDevice() << " free_list_size " << prealloc_free_list_size()
+              << " free_mem_mib " << (prealloc_free_memory() / 1024.0 / 1024) << std::endl;
 }
 }  // namespace cuda
 }  // namespace tinytorch
