@@ -47,11 +47,11 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
         // remove duplicated nodes
         //  this can happen if one tensor is used multiple times
         auto end_it = std::unique(node_stack.begin(), node_stack.end());
-        for (auto it = end_it; it != node_stack.end(); ++it)
-        {
-            autograd::Node* node = it->get();
+        // for (auto it = end_it; it != node_stack.end(); ++it)
+        // {
+            // autograd::Node* node = it->get();
             // CHECK_EQ(dynamic_cast<autograd::AccumulateGrad*>(node), nullptr);
-        }
+        // }
         node_stack.erase(end_it, node_stack.end());
 
         // take the last node (which has the highest sequence number)

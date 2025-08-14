@@ -63,9 +63,9 @@ struct TensorImpl : public std::enable_shared_from_this<TensorImpl>
     }
     uint8_t* data_ptr() { return (storage_->byte_ptr() + storage_offset_); }
 
+    std::shared_ptr<StorageImpl> storage_;
     // in byte
     int64_t storage_offset_ = 0;
-    std::shared_ptr<StorageImpl> storage_;
     SizeType sizes_;
     SizeType strides_;
     TensorOptions options_;

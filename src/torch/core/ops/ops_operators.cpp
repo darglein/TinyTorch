@@ -196,7 +196,7 @@ struct AddTensorScalarNode : public FunctionNode<AddTensorScalarNode>
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        double b    = ctx->saved_data["b"].toDouble();
+        // double b    = ctx->saved_data["b"].toDouble();
         auto l      = ctx->get_saved_variables();
         auto grad_a = grad[0];
         return {grad_a, {}};

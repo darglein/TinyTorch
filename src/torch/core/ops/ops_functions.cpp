@@ -661,7 +661,7 @@ Tensor conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding,
     CHECK_EQ(groups, 1);
 
     int64_t in_batch    = input.size(0);
-    int64_t in_channels = input.size(1);
+    // int64_t in_channels = input.size(1);
     int64_t in_height   = input.size(2);
     int64_t in_width    = input.size(3);
 

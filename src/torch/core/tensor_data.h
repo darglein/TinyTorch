@@ -42,11 +42,11 @@ struct StorageImpl
 
    TensorOptions options() const { return options_; }
    protected:
+    int64_t size_;
+    uint64_t alloc_info = 0;
     TensorOptions options_;
     bool has_ownership   = false;
     void* data_ptr_      = nullptr;
-    uint64_t alloc_info = 0;
-    int64_t size_;
 };
 
 

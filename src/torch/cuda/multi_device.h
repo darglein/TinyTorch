@@ -79,7 +79,7 @@ struct TINYTORCH_API MultiDeviceTensor
     void MainCPUToMainGPU();
 
 
-    int size() const { return data.size();}
+    int size() const { return static_cast<int>(data.size());}
 
 
     void zero_()
