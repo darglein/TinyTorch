@@ -39,13 +39,25 @@ static PerDeviceMemoryData& DeviceData(int device_id)
     return data[device_id];
 }
 
+struct PreallocBlock
+{
+    uint8_t* ptr;
+    int64_t size;
+    cudaStream_t last_stream = 0;
+};
+
+bool operator<(const PreallocBlock& lhs, const PreallocBlock& rhs)
+{
+    return std::make_pair(lhs.ptr, lhs.size) < std::make_pair(rhs.ptr, rhs.size);
+}
+
 struct PreallocPerDeviceMemoryData
 {
     uint8_t* full_ptr       = nullptr;
     int64_t full_size       = 0;
     int64_t full_alloc_info = 0;
-    std::vector<std::pair<uint8_t*, int64_t>> free_blocks;
-    std::vector<std::pair<uint8_t*, int64_t>> alloc_blocks;
+    std::vector<PreallocBlock> free_blocks;
+    std::vector<PreallocBlock> alloc_blocks;
 };
 
 static PreallocPerDeviceMemoryData& PreallocDeviceData(int device_id)
@@ -157,21 +169,31 @@ static void CleanFreeList(int device_id)
 
     for (int i = 1; i < data.free_blocks.size(); i++)
     {
-        if (data.free_blocks[i - 1].first + data.free_blocks[i - 1].second == data.free_blocks[i].first)
+        auto& b0 = data.free_blocks[i - 1];
+        auto& b1 = data.free_blocks[i];
+
+        if (b0.ptr + b0.size == b1.ptr)
         {
             // std::cout << "merge " << (void*)data.free_blocks[i - 1].first << " + " <<
             // (void*)data.free_blocks[i].first
             //     << std::endl;
             // merge from (i-1) -> i
-            data.free_blocks[i].first = data.free_blocks[i - 1].first;
-            data.free_blocks[i].second += data.free_blocks[i - 1].second;
-            data.free_blocks[i - 1].second = 0;
+            b1.ptr = b0.ptr;
+            b1.size += b0.size;
+            b0.size = 0;
+
+            if (b0.last_stream != b1.last_stream)
+            {
+                auto finished_event = getNextEvent();
+                cudaEventRecord(finished_event, b0.last_stream);
+                cudaStreamWaitEvent(b1.last_stream, finished_event);
+            }
         }
     }
 
     // remove empty free blocks
     data.free_blocks.erase(
-        std::remove_if(data.free_blocks.begin(), data.free_blocks.end(), [](auto pair) { return pair.second == 0; }),
+        std::remove_if(data.free_blocks.begin(), data.free_blocks.end(), [](auto pair) { return pair.size == 0; }),
         data.free_blocks.end());
 
     // std::cout << "prefree " << ptr
@@ -184,30 +206,49 @@ static void* premalloc(int64_t size, int device_id)
     size       = iAlignUp(size, prealloc_alignment);
     auto& data = PreallocDeviceData(device_id);
 
+    auto strm        = getCurrentCUDAStream();
     void* result_ptr = nullptr;
     for (auto& f : data.free_blocks)
     {
-        if (f.second >= size)
+        if (f.size >= size)
         {
-            auto remaining = f.second - size;
+            auto remaining = f.size - size;
             if (remaining < 1024 * 8 && remaining > 0)
             {
                 // std::cout << "free block small " << remaining << std::endl;
                 // use complete block if the free block would be too small to avoid fragmentation
-                size = f.second;
+                size = f.size;
+            }
+
+            if (f.last_stream != strm)
+            {
+                // std::cout << "sync stream" << std::endl;
+
+                auto finished_event = getNextEvent();
+                cudaEventRecord(finished_event, f.last_stream);
+
+                cudaStreamWaitEvent(strm, finished_event);
+
+                // TT_CHECK_CUDA_ERROR(cudaStreamSynchronize(f.last_stream));
             }
 
 
-            auto return_ptr = f.first;
-            data.alloc_blocks.emplace_back(return_ptr, size);
-            f.first += size;
-            f.second -= size;
+            auto return_ptr = f.ptr;
+
+            PreallocBlock out_block;
+            out_block.ptr         = return_ptr;
+            out_block.size        = size;
+            out_block.last_stream = strm;
+
+            data.alloc_blocks.emplace_back(out_block);
+            f.ptr += size;
+            f.size -= size;
 
             // make sure the pointer is really aligned
             CHECK_EQ(((uintptr_t)return_ptr) % prealloc_alignment, 0);
 
             // make sure remaining size is also aligned
-            CHECK_EQ(f.second % prealloc_alignment, 0);
+            CHECK_EQ(f.size % prealloc_alignment, 0);
 
 
 
@@ -229,7 +270,7 @@ static void prefree(void* ptr, int device_id)
     int alloc_block_id = -1;
     for (int i = 0; i < data.alloc_blocks.size(); i++)
     {
-        if (data.alloc_blocks[i].first == ptr)
+        if (data.alloc_blocks[i].ptr == ptr)
         {
             alloc_block_id = i;
             break;
@@ -529,7 +570,7 @@ int64_t prealloc_free_memory()
     int64_t sum    = 0;
     for (auto& b : data.free_blocks)
     {
-        sum += b.second;
+        sum += b.size;
     }
     return sum;
 }
