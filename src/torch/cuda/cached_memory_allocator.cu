@@ -229,7 +229,7 @@ static void* premalloc(int64_t size, int device_id)
 
             for (auto& e : f.free_events)
             {
-                cudaStreamWaitEvent(strm, e);
+                TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(strm, e));
             }
 
 
@@ -277,9 +277,13 @@ static void prefree(void* ptr, int device_id)
         }
     }
 
-    auto finished_event = getNextEvent();
-    cudaEventRecord(finished_event, getCurrentCUDAStream());
-    data.alloc_blocks[alloc_block_id].free_events.push_back(finished_event);
+    {
+        DeviceGuard dg(Device(kCUDA, device_id));
+        auto finished_event = getNextEvent();
+        auto strm           = getCurrentCUDAStream();
+        TT_CHECK_CUDA_ERROR(cudaEventRecord(finished_event, strm));
+        data.alloc_blocks[alloc_block_id].free_events.push_back(finished_event);
+    }
 
     CHECK_GE(alloc_block_id, 0);
     data.free_blocks.emplace_back(data.alloc_blocks[alloc_block_id]);
