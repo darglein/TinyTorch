@@ -43,7 +43,11 @@ struct PreallocBlock
 {
     uint8_t* ptr;
     int64_t size;
-    cudaStream_t last_stream = 0;
+    // cudaStream_t last_stream = 0;
+
+    // recorded at the moment of free()
+    // -> next usage should wait on this event
+    std::vector<cudaEvent_t> free_events;
 };
 
 bool operator<(const PreallocBlock& lhs, const PreallocBlock& rhs)
@@ -182,11 +186,14 @@ static void CleanFreeList(int device_id)
             b1.size += b0.size;
             b0.size = 0;
 
-            if (b0.last_stream != b1.last_stream)
+            b1.free_events.insert(b1.free_events.end(), b0.free_events.begin(), b0.free_events.end());
+            b0.free_events.clear();
+
+            // if (b0.last_stream != b1.last_stream)
             {
-                auto finished_event = getNextEvent();
-                cudaEventRecord(finished_event, b0.last_stream);
-                cudaStreamWaitEvent(b1.last_stream, finished_event);
+                // auto finished_event = getNextEvent();
+                // cudaEventRecord(finished_event, b0.last_stream);
+                // cudaStreamWaitEvent(b1.last_stream, finished_event);
             }
         }
     }
@@ -220,16 +227,9 @@ static void* premalloc(int64_t size, int device_id)
                 size = f.size;
             }
 
-            if (f.last_stream != strm)
+            for (auto& e : f.free_events)
             {
-                // std::cout << "sync stream" << std::endl;
-
-                auto finished_event = getNextEvent();
-                cudaEventRecord(finished_event, f.last_stream);
-
-                cudaStreamWaitEvent(strm, finished_event);
-
-                // TT_CHECK_CUDA_ERROR(cudaStreamSynchronize(f.last_stream));
+                cudaStreamWaitEvent(strm, e);
             }
 
 
@@ -238,7 +238,7 @@ static void* premalloc(int64_t size, int device_id)
             PreallocBlock out_block;
             out_block.ptr         = return_ptr;
             out_block.size        = size;
-            out_block.last_stream = strm;
+            out_block.free_events.clear();
 
             data.alloc_blocks.emplace_back(out_block);
             f.ptr += size;
@@ -276,6 +276,10 @@ static void prefree(void* ptr, int device_id)
             break;
         }
     }
+
+    auto finished_event = getNextEvent();
+    cudaEventRecord(finished_event, getCurrentCUDAStream());
+    data.alloc_blocks[alloc_block_id].free_events.push_back(finished_event);
 
     CHECK_GE(alloc_block_id, 0);
     data.free_blocks.emplace_back(data.alloc_blocks[alloc_block_id]);
@@ -363,6 +367,8 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
             if (ptr)
             {
                 std::cout << "use cuda malloc fallback...\n";
+                // std::cout << "use cuda malloc fallback...\n";
+                // std::cout << "use cuda malloc fallback...\n";
             }
         }
     }
