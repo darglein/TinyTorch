@@ -47,7 +47,7 @@ struct PreallocBlock
 
     // recorded at the moment of free()
     // -> next usage should wait on this event
-    std::vector<cudaEvent_t> free_events;
+    std::vector<std::pair<cudaEvent_t, cudaStream_t>> free_events;
 };
 
 bool operator<(const PreallocBlock& lhs, const PreallocBlock& rhs)
@@ -176,7 +176,8 @@ static void CleanFreeList(int device_id)
         auto& b0 = data.free_blocks[i - 1];
         auto& b1 = data.free_blocks[i];
 
-        if (b0.ptr + b0.size == b1.ptr)
+        // merge b0 into b1 ( b0 will be empty)
+        if (b0.size > 0 && b0.ptr + b0.size == b1.ptr)
         {
             // std::cout << "merge " << (void*)data.free_blocks[i - 1].first << " + " <<
             // (void*)data.free_blocks[i].first
@@ -229,15 +230,29 @@ static void* premalloc(int64_t size, int device_id)
 
             for (auto& e : f.free_events)
             {
-                TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(strm, e));
+                if (e.second != strm)
+                {
+                    // only wait if stream different
+                    TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(strm, e.first));
+                }
+            }
+
+            if (f.free_events.size() > 1)
+            {
+                // replace the large event list of the free block by just one event on the current stream,
+                // beecause we have just waited on all events
+                f.free_events.clear();
+                auto finished_event = getNextEvent();
+                TT_CHECK_CUDA_ERROR(cudaEventRecord(finished_event, strm));
+                f.free_events.push_back({finished_event,strm});
             }
 
 
             auto return_ptr = f.ptr;
 
             PreallocBlock out_block;
-            out_block.ptr         = return_ptr;
-            out_block.size        = size;
+            out_block.ptr  = return_ptr;
+            out_block.size = size;
             out_block.free_events.clear();
 
             data.alloc_blocks.emplace_back(out_block);
@@ -282,7 +297,7 @@ static void prefree(void* ptr, int device_id)
         auto finished_event = getNextEvent();
         auto strm           = getCurrentCUDAStream();
         TT_CHECK_CUDA_ERROR(cudaEventRecord(finished_event, strm));
-        data.alloc_blocks[alloc_block_id].free_events.push_back(finished_event);
+        data.alloc_blocks[alloc_block_id].free_events.push_back({finished_event, strm});
     }
 
     CHECK_GE(alloc_block_id, 0);
