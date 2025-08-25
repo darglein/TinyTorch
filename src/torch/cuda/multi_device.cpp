@@ -222,6 +222,15 @@ void MultiDeviceTensor::MainToOthers()
     {
         return;
     }
+
+    if (devices.size() == 2 && Main().is_uva() && data[1].defined() && data[1].is_uva())
+    {
+        // direct uva copy
+        NoGradGuard ngg;
+        data[1].copy_(Main(), true);
+        return;
+    }
+
     MainToCPU();
 
     auto on_cpu_event = getNextEvent();
@@ -247,7 +256,8 @@ MultiDeviceTensor MultiDeviceTensor::slice(int64_t d, int64_t start, int64_t end
     }
     return result;
 }
-void MultiDeviceTensor::AllocateFullCPU() {
+void MultiDeviceTensor::AllocateFullCPU()
+{
     for (int i = 0; i < data.size(); ++i)
     {
         if (!data[i].defined())
