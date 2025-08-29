@@ -171,9 +171,26 @@ void MultiDeviceTensor::AllToCPU()
 void MultiDeviceTensor::ReduceSumOnCPUToMain()
 {
     NoGradGuard ngg;
-    for (int i = 1; i < cpu_data.size(); ++i)
+
+    if (cpu_data[0].scalar_type() == kFloat32 && cpu_data[0].is_contiguous())
     {
-        cpu_data[0] += cpu_data[i];
+        for (int i = 1; i < cpu_data.size(); ++i)
+        {
+            float* target = cpu_data[0].data_ptr<float>();
+            float* src    = cpu_data[i].data_ptr<float>();
+            int64_t N     = cpu_data[0].numel();
+            for (int64_t k = 0; k < N; ++k)
+            {
+                target[k] += src[k];
+            }
+        }
+    }
+    else
+    {
+        for (int i = 1; i < cpu_data.size(); ++i)
+        {
+            cpu_data[0] += cpu_data[i];
+        }
     }
 }
 
