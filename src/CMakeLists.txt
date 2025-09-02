@@ -42,11 +42,11 @@ target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_
 target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_suppress=1394>) # field of class type without a DLL interface used in a class with a DLL interface
 
 
-if (OPENMP_FOUND)
-    target_include_directories(torch PRIVATE ${OPENMP_INCLUDE_DIRS})
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${OpenMP_CXX_FLAGS}>)
-    target_link_libraries(torch PRIVATE "${OpenMP_CXX_FLAGS}")
-endif ()
+#if (OPENMP_FOUND)
+#    target_include_directories(torch PRIVATE ${OPENMP_INCLUDE_DIRS})
+#    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${OpenMP_CXX_FLAGS}>)
+#    target_link_libraries(torch PRIVATE "${OpenMP_CXX_FLAGS}")
+#endif ()
 
 if (UNIX)
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wno-absolute-value>)
@@ -69,12 +69,22 @@ if (MSVC)
     #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/fp:fast>)
     #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/fp:fast>)
 
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp>)
+    # disable warning "unable to vectorize loop"
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd5002>)
+
+    #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp>)
     if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         # make sure libopenmp is used also for the .cu files instead of the msvc openmp
+        target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp>)
         target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp:llvm>)
+
+        # fix warning of omp simd
+        target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-pass-failed>)
     else ()
+        target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>)
         target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
+
+
     endif ()
 
     target_link_libraries(torch PRIVATE OpenMP::OpenMP_CXX)

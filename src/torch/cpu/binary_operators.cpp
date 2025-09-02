@@ -36,12 +36,14 @@ static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, Tenso
 {
     if (a.numel() == b.numel() && a.contiguous && b.contiguous)
     {
+        // std::cout << "test" << std::endl;
         // fast implementation for contiguous case (without dim expansion)
-        T* pa  = a.data;
-        T* pb  = b.data;
-        T* pr  = result.data;
+        const T* __restrict__ pa  = a.data;
+        const T* __restrict__ pb  = b.data;
+        T* __restrict__ pr  = result.data;
         auto N = result.numel();
-#pragma omp parallel for num_threads(get_num_threads())
+// #pragma omp parallel for num_threads(1)
+#pragma omp simd
         for (int64_t i = 0; i < N; ++i)
         {
             pr[i] = op.forward(pa[i], pb[i]);
