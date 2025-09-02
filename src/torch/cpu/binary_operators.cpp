@@ -58,7 +58,7 @@ static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, Tenso
         T* __restrict__ pr  = result.data;
         auto N = result.numel();
 
-#pragma omp simd if(vectorize)
+#pragma omp simd
         for (int64_t i = 0; i < N; ++i)
         {
             pr[i] = op.forward(pa[i], pb[i]);
@@ -88,7 +88,7 @@ static void element_wise_operator(Op op, TensorInfo<T> a, T b, TensorInfo<T> res
         T* pa  = a.data;
         T* pr  = result.data;
         auto N = result.numel();
-#pragma omp simd if(vectorize)
+#pragma omp simd
         for (int64_t i = 0; i < N; ++i)
         {
             pr[i] = T(G(op.forward(G(pa[i]), G(b))));
@@ -112,7 +112,7 @@ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> res
         T* pb  = b.data;
         T* pr  = result.data;
         auto N = result.numel();
-#pragma omp simd if(vectorize)
+#pragma omp simd
         for (int64_t i = 0; i < N; ++i)
         {
             pr[i] = op.forward(a, pb[i]);
