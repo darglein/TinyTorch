@@ -71,7 +71,7 @@ if (MSVC)
     #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/fp:fast>)
 
     # disable warning "unable to vectorize loop"
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd5002>)
+    #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd5002>)
 
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp>)
     if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
