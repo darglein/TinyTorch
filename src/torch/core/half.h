@@ -5,16 +5,94 @@
 namespace tinytorch
 {
 
-struct TINYTORCH_API Half
+
+
+
+struct Half
 {
-    uint16_t h;
+    uint16_t h = 0;
 
     Half() {}
-    Half(float f);
-    Half(double d) : Half(float(d)) {}
-    Half(uint16_t i);
 
-    operator float();
+    // https://gist.github.com/neshume/0edc6ae1c5ad332bb4c62026be68a2fb
+    // float16
+    // Martin Kallman
+    //
+    // Fast single-precision to half-precision floating point conversion
+    //  - Supports signed zero, denormals-as-zero (DAZ), flush-to-zero (FTZ),
+    //    clamp-to-max
+    //  - Does not support infinities or NaN
+    //  - Few, partially pipelinable, non-branching instructions,
+    //  - Core opreations ~10 clock cycles on modern x86-64
+
+    Half(float f)
+    {
+        uint32_t inu = *((uint32_t*)&f);
+        uint32_t t1;
+        uint32_t t2;
+        uint32_t t3;
+
+        t1 = inu & 0x7fffffff;  // Non-sign bits
+        t2 = inu & 0x80000000;  // Sign bit
+        t3 = inu & 0x7f800000;  // Exponent
+
+        t1 >>= 13;  // Align mantissa on MSB
+        t2 >>= 16;  // Shift sign bit into position
+
+        t1 -= 0x1c000;  // Adjust bias
+
+        t1 = (t3 < 0x38800000) ? 0 : t1;
+        t1 = (t1 > 0x7bff) ? 0x7bff : t1;
+        t1 = (t3 == 0 ? 0 : t1);  // Denormals-as-zero
+
+        t1 |= t2;  // Re-insert sign bit
+
+        h = t1;
+    }
+    Half(double d) : Half(float(d)) {}
+    Half(uint16_t i) { h = i; }
+
+    operator float() const
+    {
+        // https://fgiesen.wordpress.com/2012/03/28/half-to-float-done-quic/
+        // https://gist.github.com/rygorous/2144712 (public domain)
+        union FP32
+        {
+            uint32_t u;
+            float f;
+            struct
+            {
+                uint32_t Mantissa : 23;
+                uint32_t Exponent : 8;
+                uint32_t Sign : 1;
+            };
+        };
+
+        union FP16
+        {
+            uint16_t u;
+            struct
+            {
+                uint16_t Mantissa : 10;
+                uint16_t Exponent : 5;
+                uint16_t Sign : 1;
+            };
+        };
+
+        constexpr FP32 magic      = {(254 - 15) << 23};
+        constexpr FP32 was_infnan = {(127 + 16) << 23};
+
+        FP16 h;
+        h.u                          = this->h;
+        FP32 o;
+
+        o.u = (h.u & 0x7fff) << 13;  // exponent/mantissa bits
+        o.f *= magic.f;              // exponent adjust
+        if (o.f >= was_infnan.f)     // make sure Inf/NaN survive
+            o.u |= 255 << 23;
+        o.u |= (h.u & 0x8000) << 16;  // sign bit
+        return o.f;
+    }
 };
 
 template <typename T>
@@ -79,107 +157,3 @@ inline __device__ __half pow(__half a, __half b)
     return __float2half(pow(__half2float(a), __half2float(b)));
 }
 #endif
-
-
-namespace tinytorch
-{
-
-
-inline uint32_t half_to_float(uint16_t h2)
-{
-    union FP32
-    {
-        uint32_t u;
-        float f;
-        struct
-        {
-            uint32_t Mantissa : 23;
-            uint32_t Exponent : 8;
-            uint32_t Sign : 1;
-        };
-    };
-
-    union FP16
-    {
-        uint16_t u;
-        struct
-        {
-            uint16_t Mantissa : 10;
-            uint16_t Exponent : 5;
-            uint16_t Sign : 1;
-        };
-    };
-
-
-    FP16 h;
-    h.u                          = h2;
-    static const FP32 magic      = {(254 - 15) << 23};
-    static const FP32 was_infnan = {(127 + 16) << 23};
-    FP32 o;
-
-    o.u = (h.u & 0x7fff) << 13;  // exponent/mantissa bits
-    o.f *= magic.f;              // exponent adjust
-    if (o.f >= was_infnan.f)     // make sure Inf/NaN survive
-        o.u |= 255 << 23;
-    o.u |= (h.u & 0x8000) << 16;  // sign bit
-    return o.u;
-}
-
-
-inline Half::operator float()
-{
-    uint32_t f = half_to_float(h);
-    return *(float*)&f;
-}
-}  // namespace tinytorch
-
-
-
-namespace tinytorch
-{
-
-// https://gist.github.com/neshume/0edc6ae1c5ad332bb4c62026be68a2fb
-// float16
-// Martin Kallman
-//
-// Fast single-precision to half-precision floating point conversion
-//  - Supports signed zero, denormals-as-zero (DAZ), flush-to-zero (FTZ),
-//    clamp-to-max
-//  - Does not support infinities or NaN
-//  - Few, partially pipelinable, non-branching instructions,
-//  - Core opreations ~10 clock cycles on modern x86-64
-inline uint16_t half_from_float(uint32_t inu)
-{
-    //    uint32_t inu = *((uint32_t*)&in);
-    uint32_t t1;
-    uint32_t t2;
-    uint32_t t3;
-
-    t1 = inu & 0x7fffffff;  // Non-sign bits
-    t2 = inu & 0x80000000;  // Sign bit
-    t3 = inu & 0x7f800000;  // Exponent
-
-    t1 >>= 13;  // Align mantissa on MSB
-    t2 >>= 16;  // Shift sign bit into position
-
-    t1 -= 0x1c000;  // Adjust bias
-
-    t1 = (t3 < 0x38800000) ? 0 : t1;
-    t1 = (t1 > 0x7bff) ? 0x7bff : t1;
-    t1 = (t3 == 0 ? 0 : t1);  // Denormals-as-zero
-
-    t1 |= t2;  // Re-insert sign bit
-
-    return t1;
-};
-
-inline Half::Half(float f)
-{
-    h = half_from_float(*(uint32_t*)&f);
-}
-
-inline Half::Half(uint16_t i)
-{
-    h = i;
-}
-}  // namespace tinytorch
