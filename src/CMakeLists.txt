@@ -64,6 +64,7 @@ if (UNIX OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mfma>)
 endif ()
 
+target_link_libraries(torch PRIVATE OpenMP::OpenMP_CXX)
 
 if (MSVC)
     #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/fp:fast>)
@@ -87,7 +88,6 @@ if (MSVC)
 
     endif ()
 
-    target_link_libraries(torch PRIVATE OpenMP::OpenMP_CXX)
 
 
     # '...' needs to have dll-interface to be used by clients of struct '...'
