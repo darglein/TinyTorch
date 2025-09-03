@@ -47,7 +47,7 @@ namespace tinytorch
 {
 namespace cuda
 {
-TINYTORCH_API int& getTotalNumEventsUsed();
+TINYTORCH_API int& getTotalNumEventsUsed(int device);
 TINYTORCH_API cudaEvent_t getNextEvent();
 
 TINYTORCH_API cudaStream_t getCurrentCUDAStream();

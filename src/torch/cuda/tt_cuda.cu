@@ -54,10 +54,10 @@ void setDevice(int device_index)
 }
 
 
-int& getTotalNumEventsUsed()
+int& getTotalNumEventsUsed(int device)
 {
-    static thread_local int n = 0;
-    return n;
+    static thread_local int n[MAX_DEVICES]                    = {};
+    return n[device];
 }
 
 
@@ -78,7 +78,7 @@ cudaEvent_t getNextEvent()
         TT_CHECK_CUDA_ERROR(cudaEventCreate(&event));
     }
 
-    getTotalNumEventsUsed()++;
+    getTotalNumEventsUsed(device)++;
 
     return event;
 }
