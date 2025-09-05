@@ -15,4 +15,5 @@
 
 
 
+#include <torch/cuda/multi_device.h>
 #endif

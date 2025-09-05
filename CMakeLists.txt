@@ -9,8 +9,13 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(TT_BUILD_SAMPLES "Build the tt samples" ON)
+option(TT_WITH_CUDA "Enable CUDA if possible" ON)
+option(TT_ALL_OUTPUT_TO_BIN "Writes all .dll and .exe to the bin directory" OFF)
 
-find_package(CUDAToolkit 11.8)
+if (TT_WITH_CUDA)
+    find_package(CUDAToolkit 11.8)
+endif ()
+
 if (CUDAToolkit_FOUND)
     enable_language(CUDA)
     set(TT_HAS_CUDA 1)
@@ -18,6 +23,10 @@ if (CUDAToolkit_FOUND)
 else ()
     set(TT_HAS_CUDA 0)
     message(STATUS "Disable CUDA support (CUDAToolkit not found)")
+endif ()
+
+if (TT_ALL_OUTPUT_TO_BIN)
+    SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 endif ()
 
 

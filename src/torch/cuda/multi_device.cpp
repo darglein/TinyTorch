@@ -1,3 +1,6 @@
+
+#ifdef TT_HAS_CUDA
+
 #include "multi_device.h"
 
 #include "torch/core/graph.h"
@@ -291,3 +294,5 @@ void MultiDeviceTensor::AllocateFullCPU()
 
 }  // namespace cuda
 }  // namespace tinytorch
+
+#endif
