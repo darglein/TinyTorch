@@ -54,9 +54,9 @@ static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, Tenso
     {
         // std::cout << "test" << std::endl;
         // fast implementation for contiguous case (without dim expansion)
-        const T* __restrict__ pa = a.data;
-        const T* __restrict__ pb = b.data;
-        T* __restrict__ pr       = result.data;
+        const T* pa = a.data;
+        const T* pb = b.data;
+        T*  pr       = result.data;
 
         if constexpr (vectorize)
         {

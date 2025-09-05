@@ -5,7 +5,7 @@ project(TinyTorch VERSION 1.0.0 LANGUAGES CXX)
 
 ############# C++ Standard and Filesystem stuff ###############
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(TT_BUILD_SAMPLES "Build the tt samples" ON)
