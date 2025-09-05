@@ -1,3 +1,4 @@
+#include "torch/tiny_torch_config.h"
 
 #ifdef TT_HAS_CUDA
 

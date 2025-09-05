@@ -6,9 +6,9 @@
 
 #include "torch/tiny_torch.h"
 
-int main()
+void OptimizeSomething(tinytorch::Device device)
 {
-    auto options = tinytorch::TensorOptions().device(tinytorch::kCPU).dtype(tinytorch::kFloat);
+    auto options = tinytorch::TensorOptions().device(device).dtype(tinytorch::kFloat);
 
     // The data tensors
     tinytorch::Tensor observation = tinytorch::rand({3, 5}, options);
@@ -37,7 +37,7 @@ int main()
     tinytorch::optim::Adam optim(params, 0.1f);
 
     // Optimize the model for 50 iterations
-    for (int i = 0; i < 50; ++i)
+    for (int i = 0; i <= 50; ++i)
     {
         optim.zero_grad();
 
@@ -45,14 +45,28 @@ int main()
 
         auto loss = sum(square(prediction - target));
 
-//        std::cout << "grad   " << params[0].grad() << std::endl;
+        //        std::cout << "grad   " << params[0].grad() << std::endl;
         backward(loss);
-//        std::cout << "params " << params[0] << std::endl;
-//        std::cout << "grad   " << params[0].grad() << std::endl;
+        //        std::cout << "params " << params[0] << std::endl;
+        //        std::cout << "grad   " << params[0].grad() << std::endl;
         optim.step();
-//        std::cout << "params " << params[0] << std::endl;
+        //        std::cout << "params " << params[0] << std::endl;
 
-        std::cout << "Step " << i << " Loss: " << loss << std::endl << std::endl;
+        if (i % 10 == 0)
+        {
+            std::cout << "Step " << i << " Loss: " << loss << std::endl;
+        }
     }
+    std::cout  << std::endl;
+}
+
+
+int main()
+{
+    OptimizeSomething(tinytorch::kCPU);
+
+#ifdef TT_HAS_CUDA
+    OptimizeSomething(tinytorch::kCUDA);
+#endif
     return 0;
 }

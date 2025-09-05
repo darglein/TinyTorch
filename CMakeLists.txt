@@ -16,6 +16,7 @@ if (TT_WITH_CUDA)
     find_package(CUDAToolkit 11.8)
 endif ()
 
+
 if (CUDAToolkit_FOUND)
     enable_language(CUDA)
     set(TT_HAS_CUDA 1)
@@ -38,7 +39,7 @@ if (NOT TARGET glog::glog)
     set(WITH_GFLAGS OFF CACHE INTERNAL "")
     set(WITH_GTEST OFF CACHE INTERNAL "")
     set(WITH_UNWIND OFF CACHE INTERNAL "")
-    add_subdirectory(External/glog)
+    add_subdirectory(External/tiny-glog)
 endif ()
 
 ############# SOURCE ###############
