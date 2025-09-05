@@ -48,25 +48,35 @@ target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_s
 #    target_link_libraries(torch PRIVATE "${OpenMP_CXX_FLAGS}")
 #endif ()
 
-if (UNIX)
+target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--generate-line-info>) # for profiling
+
+if (${CMAKE_CXX_COMPILER_FRONTEND_VARIANT} MATCHES "GNU")
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wno-absolute-value>)
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-absolute-value>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fvisibility=hidden>)
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fvisibility=hidden>)
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--generate-line-info>) # for profiling
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
-endif ()
 
-if (UNIX OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.1>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mfma>)
+
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--generate-line-info>) # for profiling
+
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fvisibility=hidden>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
+
+
+    if (WIN32)
+        # make sure libopenmp is used also for the .cu files instead of the msvc openmp
+        # important because .cu files are compiled with cl.exe instead of clang-cl.exe
+        target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp:llvm>)
+    else ()
+        target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
+    endif ()
 endif ()
 
-target_link_libraries(torch PRIVATE OpenMP::OpenMP_CXX)
 
-if (MSVC)
+if (${CMAKE_CXX_COMPILER_FRONTEND_VARIANT} STREQUAL "MSVC")
     #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/fp:fast>)
     #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/fp:fast>)
 
@@ -74,20 +84,9 @@ if (MSVC)
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd5002>)
 
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp>)
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        # make sure libopenmp is used also for the .cu files instead of the msvc openmp
-        target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp>)
-        target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp:llvm>)
 
-        # fix warning of omp simd
-        target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-pass-failed>)
-    else ()
-        target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>)
-        target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
-
-
-    endif ()
-
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>)
+    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
 
 
     # '...' needs to have dll-interface to be used by clients of struct '...'
@@ -102,6 +101,7 @@ if (MSVC)
     target_link_libraries(torch PRIVATE DbgHelp)
 endif ()
 
+target_link_libraries(torch PRIVATE OpenMP::OpenMP_CXX)
 
 target_link_libraries(torch PUBLIC glog::glog)
 #target_link_libraries(torch PRIVATE "${OpenMP_CXX_LIB_NAMES}")
