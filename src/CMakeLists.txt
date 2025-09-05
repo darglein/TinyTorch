@@ -57,10 +57,7 @@ if ("${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" MATCHES "GNU")
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--generate-line-info>) # for profiling
 
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fvisibility=hidden>)
-    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
-
-
-    target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
+    #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
 
 endif ()
 
@@ -81,19 +78,25 @@ if ("${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC")
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd4068>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4068>)
 
-    target_link_libraries(torch PRIVATE DbgHelp)
 endif ()
 
 
 if (WIN32)
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if ("${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" MATCHES "GNU")
+        # "real" clang on windows
+    elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        # clang-cl on windows
         # make sure libopenmp is used also for the .cu files instead of the msvc openmp
         target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp>)
         target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp:llvm>)
     else ()
+        # MSVC on windows
         target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>)
         target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
     endif ()
+
+    find_library(DBGHELP_LIBRARY NAMES DbgHelp)
+    target_link_libraries(torch PRIVATE ${DBGHELP_LIBRARY})
 endif ()
 
 target_link_libraries(torch PRIVATE OpenMP::OpenMP_CXX)
