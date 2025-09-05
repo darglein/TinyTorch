@@ -50,7 +50,7 @@ target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcudafe=--diag_s
 
 target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--generate-line-info>) # for profiling
 
-if (${CMAKE_CXX_COMPILER_FRONTEND_VARIANT} MATCHES "GNU")
+if ("${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" MATCHES "GNU")
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wno-absolute-value>)
     #target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-absolute-value>)
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fvisibility=hidden>)
@@ -66,17 +66,12 @@ if (${CMAKE_CXX_COMPILER_FRONTEND_VARIANT} MATCHES "GNU")
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
 
 
-    if (WIN32)
-        # make sure libopenmp is used also for the .cu files instead of the msvc openmp
-        # important because .cu files are compiled with cl.exe instead of clang-cl.exe
-        target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp:llvm>)
-    else ()
-        target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
-    endif ()
+    target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
+
 endif ()
 
 
-if (${CMAKE_CXX_COMPILER_FRONTEND_VARIANT} STREQUAL "MSVC")
+if ("${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC")
     #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/fp:fast>)
     #    target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/fp:fast>)
 
@@ -101,6 +96,13 @@ if (${CMAKE_CXX_COMPILER_FRONTEND_VARIANT} STREQUAL "MSVC")
     target_link_libraries(torch PRIVATE DbgHelp)
 endif ()
 
+
+if (WIN32)
+    # make sure libopenmp is used also for the .cu files instead of the msvc openmp
+    # important because .cu files are compiled with cl.exe instead of clang-cl.exe
+    target_compile_options(torch PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp:llvm>)
+
+endif ()
 target_link_libraries(torch PRIVATE OpenMP::OpenMP_CXX)
 
 target_link_libraries(torch PUBLIC glog::glog)
