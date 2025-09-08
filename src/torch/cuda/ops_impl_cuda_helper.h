@@ -1,7 +1,6 @@
 #pragma once
 
 
-#include "torch/core/crash.h"
 
 #include "torch/core/tensor_info.h"
 #include "torch/tiny_torch_cuda.h"
