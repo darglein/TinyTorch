@@ -66,6 +66,7 @@ struct TINYTORCH_API MultiDeviceTensor
     }
 
     bool Initialized() const { return !data.empty(); }
+    bool defined() { return Initialized() && Main().defined(); }
 
 
     void AllocateFullCPU();

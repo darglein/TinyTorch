@@ -95,8 +95,8 @@ if (WIN32)
         target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/openmp>)
     endif ()
 
-    find_library(DBGHELP_LIBRARY NAMES DbgHelp)
-    target_link_libraries(torch PRIVATE ${DBGHELP_LIBRARY})
+#    find_library(DBGHELP_LIBRARY NAMES DbgHelp)
+#    target_link_libraries(torch PRIVATE ${DBGHELP_LIBRARY})
 endif ()
 
 target_link_libraries(torch PRIVATE OpenMP::OpenMP_CXX)
