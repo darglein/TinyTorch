@@ -41,8 +41,8 @@ struct TINYTORCH_API Device
     int _index       = 0;
 
     Device(DeviceType type = kCPU, int index = -1);
-    DeviceType type() { return _type; }
-    int index() { return _index; }
+    DeviceType type() const { return _type; }
+    int index() const { return _index; }
 };
 
 inline bool operator==(Device device, DeviceType type)
@@ -65,7 +65,7 @@ enum PaddingMode
 enum InterpolationType
 {
     kBilinear = 0,
-    kNearest = 1,
+    kNearest  = 1,
 };
 
 
