@@ -35,6 +35,7 @@ TINYTORCH_API void  free_preallocate_vram();
 TINYTORCH_API int64_t prealloc_free_list_size();
 TINYTORCH_API int64_t prealloc_free_memory();
 TINYTORCH_API void prealloc_print_debug_line();
+TINYTORCH_API void prealloc_allow_fallback_cudamalloc(bool value);
 
 
 struct TINYTORCH_API CUDACachingAllocator

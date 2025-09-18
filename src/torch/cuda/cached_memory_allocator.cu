@@ -18,6 +18,7 @@ namespace cuda
 {
 static constexpr int MAX_DEVICES            = 8;
 static constexpr int64_t prealloc_alignment = 1024;
+static bool prealloc_use_fallback           = true;
 
 static std::recursive_mutex mu;
 static bool allocator_initialized = false;
@@ -216,8 +217,11 @@ static void* premalloc(int64_t size, int device_id)
 
     auto strm        = getCurrentCUDAStream();
     void* result_ptr = nullptr;
+
+    // std::cout << "premalloc " << size << " first free " <<  data.free_blocks std::endl;
     for (auto& f : data.free_blocks)
     {
+        // std::cout << "free " << f.size << std::endl;
         if (f.size >= size)
         {
             auto remaining = f.size - size;
@@ -244,7 +248,7 @@ static void* premalloc(int64_t size, int device_id)
                 f.free_events.clear();
                 auto finished_event = getNextEvent();
                 TT_CHECK_CUDA_ERROR(cudaEventRecord(finished_event, strm));
-                f.free_events.push_back({finished_event,strm});
+                f.free_events.push_back({finished_event, strm});
             }
 
 
@@ -378,17 +382,18 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
         info = (uint64_t)AllocatorAlgorithm::CUDA_PRE_ALLOCATE;
 
         // if not enough was preallocated, try using the default cuda malloc
-        if (ptr == nullptr)
+        if (prealloc_use_fallback && ptr == nullptr)
         {
-            // handle_cuda_allocation_error(cudaErrorMemoryAllocation, size, device_id);
             ptr  = malloc_blocking(size, device_id);
             info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC;
             if (ptr)
             {
                 std::cout << "use cuda malloc fallback...\n";
-                // std::cout << "use cuda malloc fallback...\n";
-                // std::cout << "use cuda malloc fallback...\n";
             }
+        }
+        else if (ptr == nullptr)
+        {
+            handle_cuda_allocation_error(cudaErrorMemoryAllocation, size, device_id);
         }
     }
     else
@@ -603,6 +608,10 @@ void prealloc_print_debug_line()
 {
     std::cout << "pre_allocate: device " << getDevice() << " free_list_size " << prealloc_free_list_size()
               << " free_mem_mib " << (prealloc_free_memory() / 1024.0 / 1024) << std::endl;
+}
+void prealloc_allow_fallback_cudamalloc(bool value)
+{
+    prealloc_use_fallback = value;
 }
 }  // namespace cuda
 }  // namespace tinytorch
