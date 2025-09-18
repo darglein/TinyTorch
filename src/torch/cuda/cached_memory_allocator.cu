@@ -210,15 +210,15 @@ static void CleanFreeList(int device_id)
     // << data.free_blocks.size() << std::endl;
 }
 
-static void* premalloc(int64_t size, int device_id)
+static void* premalloc(int64_t initial_size, int device_id)
 {
-    size       = iAlignUp(size, prealloc_alignment);
+    int64_t size       = iAlignUp(initial_size, prealloc_alignment);
     auto& data = PreallocDeviceData(device_id);
 
     auto strm        = getCurrentCUDAStream();
     void* result_ptr = nullptr;
 
-    // std::cout << "premalloc " << size << " first free " <<  data.free_blocks std::endl;
+    // std::cout << "premalloc " << initial_size << " free " <<  prealloc_free_memory()  << std::endl;
     for (auto& f : data.free_blocks)
     {
         // std::cout << "free " << f.size << std::endl;
