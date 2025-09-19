@@ -296,6 +296,9 @@ static void prefree(void* ptr, int device_id)
         }
     }
 
+
+    // std::cout << "prefree " << data.alloc_blocks[alloc_block_id].size << " free " <<  prealloc_free_memory()  << std::endl;
+
     {
         DeviceGuard dg(Device(kCUDA, device_id));
         auto finished_event = getNextEvent();
