@@ -10,7 +10,7 @@
 #include <map>
 
 #ifdef TT_HAS_CUDA
-#include "torch/cuda/multi_device.h"
+#    include "torch/cuda/multi_device.h"
 #endif
 
 namespace tinytorch
@@ -78,7 +78,7 @@ struct TINYTORCH_API IValue
     IValue(Tensor t) : v_tensor(t) {}
 
 #ifdef TT_HAS_CUDA
-    IValue(const cuda::MultiDeviceTensor& t) : v_mdtensor(t) {}
+    IValue(const cuda::MultiDeviceTensor& t) : v_tensor(Tensor(t)), v_mdtensor(t) {}
 #endif
 
     IValue(SizeType s) : v_size(s) {}
@@ -113,7 +113,7 @@ struct TINYTORCH_API IValue
     std::shared_ptr<CustomClassHolder> custom_class;
 #ifdef TT_HAS_CUDA
     cuda::MultiDeviceTensor& toMultiDeviceTensor() { return v_mdtensor; }
-   cuda::MultiDeviceTensor v_mdtensor;
+    cuda::MultiDeviceTensor v_mdtensor;
 #endif
 };
 
@@ -419,7 +419,7 @@ inline bool InplaceGradientAllowed(const Tensor& t)
 // Returns:
 //    <Cuda write gradient, backward function return gradient>
 //
-TINYTORCH_API std::pair<Tensor,Tensor> MakeInplaceGradient(const Tensor& t, bool zero_init = true);
+TINYTORCH_API std::pair<Tensor, Tensor> MakeInplaceGradient(const Tensor& t, bool zero_init = true);
 
 }  // namespace autograd
 
