@@ -78,7 +78,7 @@ struct TINYTORCH_API IValue
     IValue(Tensor t) : v_tensor(t) {}
 
 #ifdef TT_HAS_CUDA
-    IValue(const cuda::MultiDeviceTensor& t) : v_tensor(Tensor(t)) {}
+    IValue(const cuda::MultiDeviceTensor& t) : v_mdtensor(t) {}
 #endif
 
     IValue(SizeType s) : v_size(s) {}
@@ -111,6 +111,10 @@ struct TINYTORCH_API IValue
     SizeType v_size;
     Device v_device;
     std::shared_ptr<CustomClassHolder> custom_class;
+#ifdef TT_HAS_CUDA
+    cuda::MultiDeviceTensor& toMultiDeviceTensor() { return v_mdtensor; }
+   cuda::MultiDeviceTensor v_mdtensor;
+#endif
 };
 
 
