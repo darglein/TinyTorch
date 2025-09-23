@@ -2,13 +2,12 @@
 
 #ifdef TT_HAS_CUDA
 
-#include "multi_device.h"
+#    include "torch/core/graph.h"
 
-#include "torch/core/graph.h"
-
-#include "ops_impl_cuda_helper.h"
-#include "torch/core/ops/ops_operators.h"
-#include "torch/core/ops/ops_tensor_creation.h"
+#    include "multi_device.h"
+#    include "ops_impl_cuda_helper.h"
+#    include "torch/core/ops/ops_operators.h"
+#    include "torch/core/ops/ops_tensor_creation.h"
 
 namespace tinytorch
 {
@@ -137,66 +136,65 @@ void MultiDeviceTensor::SetMain(Tensor t)
 
 void MultiDeviceTensor::MainToCPU()
 {
-    NoGradGuard ngg;
-    if (!Main().defined())
-    {
-        cpu_data = {};
-        return;
-    }
-
-    if (!cpu_data.front().defined())
-    {
-        cpu_data.front() = empty_like(Main(), Main().options().device(kCPU).pinned_memory(true));
-    }
-    cpu_data.front().copy_(Main(), true);
+    ToCPUSingle(0);
 }
 
 
 void MultiDeviceTensor::AllToCPU()
 {
-    NoGradGuard ngg;
-
     for (int i = 0; i < data.size(); ++i)
     {
-        if (!data[i].defined())
-        {
-            cpu_data[i] = {};
-            continue;
-        }
-        if (!cpu_data[i].defined())
-        {
-            cpu_data[i] = empty_like(data[i], data[i].options().device(kCPU).pinned_memory(true));
-        }
-        cpu_data[i].copy_(data[i], true);
+        ToCPUSingle(i);
     }
 }
+
+
+void MultiDeviceTensor::ToCPUSingle(int i)
+{
+    NoGradGuard ngg;
+    if (!data[i].defined())
+    {
+        cpu_data[i] = {};
+        return;
+    }
+    if (!cpu_data[i].defined())
+    {
+        cpu_data[i] = empty_like(data[i], data[i].options().device(kCPU).pinned_memory(true));
+    }
+    cpu_data[i].copy_(data[i], true);
+}
+
 
 
 void MultiDeviceTensor::ReduceSumOnCPUToMain()
 {
-    NoGradGuard ngg;
-
-    if (cpu_data[0].scalar_type() == kFloat32 && cpu_data[0].is_contiguous())
+    for (int i = 1; i < cpu_data.size(); ++i)
     {
-        for (int i = 1; i < cpu_data.size(); ++i)
+        ReduceSumCPUSingle(0, i);
+    }
+}
+
+
+void MultiDeviceTensor::ReduceSumCPUSingle(int target, int src)
+{
+    if (cpu_data[target].scalar_type() == kFloat32 && cpu_data[target].is_contiguous())
+    {
+        float* target_ptr = cpu_data[target].data_ptr<float>();
+        float* src_ptr    = cpu_data[src].data_ptr<float>();
+        int64_t N         = cpu_data[target].numel();
+#    pragma omp simd
+        for (int64_t k = 0; k < N; ++k)
         {
-            float* target = cpu_data[0].data_ptr<float>();
-            float* src    = cpu_data[i].data_ptr<float>();
-            int64_t N     = cpu_data[0].numel();
-            for (int64_t k = 0; k < N; ++k)
-            {
-                target[k] += src[k];
-            }
+            target_ptr[k] += src_ptr[k];
         }
     }
     else
     {
-        for (int i = 1; i < cpu_data.size(); ++i)
-        {
-            cpu_data[0] += cpu_data[i];
-        }
+        NoGradGuard ngg;
+        cpu_data[target] += cpu_data[src];
     }
 }
+
 
 
 void MultiDeviceTensor::MainCPUToOthers(cudaEvent_t wait_event, bool include_to_main_gpu)

@@ -72,9 +72,19 @@ struct TINYTORCH_API MultiDeviceTensor
     void AllocateFullCPU();
 
     void SetMain(Tensor t);
+
     void MainToCPU();
     void AllToCPU();
+    void ToCPUSingle(int i);
+
+
+    // computes
+    // cpu_data[target] += cpu_data[src]
+    //
+    // Info: not synchronized to anything
+    void ReduceSumCPUSingle(int target, int src);
     void ReduceSumOnCPUToMain();
+
 
     void MainCPUToOthers(cudaEvent_t wait_event, bool include_to_main_gpu );
     void MainCPUToMainGPU();
