@@ -170,6 +170,18 @@ struct Module
         t.set_requires_grad(true, true);
         parameters_[name] = t;
     }
+#ifdef TT_HAS_CUDA
+    void register_parameter(std::string name, cuda::MultiDeviceTensor& t)
+    {
+        // allocate gradient on each device
+        for (auto& t0 : t.data)
+        {
+            t0.set_requires_grad(true, true);
+        }
+
+        parameters_[name] = t;
+    }
+#endif
 
     template <typename ModuleType>
     std::shared_ptr<ModuleType> register_module(std::string name, std::shared_ptr<ModuleType> module)
