@@ -58,6 +58,17 @@ struct TINYTORCH_API MultiDeviceTensor
         return data.front();
     }
 
+    Tensor MainOrUndefined()
+    {
+        if (data.empty())
+        {
+            return {};
+        }else
+        {
+            return data.front();
+        }
+    }
+
 
     Tensor& Main()
     {
