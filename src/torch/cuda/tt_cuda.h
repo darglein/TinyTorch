@@ -11,7 +11,7 @@
 #include "cached_memory_allocator.h"
 #include "cuda_runtime.h"
 
-#ifdef __CUDACC__
+#if defined(__CUDACC__) && defined(__CUDA_ARCH__) && __CUDA_ARCH__ > 0
 // Warning: This assert is pretty slow, so make sure it is only active during debug
 
 #    undef assert

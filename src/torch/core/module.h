@@ -151,6 +151,12 @@ struct Module
         {
             b.second->zero_grad(set_to_none);
         }
+        // #ifdef TT_HAS_CUDA
+        //         for (auto& b : multi_device_parameters_)
+        //         {
+        //
+        //         }
+        // #endif
     }
     void train(bool on = true)
     {
@@ -171,15 +177,52 @@ struct Module
         parameters_[name] = t;
     }
 #ifdef TT_HAS_CUDA
+
+    void register_buffer(std::string name, cuda::MultiDeviceTensor& t)
+    {
+        t.SetMainAndCopyToOthers(t.Main());
+        buffers_[name] = t;
+    }
+
     void register_parameter(std::string name, cuda::MultiDeviceTensor& t)
     {
+        t.SetMainAndCopyToOthers(t.Main());
         // allocate gradient on each device
         for (auto& t0 : t.data)
         {
             t0.set_requires_grad(true, true);
         }
 
-        parameters_[name] = t;
+        parameters_[name]              = t;
+        multi_device_parameters_[name] = t;
+    }
+
+    void multi_device_reduce_grad_main_uva()
+    {
+        for (auto& b : modules_)
+        {
+            b.second->multi_device_reduce_grad_main_uva();
+        }
+
+        for (auto& mdp : multi_device_parameters_)
+        {
+            mdp.second.ReduceGradientSumToMainUVA();
+        }
+    }
+    void set_other_device_grad_to_zero()
+    {
+        for (auto& b : modules_)
+        {
+            b.second->set_other_device_grad_to_zero();
+        }
+
+        for (auto& mdp : multi_device_parameters_)
+        {
+            for (int i = 1; i < mdp.second.size(); ++i)
+            {
+                mdp.second.data[i].mutable_grad().zero_();
+            }
+        }
     }
 #endif
 
@@ -236,6 +279,9 @@ struct Module
 
     std::map<std::string, Tensor> buffers_;
     std::map<std::string, Tensor> parameters_;
+#ifdef TT_HAS_CUDA
+    std::map<std::string, cuda::MultiDeviceTensor> multi_device_parameters_;
+#endif
     std::map<std::string, std::shared_ptr<Module>> modules_;
     bool is_training_ = true;
 };
