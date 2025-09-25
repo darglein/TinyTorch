@@ -174,6 +174,14 @@ void MultiDeviceTensor::ReduceGradientSumToMainUVA()
         data[0].mutable_grad() += data[i].mutable_grad();
     }
 }
+void MultiDeviceTensor::ReduceSumToMainUVA(){
+    for (int i = 1; i < cpu_data.size(); ++i)
+    {
+        CHECK(data[0].is_uva());
+        CHECK(data[i].is_uva());
+        data[0] += data[i];
+    }
+}
 void MultiDeviceTensor::ReduceSumOnCPUToMain()
 {
     for (int i = 1; i < cpu_data.size(); ++i)

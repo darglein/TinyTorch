@@ -97,6 +97,7 @@ struct TINYTORCH_API MultiDeviceTensor
     void ReduceSumOnCPUToMain();
 
     void ReduceGradientSumToMainUVA();
+    void ReduceSumToMainUVA();
 
 
     void MainCPUToOthers(cudaEvent_t wait_event, bool include_to_main_gpu );
