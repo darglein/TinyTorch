@@ -332,6 +332,31 @@ Tensor Tensor::permute_view(const SizeType& index) const
                                                               std::move(new_sizes), std::move(new_strides), options());
     return new_impl;
 }
+Tensor Tensor::reinterpret_view(ScalarType new_scalar_type) const
+{
+    CHECK(!this->requires_grad() || !GradMode::is_enabled());
+    CHECK_EQ(dim(), 1);
+    CHECK(is_contiguous());
+
+    int64_t current_size = numel() * element_size();
+
+    CHECK_EQ(current_size % elementSize(new_scalar_type), 0);
+
+
+    auto new_sizes   = this->sizes();
+    auto new_strides = this->strides();
+
+    new_sizes[0] = current_size / elementSize(new_scalar_type);
+    CHECK_EQ(new_strides[0], 1);
+
+    auto new_options = options().dtype(new_scalar_type);
+
+
+    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(
+        impl_->storage_, impl_->storage_offset_, std::move(new_sizes), std::move(new_strides), new_options);
+
+    return new_impl;
+}
 
 void Tensor::resize_(const SizeType& size)
 {

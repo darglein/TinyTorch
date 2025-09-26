@@ -191,6 +191,8 @@ struct TINYTORCH_API Tensor
     Tensor slice_view(int64_t dim, int64_t start, int64_t end, int64_t step = 1) const;
     Tensor permute_view(const SizeType& size) const;
 
+    Tensor reinterpret_view(ScalarType new_scalar_type) const;
+
     // Tensor scatter_add(int64_t dim, Tensor ids, Tensor value) const
     // {
     //     throw std::runtime_error("not implemented");

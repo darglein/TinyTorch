@@ -116,7 +116,8 @@ struct TINYTORCH_API MultiDeviceTensor
     }
 
     MultiDeviceTensor slice(int64_t d, int64_t start, int64_t end) const;
-
+    MultiDeviceTensor view(const SizeType& sizes) const;
+    MultiDeviceTensor reinterpret_view(ScalarType new_scalar_type) const;
 
     Tensor operator[](Device d)
     {

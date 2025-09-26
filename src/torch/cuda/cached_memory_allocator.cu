@@ -488,6 +488,13 @@ void* cuda_malloc_pinned(int64_t size)
 {
     void* ptr              = nullptr;
     cudaError_t cuda_error = cudaMallocHost(&ptr, size);
+
+
+    if (size > 1024 * 1024)
+    {
+         cudaMallocHost(&ptr, size);
+        std::cout << "pinned alloc " << (size / 1024.0 / 1024.0) << " MiB" << std::endl;
+    }
     //        cudaError_t cuda_error = cudaErrorInvalidValue;
     if (cuda_error != cudaSuccess)
     {

@@ -174,7 +174,8 @@ void MultiDeviceTensor::ReduceGradientSumToMainUVA()
         data[0].mutable_grad() += data[i].mutable_grad();
     }
 }
-void MultiDeviceTensor::ReduceSumToMainUVA(){
+void MultiDeviceTensor::ReduceSumToMainUVA()
+{
     for (int i = 1; i < cpu_data.size(); ++i)
     {
         CHECK(data[0].is_uva());
@@ -277,7 +278,6 @@ void MultiDeviceTensor::MainToOthers()
 MultiDeviceTensor MultiDeviceTensor::slice(int64_t d, int64_t start, int64_t end) const
 {
     MultiDeviceTensor result = *this;
-
     for (int i = 0; i < data.size(); ++i)
     {
         if (cpu_data[i].defined())
@@ -287,6 +287,38 @@ MultiDeviceTensor MultiDeviceTensor::slice(int64_t d, int64_t start, int64_t end
         if (data[i].defined())
         {
             result.data[i] = data[i].slice(d, start, end);
+        }
+    }
+    return result;
+}
+MultiDeviceTensor MultiDeviceTensor::view(const SizeType& sizes) const
+{
+    MultiDeviceTensor result = *this;
+    for (int i = 0; i < data.size(); ++i)
+    {
+        if (cpu_data[i].defined())
+        {
+            result.cpu_data[i] = cpu_data[i].view(sizes);
+        }
+        if (data[i].defined())
+        {
+            result.data[i] = data[i].view(sizes);
+        }
+    }
+    return result;
+}
+MultiDeviceTensor MultiDeviceTensor::reinterpret_view(ScalarType new_scalar_type) const
+{
+    MultiDeviceTensor result = *this;
+    for (int i = 0; i < data.size(); ++i)
+    {
+        if (cpu_data[i].defined())
+        {
+            result.cpu_data[i] = cpu_data[i].reinterpret_view(new_scalar_type);
+        }
+        if (data[i].defined())
+        {
+            result.data[i] = data[i].reinterpret_view(new_scalar_type);
         }
     }
     return result;
