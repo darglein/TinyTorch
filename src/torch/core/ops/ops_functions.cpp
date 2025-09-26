@@ -212,7 +212,7 @@ struct ToDeviceNode : public FunctionNode<ToDeviceNode>
         Device new_device = new_device_.toDevice();
 #ifdef TT_HAS_CUDA
         Tensor contig = a.contiguous();
-        Tensor result = empty(contig.sizes(), a.options().device(new_device));
+        Tensor result = empty(contig.sizes(), a.options().device(new_device).pinned_memory(false));
         cpu_impl::to_impl_cpu_cuda(contig, result, non_blocking.toBool());
         return {result};
 #else
