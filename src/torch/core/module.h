@@ -224,19 +224,20 @@ struct Module
             }
         }
     }
-    void copy_parameters_from_main_to_others()
+    void copy_parameters_from_main_to_others_uva()
     {
         for (auto& b : modules_)
         {
-            b.second->copy_parameters_from_main_to_others();
+            b.second->copy_parameters_from_main_to_others_uva();
         }
 
         for (auto& mdp : multi_device_parameters_)
         {
-            for (int i = 1; i < mdp.second.size(); ++i)
-            {
-                mdp.second.data[i].copy_(mdp.second.Main(), true);
-            }
+            mdp.second.copy_parameters_from_main_to_others_uva();
+            // for (int i = 1; i < mdp.second.size(); ++i)
+            // {
+            //     mdp.second.data[i].copy_(mdp.second.Main(), true);
+            // }
         }
     }
 #endif
