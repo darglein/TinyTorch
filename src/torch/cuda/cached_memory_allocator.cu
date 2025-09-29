@@ -40,6 +40,12 @@ static PerDeviceMemoryData& DeviceData(int device_id)
     return data[device_id];
 }
 
+static PerDeviceMemoryData& PinnedMemoryData()
+{
+    static PerDeviceMemoryData data;
+    return data;
+}
+
 struct PreallocBlock
 {
     uint8_t* ptr;
@@ -111,6 +117,11 @@ int64_t current_allocated_size(int device_id)
 int64_t max_allocated_size(int device_id)
 {
     return DeviceData(device_id).max_allocated_bytes;
+}
+
+int64_t current_pinned_allocated_size()
+{
+    return PinnedMemoryData().current_allocated_bytes;
 }
 
 static void initialize_allocator()
@@ -486,8 +497,17 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
 
 void* cuda_malloc_pinned(int64_t size)
 {
+    std::unique_lock l(mu);
+
     void* ptr              = nullptr;
     cudaError_t cuda_error = cudaMallocHost(&ptr, size);
+
+    if (ptr && cuda_error == cudaSuccess)
+    {
+        auto & d = PinnedMemoryData();
+        d.current_allocated_bytes += size;
+        d.max_allocated_bytes = std::max(d.current_allocated_bytes, d.max_allocated_bytes);
+    }
 
 
 //    if (size > 1024 * 1024)
@@ -508,9 +528,15 @@ void* cuda_malloc_pinned(int64_t size)
     return ptr;
 }
 
-void cuda_pinned_free(void* ptr)
+void cuda_pinned_free(void* ptr, int64_t size)
 {
     TT_CHECK_CUDA_ERROR(cudaFreeHost(ptr));
+
+    if (ptr)
+    {
+        auto & d = PinnedMemoryData();
+        d.current_allocated_bytes -= size;
+    }
 }
 
 

@@ -107,7 +107,7 @@ StorageImpl::~StorageImpl()
 #ifdef TT_HAS_CUDA
             if (options_.pinned_memory_)
             {
-                cuda::cuda_pinned_free(data_ptr_);
+                cuda::cuda_pinned_free(data_ptr_, size_);
             }
             else
             {
