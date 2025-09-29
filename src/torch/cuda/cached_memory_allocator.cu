@@ -508,7 +508,7 @@ void* cuda_malloc_pinned(int64_t size)
 
     if (max_pinned_memory > 0 && PinnedMemoryData().current_allocated_bytes + size > max_pinned_memory)
     {
-        // std::cout << "pinned memory limit reached!" << std::endl;
+        std::cout << "pinned memory limit reached!" << std::endl;
         return nullptr;
     }
 
