@@ -50,6 +50,9 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id);
 
 TINYTORCH_API int64_t current_allocated_size(int device_id);
 TINYTORCH_API int64_t max_allocated_size(int device_id);
+
+
+TINYTORCH_API void set_max_pinned_memory(int64_t size);
 TINYTORCH_API int64_t current_pinned_allocated_size();
 
 

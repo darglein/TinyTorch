@@ -20,6 +20,9 @@ static constexpr int MAX_DEVICES            = 8;
 static constexpr int64_t prealloc_alignment = 1024;
 static bool prealloc_use_fallback           = true;
 
+// all pinned mallocs after this will return nullptr
+static int64_t max_pinned_memory = 0;
+
 static std::recursive_mutex mu;
 static bool allocator_initialized = false;
 static bool has_malloc_async      = false;
@@ -117,6 +120,10 @@ int64_t current_allocated_size(int device_id)
 int64_t max_allocated_size(int device_id)
 {
     return DeviceData(device_id).max_allocated_bytes;
+}
+void set_max_pinned_memory(int64_t size)
+{
+    max_pinned_memory = size;
 }
 
 int64_t current_pinned_allocated_size()
@@ -498,6 +505,12 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
 void* cuda_malloc_pinned(int64_t size)
 {
     std::unique_lock l(mu);
+
+    if (max_pinned_memory > 0 && PinnedMemoryData().current_allocated_bytes + size > max_pinned_memory)
+    {
+        // std::cout << "pinned memory limit reached!" << std::endl;
+        return nullptr;
+    }
 
     void* ptr              = nullptr;
     cudaError_t cuda_error = cudaMallocHost(&ptr, size);
