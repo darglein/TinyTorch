@@ -230,8 +230,8 @@ static void CleanFreeList(int device_id)
 
 static void* premalloc(int64_t initial_size, int device_id)
 {
-    int64_t size       = iAlignUp(initial_size, prealloc_alignment);
-    auto& data = PreallocDeviceData(device_id);
+    int64_t size = iAlignUp(initial_size, prealloc_alignment);
+    auto& data   = PreallocDeviceData(device_id);
 
     auto strm        = getCurrentCUDAStream();
     void* result_ptr = nullptr;
@@ -315,7 +315,8 @@ static void prefree(void* ptr, int device_id)
     }
 
 
-    // std::cout << "prefree " << data.alloc_blocks[alloc_block_id].size << " free " <<  prealloc_free_memory()  << std::endl;
+    // std::cout << "prefree " << data.alloc_blocks[alloc_block_id].size << " free " <<  prealloc_free_memory()  <<
+    // std::endl;
 
     {
         DeviceGuard dg(Device(kCUDA, device_id));
@@ -368,7 +369,7 @@ static void free_blocking(void* ptr)
 
 std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
 {
-    if (size == 0)
+    if (size <= 0)
     {
         return {nullptr, 0};
     }
@@ -517,17 +518,17 @@ void* cuda_malloc_pinned(int64_t size)
 
     if (ptr && cuda_error == cudaSuccess)
     {
-        auto & d = PinnedMemoryData();
+        auto& d = PinnedMemoryData();
         d.current_allocated_bytes += size;
         d.max_allocated_bytes = std::max(d.current_allocated_bytes, d.max_allocated_bytes);
     }
 
 
-//    if (size > 1024 * 1024)
-//    {
-//         cudaMallocHost(&ptr, size);
-//        std::cout << "pinned alloc " << (size / 1024.0 / 1024.0) << " MiB" << std::endl;
-//    }
+    //    if (size > 1024 * 1024)
+    //    {
+    //         cudaMallocHost(&ptr, size);
+    //        std::cout << "pinned alloc " << (size / 1024.0 / 1024.0) << " MiB" << std::endl;
+    //    }
     //        cudaError_t cuda_error = cudaErrorInvalidValue;
     if (cuda_error != cudaSuccess)
     {
@@ -547,7 +548,7 @@ void cuda_pinned_free(void* ptr, int64_t size)
 
     if (ptr)
     {
-        auto & d = PinnedMemoryData();
+        auto& d = PinnedMemoryData();
         d.current_allocated_bytes -= size;
     }
 }
@@ -582,8 +583,6 @@ int64_t pre_allocate_vram(int64_t requested)
             allocated        = iAlignUp(allocated, prealloc_alignment);
             auto [ptr, info] = cuda_cached_malloc(allocated, device_id);
 
-
-
             if (ptr)
             {
                 CHECK_EQ(((uintptr_t)ptr) % prealloc_alignment, 0);
@@ -595,7 +594,14 @@ int64_t pre_allocate_vram(int64_t requested)
         }
         catch (TinyTorchException e)
         {
-            allocated -= 500 * (1024 * 1024);
+        }
+
+        allocated -= 500 * (1024 * 1024);
+
+        if (allocated <= 0)
+        {
+            CHECK(false);
+            return 0;
         }
     }
 
