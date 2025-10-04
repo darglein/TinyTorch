@@ -600,7 +600,6 @@ int64_t pre_allocate_vram(int64_t requested)
 
         if (allocated <= 0)
         {
-            CHECK(false);
             return 0;
         }
     }
