@@ -99,6 +99,57 @@ static __global__ void ReduceToDevice0(MultiGPUInputSimple<NUM_INPUTS, T> input)
 }
 
 template <typename T>
+static void ReduceToDevice0Launcher(std::vector<Tensor> grads)
+{
+    int num_gpus  = grads.size();
+    int64_t numel = grads[0].numel();
+    DeviceGuard dg(grads[0].device());
+    switch (num_gpus)
+    {
+        case 1:
+            break;
+        case 2:
+            ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
+                MultiGPUInputSimple<2, T>(grads));
+            break;
+        case 3:
+            ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
+                MultiGPUInputSimple<3, T>(grads));
+            break;
+        case 4:
+            ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
+                MultiGPUInputSimple<4, T>(grads));
+            break;
+        default:
+            CHECK(false);
+    }
+    CUDA_SYNC_CHECK_ERROR();
+}
+
+void MultiDeviceTensor::ReduceGradientSumToMainUVA()
+{
+    std::vector<Tensor> grads;
+    for (auto& d : data)
+    {
+        grads.push_back(d.mutable_grad());
+    }
+
+    if (data[0].scalar_type() == kFloat32)
+    {
+        ReduceToDevice0Launcher<float>(grads);
+    }
+    else if (data[0].scalar_type() == kFloat64)
+    {
+        ReduceToDevice0Launcher<double>(grads);
+    }else
+    {
+        CHECK(false);
+    }
+
+}
+
+
+template <typename T>
 static __global__ void Simplecopy(T* src, T* dst, int64_t N)
 {
     int64_t tid = int64_t(blockIdx.x) * 128 + threadIdx.x;
@@ -110,39 +161,6 @@ static __global__ void Simplecopy(T* src, T* dst, int64_t N)
     dst[tid] = src[tid];
 }
 
-
-void MultiDeviceTensor::ReduceGradientSumToMainUVA()
-{
-    std::vector<Tensor> grads;
-    for (auto& d : data)
-    {
-        grads.push_back(d.mutable_grad());
-    }
-
-    int num_gpus  = size();
-    int64_t numel = Main().numel();
-    DeviceGuard dg(data[0].device());
-    switch (num_gpus)
-    {
-        case 1:
-            break;
-        case 2:
-            ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
-                MultiGPUInputSimple<2, float>(grads));
-            break;
-        case 3:
-            ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
-                MultiGPUInputSimple<3, float>(grads));
-            break;
-        case 4:
-            ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
-                MultiGPUInputSimple<4, float>(grads));
-            break;
-        default:
-            CHECK(false);
-    }
-    CUDA_SYNC_CHECK_ERROR();
-}
 
 void MultiDeviceTensor::ReduceSumToMainUVA()
 {
@@ -175,14 +193,24 @@ void MultiDeviceTensor::copy_parameters_from_main_to_others_uva()
 {
     for (int i = 1; i < data.size(); ++i)
     {
-        auto src = data[0].data_ptr<float>();
-        auto dst = data[i].data_ptr<float>();
-
         int64_t numel = data[0].numel();
-
         DeviceGuard dg(data[i].device());
 
-        Simplecopy<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(src, dst, numel);
+        if (data[0].scalar_type() == kFloat32)
+        {
+            auto src = data[0].data_ptr<float>();
+            auto dst = data[i].data_ptr<float>();
+            Simplecopy<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(src, dst, numel);
+        }
+        else if (data[0].scalar_type() == kFloat64)
+        {
+            auto src = data[0].data_ptr<double>();
+            auto dst = data[i].data_ptr<double>();
+            Simplecopy<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(src, dst, numel);
+        }else
+        {
+            CHECK(false);
+        }
         CUDA_SYNC_CHECK_ERROR();
     }
 }
