@@ -56,6 +56,10 @@ TT_HD constexpr int64_t iAlignUp(int64_t a, int64_t b)
 
 #define CUDA_CASE_MACRO(...) EXPAND(CUDA_CASE_MACRO_REFINED(128, __VA_ARGS__))
 
+
+
+
+
 #define CUDA_SWITCH_MACRO_FLOAT(device, real_scalar_type, numel, func, ...) \
     {                                                                       \
         cuda::DeviceGuard guard(device);                                    \

@@ -3,30 +3,92 @@
 #include "torch/cuda/ops_impl_cuda_helper.h"
 #include <cuda_runtime.h>
 
+#ifdef _MSC_VER
+#    pragma warning( \
+        disable : 4244)  // warning C4244: 'argument': conversion from 'double' to 'T', possible loss of data
+#endif
 
-#define SWITCH_MACRO_BINARY_OPERATOR(op, a, b, result)                                                  \
-    {                                                                                                   \
-        cuda::DeviceGuard guard(result.device());                                                       \
-        switch (result.scalar_type())                                                                   \
-        {                                                                                               \
-            CUDA_CASE_MACRO(element_wise_operator<uint8_t>, kUInt8, result.numel(), op, a, b, result)   \
-            CUDA_CASE_MACRO(element_wise_operator<uint16_t>, kUInt16, result.numel(), op, a, b, result) \
-            CUDA_CASE_MACRO(element_wise_operator<int16_t>, kInt16, result.numel(), op, a, b, result)   \
-            CUDA_CASE_MACRO(element_wise_operator<int32_t>, kInt32, result.numel(), op, a, b, result)   \
-            CUDA_CASE_MACRO(element_wise_operator<int64_t>, kInt64, result.numel(), op, a, b, result)   \
-            CUDA_CASE_MACRO(element_wise_operator<half>, kHalf, result.numel(), op, a, b, result)       \
-            CUDA_CASE_MACRO(element_wise_operator<float>, kFloat, result.numel(), op, a, b, result)     \
-            CUDA_CASE_MACRO(element_wise_operator<double>, kDouble, result.numel(), op, a, b, result)   \
-            default:                                                                                    \
-                CHECK(false) << "invalid input type " << result.scalar_type();                          \
-        }                                                                                               \
-    }
+
+//#define SWITCH_MACRO_BINARY_OPERATOR(op, a, b, result)                                                  \
+//    {                                                                                                   \
+//        cuda::DeviceGuard guard(result.device());                                                       \
+//        switch (result.scalar_type())                                                                   \
+//        {                                                                                               \
+//            CUDA_CASE_MACRO(element_wise_operator<uint8_t>, kUInt8, result.numel(), op, a, b, result)   \
+//            CUDA_CASE_MACRO(element_wise_operator<uint16_t>, kUInt16, result.numel(), op, a, b, result) \
+//            CUDA_CASE_MACRO(element_wise_operator<int16_t>, kInt16, result.numel(), op, a, b, result)   \
+//            CUDA_CASE_MACRO(element_wise_operator<int32_t>, kInt32, result.numel(), op, a, b, result)   \
+//            CUDA_CASE_MACRO(element_wise_operator<int64_t>, kInt64, result.numel(), op, a, b, result)   \
+//            CUDA_CASE_MACRO(element_wise_operator<half>, kHalf, result.numel(), op, a, b, result)       \
+//            CUDA_CASE_MACRO(element_wise_operator<float>, kFloat, result.numel(), op, a, b, result)     \
+//            CUDA_CASE_MACRO(element_wise_operator<double>, kDouble, result.numel(), op, a, b, result)   \
+//            default:                                                                                    \
+//                CHECK(false) << "invalid input type " << result.scalar_type();                          \
+//        }                                                                                               \
+//    }
+
 
 
 namespace tinytorch
 {
+
+
+inline bool is_linear_input(Tensor a, Tensor b, Tensor result)
+{
+    if (a.is_contiguous() && b.is_contiguous() && result.is_contiguous() && a.sizes() == b.sizes() &&
+        b.sizes() == result.sizes())
+    {
+        return true;
+    }
+    return false;
+}
+inline bool is_linear_input(double a, Tensor b, Tensor result)
+{
+    if (b.is_contiguous() && result.is_contiguous() && b.sizes() == result.sizes())
+    {
+        return true;
+    }
+    return false;
+}
+inline bool is_linear_input(Tensor a, double b, Tensor result)
+{
+    if (a.is_contiguous() && result.is_contiguous() && a.sizes() == result.sizes())
+    {
+        return true;
+    }
+    return false;
+}
+
 namespace cuda_impl
 {
+
+template <typename T, typename Op>
+__launch_bounds__(128) __global__
+    static void element_wise_operator_linear(Op op, TensorInfoCuda<T> a, TensorInfoCuda<T> b, TensorInfoCuda<T> result,
+                                             int64_t N)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= N) return;
+    result.data[i] = op.forward(a.data[i], b.data[i]);
+}
+template <typename T, typename Op>
+__launch_bounds__(128) __global__
+    static void element_wise_operator_linear(Op op, T a, TensorInfoCuda<T> b, TensorInfoCuda<T> result, int64_t N)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= N) return;
+    result.data[i] = op.forward(a, b.data[i]);
+}
+
+template <typename T, typename Op>
+__launch_bounds__(128) __global__
+    static void element_wise_operator_linear(Op op, TensorInfoCuda<T> a, T b, TensorInfoCuda<T> result, int64_t N)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= N) return;
+    result.data[i] = op.forward(a.data[i], b);
+}
+
 
 template <typename T, typename Op>
 __launch_bounds__(128) __global__
@@ -59,10 +121,46 @@ __launch_bounds__(128) __global__
     result[i] = op.forward(a, b[i]);
 }
 
-#ifdef _MSC_VER
-#    pragma warning( \
-        disable : 4244)  // warning C4244: 'argument': conversion from 'double' to 'T', possible loss of data
-#endif
+
+template <typename OP, typename Ta, typename Tb>
+void SWITCH_MACRO_BINARY_OPERATOR(OP op, Ta a, Tb b, Tensor result)
+{
+    cuda::DeviceGuard guard(result.device());
+
+    int64_t N = result.numel();
+
+    if (is_linear_input(a, b, result))
+    {
+        switch (result.scalar_type())
+        {
+            CUDA_CASE_MACRO(element_wise_operator_linear<uint8_t>, kUInt8, N, op, a, b, result, N)
+            CUDA_CASE_MACRO(element_wise_operator_linear<uint16_t>, kUInt16, N, op, a, b, result, N)
+            CUDA_CASE_MACRO(element_wise_operator_linear<int16_t>, kInt16, N, op, a, b, result, N)
+            CUDA_CASE_MACRO(element_wise_operator_linear<int32_t>, kInt32, N, op, a, b, result, N)
+            CUDA_CASE_MACRO(element_wise_operator_linear<int64_t>, kInt64, N, op, a, b, result, N)
+            CUDA_CASE_MACRO(element_wise_operator_linear<half>, kHalf, N, op, a, b, result, N)
+            CUDA_CASE_MACRO(element_wise_operator_linear<float>, kFloat, N, op, a, b, result, N)
+            CUDA_CASE_MACRO(element_wise_operator_linear<double>, kDouble, N, op, a, b, result, N)
+            default:
+                CHECK(false) << "invalid input type " << result.scalar_type();
+        }
+        return;
+    }
+
+    switch (result.scalar_type())
+    {
+        CUDA_CASE_MACRO(element_wise_operator<uint8_t>, kUInt8, N, op, a, b, result)
+        CUDA_CASE_MACRO(element_wise_operator<uint16_t>, kUInt16, N, op, a, b, result)
+        CUDA_CASE_MACRO(element_wise_operator<int16_t>, kInt16, N, op, a, b, result)
+        CUDA_CASE_MACRO(element_wise_operator<int32_t>, kInt32, N, op, a, b, result)
+        CUDA_CASE_MACRO(element_wise_operator<int64_t>, kInt64, N, op, a, b, result)
+        CUDA_CASE_MACRO(element_wise_operator<half>, kHalf, N, op, a, b, result)
+        CUDA_CASE_MACRO(element_wise_operator<float>, kFloat, N, op, a, b, result)
+        CUDA_CASE_MACRO(element_wise_operator<double>, kDouble, N, op, a, b, result)
+        default:
+            CHECK(false) << "invalid input type " << result.scalar_type();
+    }
+}
 
 void add_impl(Tensor a, Tensor b, Tensor result)
 {
