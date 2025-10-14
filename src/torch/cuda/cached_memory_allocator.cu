@@ -420,7 +420,7 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
     }
     else
     {
-        CHECK(false);
+        CHECK(false) << "invalid allocator: " << (int)algorithm;
     }
 
 
