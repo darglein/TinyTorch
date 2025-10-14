@@ -83,7 +83,7 @@ static PreallocPerDeviceMemoryData& PreallocDeviceData(int device_id)
 }
 
 
-static AllocatorAlgorithm algorithm = AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
+static AllocatorAlgorithm algorithm = AllocatorAlgorithm::CUDA_MALLOC;
 static int log_level                = 1;
 const int64_t log_level_size_th     = 10 * 1024 * 1024;
 
@@ -436,8 +436,13 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
 
     if (log_level >= 3 || (log_level >= 2 && size >= log_level_size_th))
     {
-        std::cout << "[AllocateCUDA] d" << getDevice() << " (" << ptr << ")" << " size: " << size;
-        std::cout << std::endl;
+        double size_mib    = (size / 1024.0 / 1024.0);
+        double current_mib = current_allocated_size(getDevice()) / 1024.0 / 1024.0;
+        // if (size_mib > 10)
+        {
+            std::cout << "[AllocateCUDA] d" << getDevice() << " (" << ptr << ")" << " size: " << size_mib << "MiB"
+                      << " total " << current_mib << "MiB"<< std::endl;
+        }
     }
 
     return {ptr, info};
