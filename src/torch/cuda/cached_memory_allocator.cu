@@ -519,7 +519,11 @@ void* cuda_malloc_pinned(int64_t size)
     }
 
     void* ptr              = nullptr;
-    cudaError_t cuda_error = cudaMallocHost(&ptr, size);
+    // cudaError_t cuda_error = cudaMallocHost(&ptr, size);
+
+    ptr = malloc(size);
+    cudaError_t cuda_error = cudaHostRegister(ptr, size, cudaHostRegisterDefault);
+
 
     if (ptr && cuda_error == cudaSuccess)
     {
@@ -549,10 +553,12 @@ void* cuda_malloc_pinned(int64_t size)
 
 void cuda_pinned_free(void* ptr, int64_t size)
 {
-    TT_CHECK_CUDA_ERROR(cudaFreeHost(ptr));
-
     if (ptr)
     {
+    // TT_CHECK_CUDA_ERROR(cudaFreeHost(ptr));
+        TT_CHECK_CUDA_ERROR(cudaHostUnregister(ptr));
+        free(ptr);
+
         auto& d = PinnedMemoryData();
         d.current_allocated_bytes -= size;
     }
