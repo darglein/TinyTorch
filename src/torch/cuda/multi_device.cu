@@ -13,7 +13,7 @@ namespace tinytorch
 {
 namespace cuda
 {
-template <int NUM_GPUS, typename T>
+template <int NUM_GPUS, typename T, typename ComputeType>
 struct MultiGPUInputSimple
 {
     __host__ MultiGPUInputSimple(const MultiDeviceTensor& data)
@@ -52,32 +52,32 @@ struct MultiGPUInputSimple
         }
     }
 
-    __device__ T CombinedRead(int tid)
+    __device__ ComputeType CombinedRead(int tid)
     {
         CUDA_KERNEL_ASSERT(tid >= 0 && tid < N);
-        T result = 0;
+        ComputeType result = 0;
         for (int i = 0; i < NUM_GPUS; ++i)
         {
-            result += in_x[i][tid];
+            result += ComputeType(in_x[i][tid]);
         }
         return result;
     }
 
 
-    __device__ void WriteToAll(T result, int tid)
+    __device__ void WriteToAll(ComputeType result, int tid)
     {
         CUDA_KERNEL_ASSERT(tid >= 0 && tid < N);
         for (int i = 0; i < NUM_GPUS; ++i)
         {
-            in_x[i][tid] = result;
+            in_x[i][tid] = T(result);
         }
     }
 
-    __device__ void WriteToD0(T result, int tid)
+    __device__ void WriteToD0(ComputeType result, int tid)
     {
         CUDA_KERNEL_ASSERT(tid >= 0 && tid < N);
 
-        in_x[0][tid] = result;
+        in_x[0][tid] = T(result);
     }
 
    public:
@@ -85,8 +85,8 @@ struct MultiGPUInputSimple
     int64_t N = 0;
 };
 
-template <typename T, int NUM_INPUTS>
-static __global__ void ReduceToDevice0(MultiGPUInputSimple<NUM_INPUTS, T> input)
+template <typename T, typename ComputeType, int NUM_INPUTS>
+static __global__ void ReduceToDevice0(MultiGPUInputSimple<NUM_INPUTS, T, ComputeType> input)
 {
     int64_t tid = int64_t(blockIdx.x) * 128 + threadIdx.x;
 
@@ -98,7 +98,7 @@ static __global__ void ReduceToDevice0(MultiGPUInputSimple<NUM_INPUTS, T> input)
     input.WriteToD0(sum, tid);
 }
 
-template <typename T>
+template <typename T, typename ComputeType>
 static void ReduceToDevice0Launcher(std::vector<Tensor> grads)
 {
     int num_gpus  = grads.size();
@@ -110,15 +110,15 @@ static void ReduceToDevice0Launcher(std::vector<Tensor> grads)
             break;
         case 2:
             ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
-                MultiGPUInputSimple<2, T>(grads));
+                MultiGPUInputSimple<2, T, ComputeType>(grads));
             break;
         case 3:
             ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
-                MultiGPUInputSimple<3, T>(grads));
+                MultiGPUInputSimple<3, T, ComputeType>(grads));
             break;
         case 4:
             ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
-                MultiGPUInputSimple<4, T>(grads));
+                MultiGPUInputSimple<4, T, ComputeType>(grads));
             break;
         default:
             CHECK(false);
@@ -136,11 +136,11 @@ void MultiDeviceTensor::ReduceGradientSumToMainUVA()
 
     if (data[0].scalar_type() == kFloat32)
     {
-        ReduceToDevice0Launcher<float>(grads);
+        ReduceToDevice0Launcher<float, float>(grads);
     }
     else if (data[0].scalar_type() == kFloat64)
     {
-        ReduceToDevice0Launcher<double>(grads);
+        ReduceToDevice0Launcher<double, double>(grads);
     }else
     {
         CHECK(false);
@@ -164,27 +164,20 @@ static __global__ void Simplecopy(T* src, T* dst, int64_t N)
 
 void MultiDeviceTensor::ReduceSumToMainUVA()
 {
-    int num_gpus  = size();
-    int64_t numel = Main().numel();
-    DeviceGuard dg(data[0].device());
-    switch (num_gpus)
+    if (data[0].scalar_type() == kFloat16)
     {
-        case 1:
-            break;
-        case 2:
-            ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
-                MultiGPUInputSimple<2, float>(*this));
-            break;
-        case 3:
-            ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
-                MultiGPUInputSimple<3, float>(*this));
-            break;
-        case 4:
-            ReduceToDevice0<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(
-                MultiGPUInputSimple<4, float>(*this));
-            break;
-        default:
-            CHECK(false);
+        ReduceToDevice0Launcher<__half, float>(this->data);
+    }
+    else if (data[0].scalar_type() == kFloat32)
+    {
+        ReduceToDevice0Launcher<float, float>(this->data);
+    }
+    else if (data[0].scalar_type() == kFloat64)
+    {
+        ReduceToDevice0Launcher<double, double>(this->data);
+    }else
+    {
+        CHECK(false);
     }
     CUDA_SYNC_CHECK_ERROR();
 }
