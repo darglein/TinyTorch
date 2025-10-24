@@ -158,11 +158,12 @@ static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size, i
             size_t mem_free, mem_total;
             cudaMemGetInfo(&mem_free, &mem_total);
             std::cout << " CUDA out of memory!\n"
-                      << "     Tried to allocate " << (size / 1024.0 / 1024.0) << "MiB\n"
-                      << "     Free memory " << (mem_free / 1024.0 / 1024.0) << "MiB\n"
-                      << "     Total memory " << (mem_total / 1024.0 / 1024.0) << "MiB\n"
-                      << "     Allocated by torch " << (DeviceData(device_id).current_allocated_bytes / 1024.0 / 1024.0)
-                      << "MB" << std::endl;
+                      << "     Device              " << device_id << "\n"
+                      << "     Tried to allocate   " << (size / 1024.0 / 1024.0) << " MiB\n"
+                      << "     Free memory         " << (mem_free / 1024.0 / 1024.0) << " MiB\n"
+                      << "     Total memory        " << (mem_total / 1024.0 / 1024.0) << " MiB\n"
+                      << "     Allocated by torch  " << (DeviceData(device_id).current_allocated_bytes / 1024.0 / 1024.0)
+                      << " MiB" << std::endl;
         }
 
         ReportCudaError(cuda_error, "cuda_allocator");
@@ -441,7 +442,7 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
         // if (size_mib > 10)
         {
             std::cout << "[AllocateCUDA] d" << getDevice() << " (" << ptr << ")" << " size: " << size_mib << "MiB"
-                      << " total " << current_mib << "MiB"<< std::endl;
+                      << " total " << current_mib << "MiB" << std::endl;
         }
     }
 
@@ -518,10 +519,10 @@ void* cuda_malloc_pinned(int64_t size)
         return nullptr;
     }
 
-    void* ptr              = nullptr;
+    void* ptr = nullptr;
     // cudaError_t cuda_error = cudaMallocHost(&ptr, size);
 
-    ptr = malloc(size);
+    ptr                    = malloc(size);
     cudaError_t cuda_error = cudaHostRegister(ptr, size, cudaHostRegisterDefault);
 
 
@@ -555,7 +556,7 @@ void cuda_pinned_free(void* ptr, int64_t size)
 {
     if (ptr)
     {
-    // TT_CHECK_CUDA_ERROR(cudaFreeHost(ptr));
+        // TT_CHECK_CUDA_ERROR(cudaFreeHost(ptr));
         TT_CHECK_CUDA_ERROR(cudaHostUnregister(ptr));
         free(ptr);
 
