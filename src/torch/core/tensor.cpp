@@ -285,7 +285,7 @@ Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) cons
     return tinytorch::slice(*this, dim, start, end, step);
 }
 
-Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step) const
+Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step, bool sanity_checks) const
 {
     CHECK(!this->requires_grad() || !GradMode::is_enabled());
     int64_t dims = this->dim();
@@ -297,7 +297,11 @@ Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step)
 
     CHECK_GE(dim, 0);
     CHECK_LT(dim, dims);
-    // CHECK_LE(start, end);
+
+    if (sanity_checks)
+    {
+        CHECK_LE(start, end);
+    }
     CHECK_LE(end, this->size(dim));
     CHECK_EQ((end - start) % step, 0);
 

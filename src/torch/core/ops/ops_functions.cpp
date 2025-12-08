@@ -501,7 +501,7 @@ Tensor flip(Tensor t, const SizeType& size)
     CHECK(!t.requires_grad());
     for (auto d : size.vec())
     {
-        t = t.slice_view(d, t.size(d) - 1, -1, -1).clone();
+        t = t.slice_view(d, t.size(d) - 1, -1, -1, false).clone();
     }
     return t;
 }

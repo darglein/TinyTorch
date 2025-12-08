@@ -188,7 +188,7 @@ struct TINYTORCH_API Tensor
 
     Tensor slice(int64_t dim, int64_t start, int64_t end, int64_t step = 1) const;
     // no grad version
-    Tensor slice_view(int64_t dim, int64_t start, int64_t end, int64_t step = 1) const;
+    Tensor slice_view(int64_t dim, int64_t start, int64_t end, int64_t step = 1, bool sanity_checks = true) const;
     Tensor permute_view(const SizeType& size) const;
 
     Tensor reinterpret_view(ScalarType new_scalar_type) const;
