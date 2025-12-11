@@ -155,7 +155,7 @@ Tensor rand(const SizeType& sizes, TensorOptions options)
     return t;
 }
 
-Tensor randint(int low, int high, const SizeType& sizes, TensorOptions options)
+Tensor randint(int64_t low, int64_t high, const SizeType& sizes, TensorOptions options)
 {
     Tensor t = empty(sizes, options);
     uniform_int(t, low, high);

@@ -30,7 +30,7 @@ TINYTORCH_API Tensor ones_like(Tensor t, TensorOptions options);
 TINYTORCH_API Tensor ones_like(Tensor t);
 
 TINYTORCH_API Tensor rand(const SizeType& sizes, TensorOptions options = TensorOptions());
-TINYTORCH_API Tensor randint(int low, int high, const SizeType& sizes, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor randint(int64_t low, int64_t high, const SizeType& sizes, TensorOptions options = TensorOptions());
 TINYTORCH_API Tensor rand_like(Tensor t);
 
 // end is inclusive

@@ -29,7 +29,7 @@ TINYTORCH_API void fill(Tensor& t, Tensor values, int dim);
 
 
 TINYTORCH_API void uniform(Tensor& t, double mi = 0, double ma = 1);
-TINYTORCH_API void uniform_int(Tensor& t, int low, int high);
+TINYTORCH_API void uniform_int(Tensor& t, int64_t low, int64_t high);
 
 TINYTORCH_API std::pair<Tensor, Tensor> sort(Tensor t, int64_t dim);
 

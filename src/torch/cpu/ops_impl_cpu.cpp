@@ -312,7 +312,7 @@ static void rand_int_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, int lo
     }
 }
 
-void uniform_int_impl(Tensor& t, int low, int high)
+void uniform_int_impl(Tensor& t, int64_t low, int64_t high)
 {
     SWITCH_MACRO_INT(t.scalar_type(), rand_int_impl, t, generator(), low, high);
 }

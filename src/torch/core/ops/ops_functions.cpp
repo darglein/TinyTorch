@@ -178,7 +178,7 @@ void uniform(Tensor& t, double mi, double ma)
     SELECT_DEVICE(t.device(), uniform_impl, t, mi, ma);
 }
 
-void uniform_int(Tensor& t, int low, int high)
+void uniform_int(Tensor& t, int64_t low, int64_t high)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();

@@ -225,7 +225,7 @@ void uniform_impl(Tensor& a, double mi, double ma)
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void rand_int_impl(TensorInfoCuda<T> a, int low, int high, uint64_t seed)
+__launch_bounds__(128) static __global__ void rand_int_impl(TensorInfoCuda<T> a, int64_t low, int64_t high, uint64_t seed)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= a.numel()) return;
@@ -235,7 +235,7 @@ __launch_bounds__(128) static __global__ void rand_int_impl(TensorInfoCuda<T> a,
     a[i]       = T((unsigned long long)(x % (high - low) + low));
 }
 
-void uniform_int_impl(Tensor& a, int low, int high)
+void uniform_int_impl(Tensor& a, int64_t low, int64_t high)
 {
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
     uint64_t seed = dist(generator());
