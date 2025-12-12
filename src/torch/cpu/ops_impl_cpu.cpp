@@ -302,10 +302,10 @@ void uniform_impl(Tensor& t, double mi, double ma)
 }
 
 template <typename T>
-static void rand_int_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, int low, int high)
+static void rand_int_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, int64_t low, int64_t high)
 {
     // the high bounds is exclusive
-    std::uniform_int_distribution<int> dist{low, high - 1};
+    std::uniform_int_distribution<int64_t> dist{low, high - 1};
     for (int64_t i = 0; i < t.numel(); ++i)
     {
         t[i] = T(dist(mersenne_engine));

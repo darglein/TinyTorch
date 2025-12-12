@@ -185,32 +185,38 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
     }
 }
 
-inline TT_HD unsigned int xorshift64(unsigned int x)
+__device__ inline uint32_t xorshift32(uint32_t &state)
 {
-    //    x ^= x << 13;
-    //    x ^= x >> 7;
-    //    x ^= x << 17;
+ uint32_t x = state;
     x ^= x << 13;
     x ^= x >> 17;
     x ^= x << 5;
+    state = x;
     return x;
 }
 
 template <typename T>
 __launch_bounds__(128) static __global__
-    void rand_float_impl(TensorInfoCuda<T, -1> a, float low, float high, uint64_t seed)
+    void rand_float_impl(TensorInfoCuda<T, -1> a, float low, float high, uint32_t seed)
 {
     int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    int64_t grid_size = blockDim.x * gridDim.x;
-    //    if (i >= a.numel()) return;
-    unsigned int seed2 = seed + (i * 146394585141533LL);
+    int64_t grid_size =  (int64_t)blockDim.x * gridDim.x;
+
+    uint32_t state = seed ^ (uint32_t)i;
+    state *= 0x85ebca6b;
+    state ^= state >> 13;
+
+    // Optional: Warm up xorshift (discard one value) to enter randomness
+    xorshift32(state);
 
     for (; i < a.numel(); i += grid_size)
     {
-        seed2    = xorshift64(seed2);
-        float xf = float(seed2) * (1.0f / std::numeric_limits<unsigned int>::max());
-        a[i]     = T(xf * (high - low) + low);
-        //        a[i] = 0;
+        auto rnd    = xorshift32(state);
+
+        const float uint_to_float = 2.3283064365386963e-10f;
+        float rnd_float = float(rnd) * uint_to_float;
+
+        a[i]     = T(rnd_float * (high - low) + low);
     }
 }
 
@@ -218,28 +224,39 @@ void uniform_impl(Tensor& a, double mi, double ma)
 {
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
     uint64_t seed = dist(generator());
-
     int64_t max_threads = std::min<int64_t>(a.numel(), int64_t(1024) * 1024 * 1024);
-
     CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_float_impl, a, (float)mi, (float)ma, seed);
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void rand_int_impl(TensorInfoCuda<T> a, int64_t low, int64_t high, uint64_t seed)
+__launch_bounds__(128) static __global__ void rand_int_impl(TensorInfoCuda<T> a, int64_t low, int64_t high, uint32_t seed)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    if (i >= a.numel()) return;
+    int64_t grid_size =  (int64_t)blockDim.x * gridDim.x;
 
-    auto seed2 = seed + i;
-    uint64_t x = xorshift64(seed2);
-    a[i]       = T((unsigned long long)(x % (high - low) + low));
+    uint32_t state = seed ^ (uint32_t)i;
+    state *= 0x85ebca6b;
+    state ^= state >> 13;
+
+    for (; i < a.numel(); i += grid_size)
+    {
+        auto rnd    = xorshift32(state);
+
+        // Fast Range Mapping (no modulo bias)
+        // Cast to uint64 to multiply, then shift down.
+        uint32_t range = (uint32_t)(high - low);
+        uint32_t val   = ((uint64_t)rnd * (uint64_t)range) >> 32;
+
+        a[i] = T(val + low);
+    }
 }
 
 void uniform_int_impl(Tensor& a, int64_t low, int64_t high)
 {
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
     uint64_t seed = dist(generator());
-    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), a.numel(), rand_int_impl, a, low, high, seed);
+    int64_t max_threads = std::min<int64_t>(a.numel(), int64_t(1024) * 1024 * 1024);
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_int_impl, a, low, high, seed);
 }
 
 template <typename T>
