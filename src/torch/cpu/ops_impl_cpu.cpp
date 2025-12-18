@@ -30,7 +30,8 @@ static void print_impl(std::ostream& strm, TensorInfo<T> a)
 
 void print_impl(std::ostream& strm, Tensor t)
 {
-    print_impl<double>(strm, t.to(kDouble));
+    t = t.to(kDouble);
+    print_impl<double>(strm, t);
 }
 
 void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)

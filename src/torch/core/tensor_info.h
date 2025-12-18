@@ -221,7 +221,9 @@ struct TensorInfoBase
         data  = nullptr;
         dims_ = 0;
     }
-    TensorInfoBase(Tensor t)
+
+    // pass as reference so that we cannot give rvalues
+    TensorInfoBase(Tensor& t)
     {
         if (!t.defined())
         {
@@ -260,7 +262,8 @@ struct TensorInfoBase
 
 
 #ifdef TT_HAS_CUDA
-    TensorInfoBase(const cuda::MultiDeviceTensor& t) : TensorInfoBase(Tensor(t))
+    // pass as reference so that we cannot give rvalues
+    TensorInfoBase(cuda::MultiDeviceTensor& t) : TensorInfoBase(t.Main())
     {
     }
 #endif
