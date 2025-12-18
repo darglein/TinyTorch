@@ -120,7 +120,7 @@ struct TINYTORCH_API MultiDeviceTensor
     MultiDeviceTensor view(const SizeType& sizes) const;
     MultiDeviceTensor reinterpret_view(ScalarType new_scalar_type) const;
 
-    Tensor operator[](Device d)
+    Tensor& operator[](Device d)
     {
         for (int i = 0; i < devices.size(); ++i)
         {
@@ -130,7 +130,7 @@ struct TINYTORCH_API MultiDeviceTensor
             }
         }
         CHECK(false) << "Device " << d << " not found!";
-        return {};
+        return data.front();
     }
 
     void SetMainAndCopyToOthers(Tensor t);
