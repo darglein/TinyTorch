@@ -323,9 +323,23 @@ void uniform_int_impl(Tensor& t, int64_t low, int64_t high)
 template <typename T>
 static void sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    for (int64_t i = 0; i < a.numel(); ++i)
+    T& r = result[0];
+
+#pragma omp parallel num_threads(get_num_threads())
     {
-        result[0] = result[0] + a[i];
+        T local_sum = T(0.);
+
+#pragma omp for schedule(static)
+        for (int64_t i = 0; i < a.numel(); ++i)
+        {
+            T v       = a.contiguous ? a.data[i] : a[i];
+            local_sum = local_sum + v;
+        }
+
+#pragma omp critical
+        {
+            r = r + local_sum;
+        }
     }
 }
 
@@ -337,16 +351,57 @@ void sum_impl(Tensor a, Tensor result)
 template <typename T>
 static void abs_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    for (int64_t i = 0; i < a.numel(); ++i)
+    T& r = result[0];
+
+#pragma omp parallel num_threads(get_num_threads())
     {
-        T v       = a[i];
-        result[0] = result[0] + (v > T(0.) ? T(v) : T(-v));
+        T local_sum = T(0.);
+
+#pragma omp for schedule(static)
+        for (int64_t i = 0; i < a.numel(); ++i)
+        {
+            T v       = a.contiguous ? a.data[i] : a[i];
+            local_sum = local_sum + (v > T(0.) ? T(v) : T(-v));
+        }
+
+#pragma omp critical
+        {
+            r = r + local_sum;
+        }
     }
 }
 
 void abs_sum_impl(Tensor a, Tensor result)
 {
     SWITCH_MACRO_ALL(a.scalar_type(), abs_sum_impl, a, result);
+}
+
+template <typename T>
+static void prod_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
+{
+    T& r = result[0];
+
+#pragma omp parallel num_threads(get_num_threads())
+    {
+        T local_sum = T(0.);
+
+#pragma omp for schedule(static)
+        for (int64_t i = 0; i < a.numel(); ++i)
+        {
+            T v       = a.contiguous ? a.data[i] : a[i];
+            local_sum = local_sum + v * v;
+        }
+
+#pragma omp critical
+        {
+            r = r + local_sum;
+        }
+    }
+}
+
+void prod_sum_impl(Tensor a, Tensor result)
+{
+    SWITCH_MACRO_ALL(a.scalar_type(), prod_sum_impl, a, result);
 }
 
 

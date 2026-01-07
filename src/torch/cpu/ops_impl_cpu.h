@@ -30,6 +30,7 @@ void permute_impl(Tensor& src, Tensor result, SizeType new_dims);
 void uniform_impl(Tensor& t, double mi, double ma);
 void uniform_int_impl(Tensor& t, int64_t low, int64_t high);
 void abs_sum_impl(Tensor a, Tensor result);
+void prod_sum_impl(Tensor a, Tensor result);
 void sum_impl(Tensor a, Tensor result);
 void sum_impl(Tensor a, int64_t dim, Tensor result);
 

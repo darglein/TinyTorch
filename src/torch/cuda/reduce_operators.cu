@@ -95,6 +95,10 @@ void abs_sum_impl(Tensor a, Tensor result)
 {
     global_reduce_helper(a, result, ReduceAbsAdd());
 }
+void prod_sum_impl(Tensor a, Tensor result)
+{
+    global_reduce_helper(a, result, ReduceProdAdd());
+}
 void sum_impl(Tensor a, Tensor result)
 {
     global_reduce_helper(a, result, ReduceAdd());

@@ -16,6 +16,7 @@ namespace cuda_impl
 
 // full reductions
 TINYTORCH_API void abs_sum_impl(Tensor a, Tensor result);
+TINYTORCH_API void prod_sum_impl(Tensor a, Tensor result);
 TINYTORCH_API void sum_impl(Tensor a, Tensor result);
 TINYTORCH_API void min_impl(Tensor a, Tensor result);
 TINYTORCH_API void max_impl(Tensor a, Tensor result);

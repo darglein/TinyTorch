@@ -36,6 +36,21 @@ struct AbsSumNode : public FunctionNode<AbsSumNode>
         return {grad_a};
     }
 };
+struct ProdSumNode : public FunctionNode<ProdSumNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a)
+    {
+        Tensor result = zeros({ 1 }, a.options());
+        SELECT_DEVICE(a.device(), prod_sum_impl, a, result);
+        return { result };
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        CHECK(false);
+        return { };
+    }
+};
 struct SumNode : public FunctionNode<SumNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
@@ -319,6 +334,11 @@ Tensor max(Tensor a, Tensor b)
 Tensor abs_sum(Tensor a)
 {
     return AbsSumNode::forward_and_build_graph(a)[0];
+}
+
+TINYTORCH_API Tensor prod_sum(Tensor a)
+{
+    return ProdSumNode::forward_and_build_graph(a)[0];
 }
 
 
