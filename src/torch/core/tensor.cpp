@@ -287,6 +287,7 @@ Tensor Tensor::slice(int64_t dim, int64_t start, int64_t end, int64_t step) cons
 
 Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step, bool sanity_checks) const
 {
+    CHECK(defined());
     CHECK(!this->requires_grad() || !GradMode::is_enabled());
     int64_t dims = this->dim();
 
@@ -423,7 +424,33 @@ Tensor Tensor::squeeze() const
     std::vector<int64_t> new_sizes = sizes();
     new_sizes.erase(std::remove(new_sizes.begin(), new_sizes.end(), 1), new_sizes.end());
 
-    return reshape(new_sizes);
+    return view(new_sizes);
+}
+Tensor Tensor::squeeze_view() const
+{
+    CHECK(defined());
+    CHECK(!this->requires_grad() || !GradMode::is_enabled());
+
+    std::vector<int64_t> new_sizes  ; // = this->sizes();
+    std::vector<int64_t> new_strides; // = this->strides();
+
+    for (int d = 0; d < this->dim(); ++d)
+    {
+        if (size(d) != 1 || (new_sizes.empty() && d+1 == this->dim()))
+        {
+            new_sizes.push_back(size(d));
+            new_strides.push_back(stride(d));
+
+        }else
+        {
+            // squeeze away
+        }
+    }
+
+    std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_,
+                                                              std::move(new_sizes), std::move(new_strides), options());
+
+    return Tensor(new_impl);
 }
 
 bool Tensor::is_contiguous() const

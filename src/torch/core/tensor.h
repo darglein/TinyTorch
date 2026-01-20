@@ -240,6 +240,7 @@ struct TINYTORCH_API Tensor
     Tensor unsqueeze(int64_t dim) const;
     Tensor squeeze(int64_t dim) const;
     Tensor squeeze() const;
+    Tensor squeeze_view() const;
     Tensor prod(int64_t dim, bool keepdim = false) const;
     Tensor cumprod(int64_t dim) const;
     Tensor cumsum(int64_t dim) const;

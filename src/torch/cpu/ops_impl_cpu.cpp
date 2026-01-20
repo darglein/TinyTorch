@@ -37,11 +37,18 @@ void print_impl(std::ostream& strm, Tensor t)
 void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
 {
 #ifdef TT_HAS_CUDA
+
+    CHECK_EQ(src.sizes(), dest.sizes());
+
+
+
     CHECK(src.is_contiguous()) << src.sizes() << " " << src.strides();
     CHECK(dest.is_contiguous()) << dest.sizes() << " " << dest.strides();
-    CHECK_EQ(src.numel(), dest.numel());
+
     CHECK_EQ(src.scalar_type(), dest.scalar_type());
 
+    // cudaMemcpy2D()
+    // cudaMemcpy3D();
     if (async)
     {
         //        if (src.is_cpu())
