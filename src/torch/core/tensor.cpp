@@ -584,22 +584,8 @@ Tensor Tensor::index_add(int64_t dim, Tensor index, Tensor data) const
 }
 bool Tensor::allclose(Tensor other, double rtol, double atol) const
 {
-    Tensor diff = (*this - other).abs().max();
-    double v    = 0.f;
-    switch (diff.dtype())
-    {
-        case kFloat:
-            v = diff.toFloat();
-            break;
-        case kDouble:
-            v = diff.toDouble();
-            break;
-        case kInt:
-            v = diff.toInt();
-            break;
-        default:
-            CHECK(false);
-    }
+    Tensor diff = (*this - other).abs().max().to(kDouble);
+    double v    = diff.toDouble();
     return v <= atol;
 }
 void Tensor::backward() const
