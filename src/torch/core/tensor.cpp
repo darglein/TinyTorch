@@ -616,11 +616,19 @@ Tensor Tensor::mean(const SizeType& sizes, bool keepdim) const
 {
     return tinytorch::mean(*this, sizes, keepdim);
 }
+Tensor Tensor::median(double percentile ) const
+{
+    return tinytorch::median(*this, percentile);
+}
 Tensor Tensor::index_select(int64_t i, Tensor index) const
 {
     return tinytorch::index_select(*this, i, index);
 }
 Tensor Tensor::pow(Tensor a) const
+{
+    return tinytorch::pow(*this, a);
+}
+Tensor Tensor::pow(double a) const
 {
     return tinytorch::pow(*this, a);
 }

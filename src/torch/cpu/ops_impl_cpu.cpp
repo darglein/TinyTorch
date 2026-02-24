@@ -325,6 +325,58 @@ void uniform_int_impl(Tensor& t, int64_t low, int64_t high)
     SWITCH_MACRO_INT(t.scalar_type(), rand_int_impl, t, generator(), low, high);
 }
 
+template <typename T>
+static void add_poisson_noise_impl(TensorInfo<T> t, std::mt19937& gen)
+{
+    std::uniform_real_distribution<T> uniform_dist(0.0, 1.0);
+    std::normal_distribution<T> normal_dist(0.0, 1.0);
+
+    for (int64_t i = 0; i < t.numel(); ++i)
+    {
+        T lambda = t[i];
+
+        // Safety check: Photon counts cannot be negative
+        if (lambda <= 0.0)
+        {
+            t[i] = 0.0;
+            continue;
+        }
+
+        // 2. The High-Photon Fast Path (Gaussian Approximation)
+        // O(1) time complexity. Used for > 99% of X-ray pixels.
+        if (lambda > 15.0)
+        {
+            // Sample = Mean + (StdDev * Standard_Normal)
+            T n = normal_dist(gen);
+            T sample = lambda + std::sqrt(lambda) * n;
+
+            // Round to nearest integer and prevent negative photon clipping
+            t[i] = std::max(static_cast<T>(0.0), std::round(sample));
+        }
+
+        // 3. The Low-Photon Accurate Path (Knuth's Method)
+        // Used only for incredibly dense bone/metal where photons < 15.
+        else
+        {
+            T L = std::exp(-lambda);
+            T p = 1.0;
+            int k = 0;
+
+            do {
+                k++;
+                p *= uniform_dist(gen);
+            } while (p > L);
+
+            t[i] = static_cast<T>(k - 1);
+        }
+    }
+}
+
+void add_poisson_noise_impl(Tensor& t)
+{
+    add_poisson_noise_impl<float>(t, generator());
+}
+
 
 
 template <typename T>
@@ -596,6 +648,41 @@ void max_impl(Tensor input, int64_t dim, Tensor result, Tensor& indices)
     SWITCH_MACRO_ALL(input.scalar_type(), min_max_impl, input, dim, indices, result, false);
 }
 
+
+template <typename T>
+static void median_impl(TensorInfo<T> input, TensorInfo<T, 1> result,double percentile )
+{
+    using G = typename CpuComputeFloatType<T>::Type;
+
+    int64_t n = input.numel();
+
+    if (n == 0) return;
+
+    std::vector<T> buffer(n);
+    for (int64_t i = 0; i < n; ++i)
+    {
+        buffer[i] = input[i];
+    }
+
+    int64_t mid = n * percentile;
+    std::nth_element(buffer.begin(), buffer.begin() + mid, buffer.end());
+
+    // 4. Handle exact mathematical median (Odd vs Even number of elements)
+    if (n % 2 != 0)
+    {
+        result[0] = buffer[mid];
+    }
+    else
+    {
+        auto max_left_it = std::max_element(buffer.begin(), buffer.begin() + mid);
+        result[0]        = T((G(*max_left_it) + G(buffer[mid])) / G(2.));
+    }
+}
+
+void median_impl(Tensor a, Tensor result,double percentile )
+{
+    SWITCH_MACRO_ALL(a.scalar_type(), median_impl, a, result,percentile);
+}
 
 template <typename T, typename Indextype>
 static void index_select_impl(TensorInfo<T> input, int64_t dim, TensorInfo<Indextype> index, TensorInfo<T> result)
@@ -886,7 +973,6 @@ __launch_bounds__(128) static __global__
 #pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < dst.numel(); ++i)
     {
-
         int64_t b = 0;
         int64_t c = i / dst.size(3) / dst.size(2);
         int64_t y = i / dst.size(3) % dst.size(2);
@@ -915,15 +1001,14 @@ __launch_bounds__(128) static __global__
             y_src -= 2 * (y_src - (src.size(2) - 1));
         }
 
-        dst(b, c, y, x) = src(b ,c, y_src, x_src);
+        dst(b, c, y, x) = src(b, c, y_src, x_src);
     }
 }
 
 
 void padding_2d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom)
 {
-    SWITCH_MACRO_ALL( src.scalar_type(),padding_2d_reflect_impl, src, result,
-                        pad_left, pad_right, pad_top, pad_bottom);
+    SWITCH_MACRO_ALL(src.scalar_type(), padding_2d_reflect_impl, src, result, pad_left, pad_right, pad_top, pad_bottom);
 }
 
 

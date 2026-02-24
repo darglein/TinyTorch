@@ -40,15 +40,15 @@ struct ProdSumNode : public FunctionNode<ProdSumNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
-        Tensor result = zeros({ 1 }, a.options());
+        Tensor result = zeros({1}, a.options());
         SELECT_DEVICE(a.device(), prod_sum_impl, a, result);
-        return { result };
+        return {result};
     }
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         CHECK(false);
-        return { };
+        return {};
     }
 };
 struct SumNode : public FunctionNode<SumNode>
@@ -207,7 +207,7 @@ static void fill_with_infinite(Tensor& a, bool positive_inf)
         }
         else
         {
-            value =  (double)std::numeric_limits<T>::lowest();
+            value = (double)std::numeric_limits<T>::lowest();
         }
     }
     else
@@ -399,6 +399,13 @@ Tensor mean(Tensor a, SizeType s, bool keepdim)
 
     return a;
 }
+Tensor median(Tensor a, double percentile )
+{
+    CHECK_EQ(a.device(), kCPU);
+    auto result = ones({1}, a.options());
+    cpu_impl::median_impl(a, result, percentile);
+    return result;
+}
 
 Tensor std(Tensor a)
 {
@@ -451,6 +458,13 @@ Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
     a = a.sqrt();
     return a;
 }
+
+void add_poisson_noise_(Tensor a)
+{
+    CHECK_EQ(a.device(), kCPU);
+    cpu_impl::add_poisson_noise_impl(a);
+}
+
 Tensor prod(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());

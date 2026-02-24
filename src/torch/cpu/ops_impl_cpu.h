@@ -29,6 +29,7 @@ void permute_impl(Tensor& src, Tensor result, SizeType new_dims);
 
 void uniform_impl(Tensor& t, double mi, double ma);
 void uniform_int_impl(Tensor& t, int64_t low, int64_t high);
+void add_poisson_noise_impl(Tensor& t);
 void abs_sum_impl(Tensor a, Tensor result);
 void prod_sum_impl(Tensor a, Tensor result);
 void sum_impl(Tensor a, Tensor result);
@@ -44,6 +45,8 @@ void min_impl(Tensor a, int64_t dim, Tensor result, Tensor& indices);
 void max_impl(Tensor a, Tensor result);
 void max_impl(Tensor a, Tensor b, Tensor result);
 void max_impl(Tensor a, int64_t dim, Tensor result, Tensor& indices);
+
+void median_impl(Tensor a, Tensor result, double percentile );
 
 void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor result);
 void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value);

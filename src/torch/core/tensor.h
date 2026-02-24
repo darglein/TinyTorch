@@ -205,6 +205,7 @@ struct TINYTORCH_API Tensor
     // }
     Tensor& index_copy_(int64_t dim, Tensor ids, Tensor value);
     Tensor pow(Tensor a) const;
+    Tensor pow(double a) const;
     void copy_(Tensor a, bool non_blocking = false);
 
     Tensor clone() const;
@@ -265,6 +266,7 @@ struct TINYTORCH_API Tensor
     Tensor mean() const;
     Tensor mean(int64_t dim, bool keepdim) const;
     Tensor mean(const SizeType& sizes, bool keepdim = false) const;
+    Tensor median(double percentile = 0.5) const;
     Tensor std() const;
     Tensor index_select(int64_t i, Tensor index) const;
     Tensor abs() const;

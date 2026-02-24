@@ -32,6 +32,7 @@ TINYTORCH_API void clamp_(Tensor& a, double low, double high);
 TINYTORCH_API Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep);
 
 
+TINYTORCH_API void add_poisson_noise_(Tensor a);
 
 TINYTORCH_API Tensor std(Tensor a);
 TINYTORCH_API Tensor std(Tensor a, int64_t dim);
@@ -46,6 +47,8 @@ TINYTORCH_API Tensor sum(Tensor a, SizeType s, bool keepdim = false);
 TINYTORCH_API Tensor mean(Tensor a);
 TINYTORCH_API Tensor mean(Tensor a, int64_t dim, bool keepdim);
 TINYTORCH_API Tensor mean(Tensor a, SizeType s, bool keepdim = false);
+
+TINYTORCH_API Tensor median(Tensor a, double percentile = 0.5);
 
 
 }  // namespace tinytorch
