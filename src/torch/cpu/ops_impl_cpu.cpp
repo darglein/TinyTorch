@@ -879,6 +879,55 @@ void clamp_impl_(Tensor& a, double low, double high)
 
 
 template <typename T>
+__launch_bounds__(128) static __global__
+    void padding_2d_reflect_impl(TensorInfoCuda<T, 4> src, TensorInfoCuda<T, 4> dst, int pad_left, int pad_right,
+                                 int pad_top, int pad_bottom)
+{
+#pragma omp parallel for num_threads(get_num_threads())
+    for (int64_t i = 0; i < dst.numel(); ++i)
+    {
+
+        int64_t b = 0;
+        int64_t c = i / dst.size(3) / dst.size(2);
+        int64_t y = i / dst.size(3) % dst.size(2);
+        int64_t x = i % dst.size(3);
+
+
+        auto x_src = x - pad_left;
+        auto y_src = y - pad_top;
+
+        if (x_src < 0)
+        {
+            x_src = -x_src;
+        }
+        if (y_src < 0)
+        {
+            y_src = -y_src;
+        }
+
+        if (x_src >= src.size(3))
+        {
+            x_src -= 2 * (x_src - (src.size(3) - 1));
+        }
+
+        if (y_src >= src.size(2))
+        {
+            y_src -= 2 * (y_src - (src.size(2) - 1));
+        }
+
+        dst(b, c, y, x) = src(b ,c, y_src, x_src);
+    }
+}
+
+
+void padding_2d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom)
+{
+    SWITCH_MACRO_ALL( src.scalar_type(),padding_2d_reflect_impl, src, result,
+                        pad_left, pad_right, pad_top, pad_bottom);
+}
+
+
+template <typename T>
 static void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInfo<T> result)
 {
 #pragma omp parallel for num_threads(get_num_threads())

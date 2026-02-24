@@ -57,7 +57,8 @@ void fill_impl(Tensor& a, double value)
     if (value == 0 && a.is_contiguous())
     {
         cuda::DeviceGuard guard(a.device());
-        TT_CHECK_CUDA_ERROR(cudaMemsetAsync(a.data_ptr(), 0, a.numel() * a.element_size(), cuda::getCurrentCUDAStream()));
+        TT_CHECK_CUDA_ERROR(
+            cudaMemsetAsync(a.data_ptr(), 0, a.numel() * a.element_size(), cuda::getCurrentCUDAStream()));
         return;
     }
 
@@ -131,7 +132,7 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
         // trivial copy without conversion
         cuda::DeviceGuard guard(src.device());
         TT_CHECK_CUDA_ERROR(cudaMemcpyAsync(target.data_ptr(), src.data_ptr(), src.numel() * src.element_size(),
-                                         cudaMemcpyDeviceToDevice, cuda::getCurrentCUDAStream()));
+                                            cudaMemcpyDeviceToDevice, cuda::getCurrentCUDAStream()));
         return;
     }
 
@@ -185,9 +186,9 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
     }
 }
 
-__device__ inline uint32_t xorshift32(uint32_t &state)
+__device__ inline uint32_t xorshift32(uint32_t& state)
 {
- uint32_t x = state;
+    uint32_t x = state;
     x ^= x << 13;
     x ^= x >> 17;
     x ^= x << 5;
@@ -200,7 +201,7 @@ __launch_bounds__(128) static __global__
     void rand_float_impl(TensorInfoCuda<T, -1> a, float low, float high, uint32_t seed)
 {
     int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    int64_t grid_size =  (int64_t)blockDim.x * gridDim.x;
+    int64_t grid_size = (int64_t)blockDim.x * gridDim.x;
 
     uint32_t state = seed ^ (uint32_t)i;
     state *= 0x85ebca6b;
@@ -211,28 +212,30 @@ __launch_bounds__(128) static __global__
 
     for (; i < a.numel(); i += grid_size)
     {
-        auto rnd    = xorshift32(state);
+        auto rnd = xorshift32(state);
 
         const float uint_to_float = 2.3283064365386963e-10f;
-        float rnd_float = float(rnd) * uint_to_float;
+        float rnd_float           = float(rnd) * uint_to_float;
 
-        a[i]     = T(rnd_float * (high - low) + low);
+        a[i] = T(rnd_float * (high - low) + low);
     }
 }
 
 void uniform_impl(Tensor& a, double mi, double ma)
 {
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
-    uint64_t seed = dist(generator());
+    uint64_t seed       = dist(generator());
     int64_t max_threads = std::min<int64_t>(a.numel(), int64_t(1024) * 1024 * 1024);
-    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_float_impl, a, (float)mi, (float)ma, uint32_t(seed));
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_float_impl, a, (float)mi, (float)ma,
+                          uint32_t(seed));
 }
 
 template <typename T>
-__launch_bounds__(128) static __global__ void rand_int_impl(TensorInfoCuda<T> a, int64_t low, int64_t high, uint32_t seed)
+__launch_bounds__(128) static __global__
+    void rand_int_impl(TensorInfoCuda<T> a, int64_t low, int64_t high, uint32_t seed)
 {
-    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
-    int64_t grid_size =  (int64_t)blockDim.x * gridDim.x;
+    int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    int64_t grid_size = (int64_t)blockDim.x * gridDim.x;
 
     uint32_t state = seed ^ (uint32_t)i;
     state *= 0x85ebca6b;
@@ -240,7 +243,7 @@ __launch_bounds__(128) static __global__ void rand_int_impl(TensorInfoCuda<T> a,
 
     for (; i < a.numel(); i += grid_size)
     {
-        auto rnd    = xorshift32(state);
+        auto rnd = xorshift32(state);
 
         // Fast Range Mapping (no modulo bias)
         // Cast to uint64 to multiply, then shift down.
@@ -254,7 +257,7 @@ __launch_bounds__(128) static __global__ void rand_int_impl(TensorInfoCuda<T> a,
 void uniform_int_impl(Tensor& a, int64_t low, int64_t high)
 {
     std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
-    uint64_t seed = dist(generator());
+    uint64_t seed       = dist(generator());
     int64_t max_threads = std::min<int64_t>(a.numel(), int64_t(1024) * 1024 * 1024);
     CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_int_impl, a, low, high, uint32_t(seed));
 }
@@ -276,6 +279,51 @@ __launch_bounds__(128) static __global__ void clamp_impl_(TensorInfoCuda<T> src,
 void clamp_impl_(Tensor& a, double low, double high)
 {
     CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), a.numel(), clamp_impl_, a, low, high);
+}
+
+template <typename T>
+__launch_bounds__(128) static __global__
+    void padding_2d_reflect_impl(TensorInfoCuda<T, 4> src, TensorInfoCuda<T, 4> dst, int pad_left, int pad_right,
+                                 int pad_top, int pad_bottom)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= dst.numel()) return;
+
+    int64_t b = 0;
+    int64_t c = i / dst.size(3) / dst.size(2);
+    int64_t y = i / dst.size(3) % dst.size(2);
+    int64_t x = i % dst.size(3);
+
+
+    auto x_src = x - pad_left;
+    auto y_src = y - pad_top;
+
+    if (x_src < 0)
+    {
+        x_src = -x_src;
+    }
+    if (y_src < 0)
+    {
+        y_src = -y_src;
+    }
+
+    if (x_src >= src.size(3))
+    {
+        x_src -= 2 * (x_src - (src.size(3) - 1));
+    }
+
+    if (y_src >= src.size(2))
+    {
+        y_src -= 2 * (y_src - (src.size(2) - 1));
+    }
+
+    dst(b, c, y, x) = src(b ,c, y_src, x_src);
+}
+
+void padding_2d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom)
+{
+    CUDA_SWITCH_MACRO_ALL(src.device(), src.scalar_type(), result.numel(), padding_2d_reflect_impl, src, result,
+                          pad_left, pad_right, pad_top, pad_bottom);
 }
 
 template <typename T>

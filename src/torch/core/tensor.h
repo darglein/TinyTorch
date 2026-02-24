@@ -79,6 +79,7 @@ struct TINYTORCH_API SizeType
         CHECK_LT(i, size());
         return data_[i];
     }
+    const int64_t* data() const { return data_.data(); }
     int64_t size() const { return data_.size(); }
     void resize(int64_t s) { data_.resize(s); }
     std::vector<int64_t>& vec() { return data_; }
@@ -115,6 +116,10 @@ inline SizeType CompactStrideForSize(SizeType size)
 inline bool operator==(const SizeType& s1, const SizeType& s2)
 {
     return s1.vec() == s2.vec();
+}
+inline bool operator!=(const SizeType& s1, const SizeType& s2)
+{
+    return !(s1 == s2);
 }
 inline std::ostream& operator<<(std::ostream& strm, const SizeType& size)
 {

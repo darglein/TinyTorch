@@ -52,6 +52,7 @@ void index_add_impl(int64_t dim, Tensor index, Tensor data, Tensor result);
 void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor result);
 void copy_and_convert_impl(Tensor src, Tensor& target);
 void clamp_impl_(Tensor& a, double low, double high);
+void padding_2d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom);
 void repeat_interleave_impl(Tensor input, int64_t count, Tensor result);
 void repeat_impl(Tensor t, SizeType sizes, Tensor result);
 

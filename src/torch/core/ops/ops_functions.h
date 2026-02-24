@@ -47,6 +47,9 @@ TINYTORCH_API Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor d
 TINYTORCH_API void index_copy(Tensor& target, int64_t dim, Tensor index, Tensor source);
 TINYTORCH_API Tensor gather(Tensor data, int64_t dim, Tensor index);
 
+TINYTORCH_API void padding_2d_reflect(Tensor data,Tensor output, int pad_left, int pad_right, int pad_top, int pad_bottom);
+TINYTORCH_API Tensor padding_2d_reflect(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom);
+
 inline void load(Tensor&, const std::filesystem::path&)
 {
     throw std::runtime_error("not implemented");

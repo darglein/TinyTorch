@@ -388,6 +388,25 @@ Tensor gather(Tensor data, int64_t dim, Tensor index)
     SELECT_DEVICE(result.device(), gather_impl, data, dim, index, result);
     return result;
 }
+void padding_2d_reflect(Tensor data, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom)
+{
+    SELECT_DEVICE(result.device(), padding_2d_reflect_impl, data, result, pad_left, pad_right, pad_top, pad_bottom);
+
+}
+Tensor padding_2d_reflect(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom)
+{
+    CHECK_EQ(data.size(0), 1);
+    CHECK_EQ(data.size(1), 1);
+    CHECK_EQ(data.dim(), 4);
+    auto out_sizes = data.sizes();
+    out_sizes[2] += pad_top + pad_bottom;
+    out_sizes[3] += pad_left + pad_right;
+    CHECK_LE(out_sizes[2], 2 * data.size(2));
+    CHECK_LE(out_sizes[3], 2 * data.size(3));
+    auto result = empty(out_sizes, data.options());
+    padding_2d_reflect(data,result,pad_left,pad_right,pad_top,pad_bottom);
+    return result;
+}
 
 namespace autograd
 {
@@ -660,10 +679,10 @@ Tensor conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding,
     CHECK_EQ(dilation, 1);
     CHECK_EQ(groups, 1);
 
-    int64_t in_batch    = input.size(0);
+    int64_t in_batch = input.size(0);
     // int64_t in_channels = input.size(1);
-    int64_t in_height   = input.size(2);
-    int64_t in_width    = input.size(3);
+    int64_t in_height = input.size(2);
+    int64_t in_width  = input.size(3);
 
     CHECK_EQ(weight.size(0), 1);
     int64_t out_batch    = in_batch;

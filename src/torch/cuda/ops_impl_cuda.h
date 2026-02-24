@@ -29,7 +29,7 @@ void uniform_int_impl(Tensor& t, int64_t low, int64_t high);
 
 
 void clamp_impl_(Tensor& a, double low, double high);
-
+void padding_2d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom);
 
 void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor result);
 void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value);
