@@ -289,6 +289,7 @@ struct TINYTORCH_API Tensor
     double toDouble() const { return item<double>(); }
     double toFloat() const { return item<float>(); }
     int toInt() const { return item<int>(); }
+    int64_t toLong() const { return item<int64_t>(); }
     bool is_contiguous() const;
     bool is_leaf() const;
     inline bool is_cuda() const { return device().type() == kCUDA; } // Compare only type here, not device_index.
