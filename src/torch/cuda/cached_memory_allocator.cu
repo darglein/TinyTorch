@@ -33,6 +33,7 @@ struct PerDeviceMemoryData
 
     int64_t current_allocated_bytes = 0;
     int64_t max_allocated_bytes     = 0;
+
 };
 
 static PerDeviceMemoryData& DeviceData(int device_id)
@@ -70,6 +71,7 @@ struct PreallocPerDeviceMemoryData
     uint8_t* full_ptr       = nullptr;
     int64_t full_size       = 0;
     int64_t full_alloc_info = 0;
+    int64_t reserved_bytes     = 0;
     std::vector<PreallocBlock> free_blocks;
     std::vector<PreallocBlock> alloc_blocks;
 };
@@ -234,6 +236,20 @@ static void* premalloc(int64_t initial_size, int device_id)
     int64_t size = iAlignUp(initial_size, prealloc_alignment);
     auto& data   = PreallocDeviceData(device_id);
 
+
+
+    {
+        int64_t free_size    = 0;
+        for (auto& b : data.free_blocks)
+        {
+            free_size += b.size;
+        }
+
+        if (free_size - size < data.reserved_bytes)
+        {
+            return nullptr;
+        }
+    }
     auto strm        = getCurrentCUDAStream();
     void* result_ptr = nullptr;
 
@@ -678,6 +694,14 @@ void prealloc_print_debug_line()
 void prealloc_allow_fallback_cudamalloc(bool value)
 {
     prealloc_use_fallback = value;
+}
+void pre_allocate_set_reserved_memory(int64_t reserve)
+{
+    PreallocDeviceData(getDevice()).reserved_bytes = reserve;
+}
+int64_t pre_allocate_get_reserved_memory()
+{
+    return  PreallocDeviceData(getDevice()).reserved_bytes;
 }
 }  // namespace cuda
 }  // namespace tinytorch
