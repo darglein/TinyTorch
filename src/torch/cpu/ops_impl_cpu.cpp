@@ -347,7 +347,7 @@ static void add_poisson_noise_impl(TensorInfo<T> t, std::mt19937& gen)
         if (lambda > 15.0)
         {
             // Sample = Mean + (StdDev * Standard_Normal)
-            T n = normal_dist(gen);
+            T n      = normal_dist(gen);
             T sample = lambda + std::sqrt(lambda) * n;
 
             // Round to nearest integer and prevent negative photon clipping
@@ -358,11 +358,12 @@ static void add_poisson_noise_impl(TensorInfo<T> t, std::mt19937& gen)
         // Used only for incredibly dense bone/metal where photons < 15.
         else
         {
-            T L = std::exp(-lambda);
-            T p = 1.0;
+            T L   = std::exp(-lambda);
+            T p   = 1.0;
             int k = 0;
 
-            do {
+            do
+            {
                 k++;
                 p *= uniform_dist(gen);
             } while (p > L);
@@ -650,7 +651,7 @@ void max_impl(Tensor input, int64_t dim, Tensor result, Tensor& indices)
 
 
 template <typename T>
-static void median_impl(TensorInfo<T> input, TensorInfo<T, 1> result,double percentile )
+static void median_impl(TensorInfo<T> input, TensorInfo<T, 1> result, double percentile)
 {
     using G = typename CpuComputeFloatType<T>::Type;
 
@@ -679,9 +680,9 @@ static void median_impl(TensorInfo<T> input, TensorInfo<T, 1> result,double perc
     }
 }
 
-void median_impl(Tensor a, Tensor result,double percentile )
+void median_impl(Tensor a, Tensor result, double percentile)
 {
-    SWITCH_MACRO_ALL(a.scalar_type(), median_impl, a, result,percentile);
+    SWITCH_MACRO_ALL(a.scalar_type(), median_impl, a, result, percentile);
 }
 
 template <typename T, typename Indextype>
@@ -966,9 +967,8 @@ void clamp_impl_(Tensor& a, double low, double high)
 
 
 template <typename T>
-__launch_bounds__(128) static __global__
-    void padding_2d_reflect_impl(TensorInfoCuda<T, 4> src, TensorInfoCuda<T, 4> dst, int pad_left, int pad_right,
-                                 int pad_top, int pad_bottom)
+static void padding_2d_reflect_impl(TensorInfoCuda<T, 4> src, TensorInfoCuda<T, 4> dst, int pad_left, int pad_right,
+                                    int pad_top, int pad_bottom)
 {
 #pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < dst.numel(); ++i)
@@ -1010,7 +1010,63 @@ void padding_2d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_ri
 {
     SWITCH_MACRO_ALL(src.scalar_type(), padding_2d_reflect_impl, src, result, pad_left, pad_right, pad_top, pad_bottom);
 }
+template <typename T>
+static void padding_3d_reflect_impl(TensorInfoCuda<T, 5> src, TensorInfoCuda<T, 5> dst, int pad_left, int pad_right,
+                                    int pad_top, int pad_bottom, int pad_front, int pad_back)
+{
+#pragma omp parallel for num_threads(get_num_threads())
+    for (int64_t i = 0; i < dst.numel(); ++i)
+    {
+        int64_t b = 0; // Keeping identical batch assumption as 2D
 
+        // 1D to 5D Index Unrolling
+        int64_t x = i % dst.size(4);
+        int64_t y = (i / dst.size(4)) % dst.size(3);
+        int64_t z = (i / dst.size(4) / dst.size(3)) % dst.size(2);
+        int64_t c = (i / dst.size(4) / dst.size(3) / dst.size(2));
+
+        // Offset to original source coordinates
+        auto x_src = x - pad_left;
+        auto y_src = y - pad_top;
+        auto z_src = z - pad_front;
+
+        // Lower Boundary Reflection
+        if (x_src < 0)
+        {
+            x_src = -x_src;
+        }
+        if (y_src < 0)
+        {
+            y_src = -y_src;
+        }
+        if (z_src < 0)
+        {
+            z_src = -z_src;
+        }
+
+        // Upper Boundary Reflection
+        if (x_src >= src.size(4))
+        {
+            x_src -= 2 * (x_src - (src.size(4) - 1));
+        }
+        if (y_src >= src.size(3))
+        {
+            y_src -= 2 * (y_src - (src.size(3) - 1));
+        }
+        if (z_src >= src.size(2))
+        {
+            z_src -= 2 * (z_src - (src.size(2) - 1));
+        }
+
+        // Map the mirrored source voxel to the destination padding
+        dst(b, c, z, y, x) = src(b, c, z_src, y_src, x_src);
+    }
+}
+
+void padding_3d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back)
+{
+    SWITCH_MACRO_ALL(src.scalar_type(), padding_3d_reflect_impl, src, result, pad_left, pad_right, pad_top, pad_bottom, pad_front, pad_back);
+}
 
 template <typename T>
 static void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInfo<T> result)

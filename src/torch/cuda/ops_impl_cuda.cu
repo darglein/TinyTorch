@@ -325,7 +325,64 @@ void padding_2d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_ri
     CUDA_SWITCH_MACRO_ALL(src.device(), src.scalar_type(), result.numel(), padding_2d_reflect_impl, src, result,
                           pad_left, pad_right, pad_top, pad_bottom);
 }
+template <typename T>
+__launch_bounds__(128) static __global__
+    void padding_3d_reflect_impl(TensorInfoCuda<T, 5> src, TensorInfoCuda<T, 5> dst, int pad_left, int pad_right,
+                                 int pad_top, int pad_bottom, int pad_front, int pad_back)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= dst.numel()) return;
 
+    // 1D to 5D Index Unrolling (Assuming Batch = 0 to match your 2D code)
+    int64_t b = 0;
+    int64_t c = i / dst.size(4) / dst.size(3) / dst.size(2);
+    int64_t z = (i / dst.size(4) / dst.size(3)) % dst.size(2);
+    int64_t y = (i / dst.size(4)) % dst.size(3);
+    int64_t x = i % dst.size(4);
+
+    // Offset to original source coordinates
+    auto x_src = x - pad_left;
+    auto y_src = y - pad_top;
+    auto z_src = z - pad_front;
+
+    // Lower Boundary Reflection
+    if (x_src < 0)
+    {
+        x_src = -x_src;
+    }
+    if (y_src < 0)
+    {
+        y_src = -y_src;
+    }
+    if (z_src < 0)
+    {
+        z_src = -z_src;
+    }
+
+    // Upper Boundary Reflection
+    if (x_src >= src.size(4))
+    {
+        x_src -= 2 * (x_src - (src.size(4) - 1));
+    }
+    if (y_src >= src.size(3))
+    {
+        y_src -= 2 * (y_src - (src.size(3) - 1));
+    }
+    if (z_src >= src.size(2))
+    {
+        z_src -= 2 * (z_src - (src.size(2) - 1));
+    }
+
+    // Map the mirrored source voxel to the destination padding
+    dst(b, c, z, y, x) = src(b, c, z_src, y_src, x_src);
+}
+
+void padding_3d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back)
+{
+    // Make sure your CUDA_SWITCH_MACRO_ALL accepts the extra arguments properly!
+    CUDA_SWITCH_MACRO_ALL(src.device(), src.scalar_type(), result.numel(), padding_3d_reflect_impl, src, result,
+                          pad_left, pad_right, pad_top, pad_bottom, pad_front, pad_back);
+}
 template <typename T>
 __launch_bounds__(128) static __global__
     void repeat_interleave_impl(TensorInfoCuda<T> input, int64_t count, TensorInfoCuda<T> result)

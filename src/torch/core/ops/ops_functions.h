@@ -49,6 +49,8 @@ TINYTORCH_API Tensor gather(Tensor data, int64_t dim, Tensor index);
 
 TINYTORCH_API void padding_2d_reflect(Tensor data,Tensor output, int pad_left, int pad_right, int pad_top, int pad_bottom);
 TINYTORCH_API Tensor padding_2d_reflect(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom);
+TINYTORCH_API void padding_3d_reflect(Tensor data, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back);
+TINYTORCH_API Tensor padding_3d_reflect(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back);
 
 inline void load(Tensor&, const std::filesystem::path&)
 {

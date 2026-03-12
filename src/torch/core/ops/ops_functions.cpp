@@ -408,6 +408,34 @@ Tensor padding_2d_reflect(Tensor data, int pad_left, int pad_right, int pad_top,
     return result;
 }
 
+void padding_3d_reflect(Tensor data, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back)
+{
+    SELECT_DEVICE(result.device(), padding_3d_reflect_impl, data, result, pad_left, pad_right, pad_top, pad_bottom, pad_front, pad_back);
+}
+
+Tensor padding_3d_reflect(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back)
+{
+    CHECK_EQ(data.size(0), 1);
+    CHECK_EQ(data.size(1), 1);
+    CHECK_EQ(data.dim(), 5); // 5D Tensor: [Batch, Channel, Depth, Height, Width]
+
+    auto out_sizes = data.sizes();
+
+    out_sizes[2] += pad_front + pad_back;
+    out_sizes[3] += pad_top + pad_bottom;
+    out_sizes[4] += pad_left + pad_right;
+
+    CHECK_LE(out_sizes[2], 2 * data.size(2));
+    CHECK_LE(out_sizes[3], 2 * data.size(3));
+    CHECK_LE(out_sizes[4], 2 * data.size(4));
+
+    auto result = empty(out_sizes, data.options());
+
+    padding_3d_reflect(data, result, pad_left, pad_right, pad_top, pad_bottom, pad_front, pad_back);
+
+    return result;
+}
+
 namespace autograd
 {
 struct SliceNode : public FunctionNode<SliceNode>
