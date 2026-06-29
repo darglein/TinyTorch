@@ -317,6 +317,12 @@ __launch_bounds__(128) static __global__
         y_src -= 2 * (y_src - (src.size(2) - 1));
     }
 
+    if (x_src < 0) x_src = 0;
+    if (x_src >= src.size(3)) x_src = src.size(3) - 1;
+
+    if (y_src < 0) y_src = 0;
+    if (y_src >= src.size(2)) y_src = src.size(2) - 1;
+
     dst(b, c, y, x) = src(b ,c, y_src, x_src);
 }
 
