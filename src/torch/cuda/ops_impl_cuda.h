@@ -25,6 +25,7 @@ void permute_impl(Tensor& src, Tensor result, SizeType new_dims);
 void copy_and_convert_impl(Tensor src, Tensor& target);
 void uniform_impl(Tensor& t, double mi, double ma);
 void uniform_int_impl(Tensor& t, int64_t low, int64_t high);
+void normal_random_impl(Tensor& t);
 
 
 

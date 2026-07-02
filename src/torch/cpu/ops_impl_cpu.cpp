@@ -325,6 +325,41 @@ void uniform_int_impl(Tensor& t, int64_t low, int64_t high)
     SWITCH_MACRO_INT(t.scalar_type(), rand_int_impl, t, generator(), low, high);
 }
 
+
+
+
+template <typename T>
+static void normal_random_float_impl(TensorInfo<T> t, std::mt19937& mersenne_engine)
+{
+    std::normal_distribution<float> dist;
+
+    auto N = t.numel();
+    if (t.contiguous)
+    {
+        T* pt = t.data;
+        for (int64_t i = 0; i < N; ++i)
+        {
+
+            float xf       = dist(mersenne_engine);
+            pt[i]          = T(xf);
+        }
+    }
+    else
+    {
+        for (int64_t i = 0; i < N; ++i)
+        {
+            float xf       = dist(mersenne_engine);
+            t[i]           = T(xf );
+        }
+    }
+}
+
+void normal_random_impl(Tensor& t)
+{
+    SWITCH_MACRO_ALL(t.scalar_type(), normal_random_float_impl, t, generator());
+}
+
+
 template <typename T>
 static void add_poisson_noise_impl(TensorInfo<T> t, std::mt19937& gen)
 {

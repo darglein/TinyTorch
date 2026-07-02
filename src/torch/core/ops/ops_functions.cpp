@@ -185,6 +185,14 @@ void uniform_int(Tensor& t, int64_t low, int64_t high)
     SELECT_DEVICE(t.device(), uniform_int_impl, t, low, high);
 }
 
+void normal_random(Tensor& t)
+{
+    CHECK(!t.requires_grad() || !GradMode::is_enabled());
+    TINYTORCH_LOG_FUNCTION_CALL();
+    SELECT_DEVICE(t.device(), normal_random_impl, t);
+}
+
+
 void copy(Tensor src, Tensor target, bool async)
 {
     CHECK(!src.requires_grad() || !GradMode::is_enabled());

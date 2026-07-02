@@ -166,6 +166,21 @@ Tensor rand_like(Tensor t)
 {
     return rand(t.sizes(), t.options().requires_grad(false));
 }
+
+Tensor randn(const SizeType& sizes, TensorOptions options)
+{
+    Tensor t = empty(sizes, options);
+    NoGradGuard ngg;
+    normal_random(t);
+    return t;
+}
+
+
+Tensor randn_like(Tensor t)
+{
+    return randn(t.sizes(), t.options().requires_grad(false));
+}
+
 Tensor from_blob(void* data, const SizeType& sizes, const SizeType& stride, TensorOptions options)
 {
     CHECK(options.requires_grad_ == false);

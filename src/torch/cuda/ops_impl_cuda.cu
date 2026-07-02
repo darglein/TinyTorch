@@ -262,6 +262,54 @@ void uniform_int_impl(Tensor& a, int64_t low, int64_t high)
     CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_int_impl, a, low, high, uint32_t(seed));
 }
 
+
+template <typename T>
+__launch_bounds__(128) static __global__
+    void normal_random_float_impl(TensorInfoCuda<T, -1> a, uint32_t seed)
+{
+    int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    int64_t grid_size = (int64_t)blockDim.x * gridDim.x;
+
+    uint32_t state = seed ^ (uint32_t)i;
+    state *= 0x85ebca6b;
+    state ^= state >> 13;
+
+    // Optional: Warm up xorshift (discard one value) to enter randomness
+    xorshift32(state);
+
+    // Constants for uniform-to-float conversion and Box-Muller
+    const float uint_to_float = 2.3283064365386963e-10f;
+    const float two_pi        = 6.28318530717958647692f;
+
+    for (; i < a.numel(); i += grid_size)
+    {
+        // 1. Generate two independent uniform uint32_t values
+        uint32_t rnd1 = xorshift32(state);
+        uint32_t rnd2 = xorshift32(state);
+
+        // 2. Map them to floating point ranges.
+        // We use (1.0f - ...) for u1 so the range strictly becomes (0, 1].
+        // This is critical because logf(0) yields -infinity, which causes NaNs.
+        float u1 = 1.0f - float(rnd1) * uint_to_float;
+        float u2 = float(rnd2) * uint_to_float;
+
+        // 3. Apply the Box-Muller transform to get a standard normal variable (mean=0, std=1)
+        float z0 = sqrtf(-2.0f * logf(u1)) * cosf(two_pi * u2);
+
+        // 4. Cast and store
+        a[i] = T(z0);
+    }
+}
+
+void normal_random_impl(Tensor& a)
+{
+    std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+    uint64_t seed       = dist(generator());
+    int64_t max_threads = std::min<int64_t>(a.numel(), int64_t(1024) * 1024 * 1024);
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, normal_random_float_impl, a,
+                          uint32_t(seed));
+}
+
 template <typename T>
 __launch_bounds__(128) static __global__ void clamp_impl_(TensorInfoCuda<T> src, double low, double high)
 {
