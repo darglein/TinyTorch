@@ -417,15 +417,15 @@ Tensor std(Tensor a)
     {
         result = zeros_like(mean);
         cuda_impl::std_helper_impl(a, mean, result);
+        result = result / (double)a.numel();
     }
     else
 #endif
     {
         result = a - mean;
         result = result.square();
-        result = result.sum();
+        result = result.mean();
     }
-    result = result / (double)a.numel();
     result = result.sqrt();
     return result;
 }
