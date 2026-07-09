@@ -33,7 +33,6 @@ struct PerDeviceMemoryData
 
     int64_t current_allocated_bytes = 0;
     int64_t max_allocated_bytes     = 0;
-
 };
 
 static PerDeviceMemoryData& DeviceData(int device_id)
@@ -71,7 +70,7 @@ struct PreallocPerDeviceMemoryData
     uint8_t* full_ptr       = nullptr;
     int64_t full_size       = 0;
     int64_t full_alloc_info = 0;
-    int64_t reserved_bytes     = 0;
+    int64_t reserved_bytes  = 0;
     std::vector<PreallocBlock> free_blocks;
     std::vector<PreallocBlock> alloc_blocks;
 };
@@ -158,14 +157,16 @@ static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size, i
         if (log_level >= 1)
         {
             size_t mem_free, mem_total;
-            cudaMemGetInfo(&mem_free, &mem_total);
+            auto info_error = cudaMemGetInfo(&mem_free, &mem_total);
             std::cout << " CUDA out of memory!\n"
                       << "     Device              " << device_id << "\n"
+                      << "     Allocator           " << (int)algorithm << " \n"
+                      << "     info_error          " << info_error << " \n"
                       << "     Tried to allocate   " << (size / 1024.0 / 1024.0) << " MiB\n"
                       << "     Free memory         " << (mem_free / 1024.0 / 1024.0) << " MiB\n"
                       << "     Total memory        " << (mem_total / 1024.0 / 1024.0) << " MiB\n"
-                      << "     Allocated by torch  " << (DeviceData(device_id).current_allocated_bytes / 1024.0 / 1024.0)
-                      << " MiB" << std::endl;
+                      << "     Allocated by torch  "
+                      << (DeviceData(device_id).current_allocated_bytes / 1024.0 / 1024.0) << " MiB" << std::endl;
         }
 
         ReportCudaError(cuda_error, "cuda_allocator");
@@ -239,7 +240,7 @@ static void* premalloc(int64_t initial_size, int device_id)
 
 
     {
-        int64_t free_size    = 0;
+        int64_t free_size = 0;
         for (auto& b : data.free_blocks)
         {
             free_size += b.size;
@@ -701,7 +702,7 @@ void pre_allocate_set_reserved_memory(int64_t reserve)
 }
 int64_t pre_allocate_get_reserved_memory()
 {
-    return  PreallocDeviceData(getDevice()).reserved_bytes;
+    return PreallocDeviceData(getDevice()).reserved_bytes;
 }
 }  // namespace cuda
 }  // namespace tinytorch
