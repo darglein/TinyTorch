@@ -58,6 +58,7 @@ TINYTORCH_API void setCUDAStreamForThisThread(cudaStream_t stream);
 
 TINYTORCH_API int getDevice();
 TINYTORCH_API void setDevice(int device_index);
+inline void setDevice(Device device){ setDevice(device.index()); }
 
 struct TINYTORCH_API DeviceGuard
 {
