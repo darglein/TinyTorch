@@ -162,11 +162,18 @@ static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size, i
                       << "     Device              " << device_id << "\n"
                       << "     Allocator           " << (int)algorithm << " \n"
                       << "     info_error          " << info_error << " \n"
-                      << "     Tried to allocate   " << (size / 1024.0 / 1024.0) << " MiB\n"
+                      << "     Tried to allocate   " << size << " B = " << (size / 1024.0 / 1024.0) << " MiB\n"
                       << "     Free memory         " << (mem_free / 1024.0 / 1024.0) << " MiB\n"
                       << "     Total memory        " << (mem_total / 1024.0 / 1024.0) << " MiB\n"
                       << "     Allocated by torch  "
-                      << (DeviceData(device_id).current_allocated_bytes / 1024.0 / 1024.0) << " MiB" << std::endl;
+                      << (DeviceData(device_id).current_allocated_bytes / 1024.0 / 1024.0) << " MiB";
+
+            if (algorithm == AllocatorAlgorithm::CUDA_PRE_ALLOCATE)
+            {
+                std::cout << "\n     Prealloc Freemem     " << (prealloc_free_memory() / 1024.0 / 1024.0) << " MiB\n";
+            }
+
+            std::cout << std::endl;
         }
 
         ReportCudaError(cuda_error, "cuda_allocator");
@@ -689,8 +696,13 @@ int64_t prealloc_free_memory()
 }
 void prealloc_print_debug_line()
 {
+    auto device_id = getDevice();
+    auto& data     = PreallocDeviceData(device_id);
+
     std::cout << "pre_allocate: device " << getDevice() << " free_list_size " << prealloc_free_list_size()
-              << " free_mem_mib " << (prealloc_free_memory() / 1024.0 / 1024) << std::endl;
+              << " free_mem " << (prealloc_free_memory()-data.reserved_bytes) <<
+        " free_mem_mib " << ((prealloc_free_memory()-data.reserved_bytes) / 1024.0 / 1024) << " reserved_mib "
+                         << (data.reserved_bytes / 1024.0 / 1024) << std::endl;
 }
 void prealloc_allow_fallback_cudamalloc(bool value)
 {
