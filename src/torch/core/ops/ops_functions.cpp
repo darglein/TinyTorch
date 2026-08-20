@@ -396,12 +396,11 @@ Tensor gather(Tensor data, int64_t dim, Tensor index)
     SELECT_DEVICE(result.device(), gather_impl, data, dim, index, result);
     return result;
 }
-void padding_2d_reflect(Tensor data, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom)
+void padding_2d(Tensor data, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, PaddingMode mode)
 {
-    SELECT_DEVICE(result.device(), padding_2d_reflect_impl, data, result, pad_left, pad_right, pad_top, pad_bottom);
-
+    SELECT_DEVICE(result.device(), padding_2d_impl, data, result, pad_left, pad_right, pad_top, pad_bottom, mode);
 }
-Tensor padding_2d_reflect(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom)
+Tensor padding_2d(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom, PaddingMode mode)
 {
     CHECK_EQ(data.size(0), 1);
     CHECK_EQ(data.size(1), 1);
@@ -412,20 +411,23 @@ Tensor padding_2d_reflect(Tensor data, int pad_left, int pad_right, int pad_top,
     CHECK_LE(out_sizes[2], 2 * data.size(2));
     CHECK_LE(out_sizes[3], 2 * data.size(3));
     auto result = empty(out_sizes, data.options());
-    padding_2d_reflect(data,result,pad_left,pad_right,pad_top,pad_bottom);
+    padding_2d(data, result, pad_left, pad_right, pad_top, pad_bottom, mode);
     return result;
 }
 
-void padding_3d_reflect(Tensor data, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back)
+void padding_3d(Tensor data, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front,
+                int pad_back, PaddingMode mode)
 {
-    SELECT_DEVICE(result.device(), padding_3d_reflect_impl, data, result, pad_left, pad_right, pad_top, pad_bottom, pad_front, pad_back);
+    SELECT_DEVICE(result.device(), padding_3d_impl, data, result, pad_left, pad_right, pad_top, pad_bottom, pad_front,
+                  pad_back, mode);
 }
 
-Tensor padding_3d_reflect(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back)
+Tensor padding_3d(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back,
+                  PaddingMode mode)
 {
     CHECK_EQ(data.size(0), 1);
     CHECK_EQ(data.size(1), 1);
-    CHECK_EQ(data.dim(), 5); // 5D Tensor: [Batch, Channel, Depth, Height, Width]
+    CHECK_EQ(data.dim(), 5);  // 5D Tensor: [Batch, Channel, Depth, Height, Width]
 
     auto out_sizes = data.sizes();
 
@@ -439,7 +441,7 @@ Tensor padding_3d_reflect(Tensor data, int pad_left, int pad_right, int pad_top,
 
     auto result = empty(out_sizes, data.options());
 
-    padding_3d_reflect(data, result, pad_left, pad_right, pad_top, pad_bottom, pad_front, pad_back);
+    padding_3d(data, result, pad_left, pad_right, pad_top, pad_bottom, pad_front, pad_back, mode);
 
     return result;
 }

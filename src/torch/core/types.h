@@ -61,6 +61,7 @@ enum PaddingMode
 {
     kBorder,
     kZero,
+    kReflect,
 };
 enum InterpolationType
 {

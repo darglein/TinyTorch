@@ -30,8 +30,8 @@ void normal_random_impl(Tensor& t);
 
 
 void clamp_impl_(Tensor& a, double low, double high);
-void padding_2d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom);
-void padding_3d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back);
+void padding_2d_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, PaddingMode mode );
+void padding_3d_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back, PaddingMode mode );
 
 void gather_impl(Tensor data, int64_t dim, Tensor index, Tensor result);
 void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value);

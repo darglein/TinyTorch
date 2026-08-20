@@ -327,7 +327,6 @@ void uniform_int_impl(Tensor& t, int64_t low, int64_t high)
 
 
 
-
 template <typename T>
 static void normal_random_float_impl(TensorInfo<T> t, std::mt19937& mersenne_engine)
 {
@@ -339,17 +338,16 @@ static void normal_random_float_impl(TensorInfo<T> t, std::mt19937& mersenne_eng
         T* pt = t.data;
         for (int64_t i = 0; i < N; ++i)
         {
-
-            float xf       = dist(mersenne_engine);
-            pt[i]          = T(xf);
+            float xf = dist(mersenne_engine);
+            pt[i]    = T(xf);
         }
     }
     else
     {
         for (int64_t i = 0; i < N; ++i)
         {
-            float xf       = dist(mersenne_engine);
-            t[i]           = T(xf );
+            float xf = dist(mersenne_engine);
+            t[i]     = T(xf);
         }
     }
 }
@@ -1000,10 +998,9 @@ void clamp_impl_(Tensor& a, double low, double high)
     SWITCH_MACRO_ALL(a.scalar_type(), clamp_impl_, a, low, high);
 }
 
-
 template <typename T>
-static void padding_2d_reflect_impl(TensorInfoCuda<T, 4> src, TensorInfoCuda<T, 4> dst, int pad_left, int pad_right,
-                                    int pad_top, int pad_bottom)
+static void padding_2d_impl(TensorInfoCuda<T, 4> src, TensorInfoCuda<T, 4> dst, int pad_left, int pad_right,
+                            int pad_top, int pad_bottom, PaddingMode mode)
 {
 #pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < dst.numel(); ++i)
@@ -1013,30 +1010,39 @@ static void padding_2d_reflect_impl(TensorInfoCuda<T, 4> src, TensorInfoCuda<T, 
         int64_t y = i / dst.size(3) % dst.size(2);
         int64_t x = i % dst.size(3);
 
-
         auto x_src = x - pad_left;
         auto y_src = y - pad_top;
 
-        if (x_src < 0)
+        if (mode == kZero)
         {
-            x_src = -x_src;
+            if (x_src < 0 || x_src >= src.size(3) || y_src < 0 || y_src >= src.size(2))
+            {
+                dst(b, c, y, x) = T(0.);
+                continue;
+            }
         }
-        if (y_src < 0)
+        else if (mode == kReflect)
         {
-            y_src = -y_src;
+            if (x_src < 0)
+            {
+                x_src = -x_src;
+            }
+            if (y_src < 0)
+            {
+                y_src = -y_src;
+            }
+
+            if (x_src >= src.size(3))
+            {
+                x_src -= 2 * (x_src - (src.size(3) - 1));
+            }
+            if (y_src >= src.size(2))
+            {
+                y_src -= 2 * (y_src - (src.size(2) - 1));
+            }
         }
 
-        if (x_src >= src.size(3))
-        {
-            x_src -= 2 * (x_src - (src.size(3) - 1));
-        }
-
-        if (y_src >= src.size(2))
-        {
-            y_src -= 2 * (y_src - (src.size(2) - 1));
-        }
-
-
+        // Clamp applied for kBorder (replicate), and as a safety fallback for extreme kReflect bounds
         if (x_src < 0) x_src = 0;
         if (x_src >= src.size(3)) x_src = src.size(3) - 1;
 
@@ -1047,19 +1053,20 @@ static void padding_2d_reflect_impl(TensorInfoCuda<T, 4> src, TensorInfoCuda<T, 
     }
 }
 
-
-void padding_2d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom)
+void padding_2d_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom,
+                     PaddingMode mode)
 {
-    SWITCH_MACRO_ALL(src.scalar_type(), padding_2d_reflect_impl, src, result, pad_left, pad_right, pad_top, pad_bottom);
+    SWITCH_MACRO_ALL(src.scalar_type(), padding_2d_impl, src, result, pad_left, pad_right, pad_top, pad_bottom, mode);
 }
+
 template <typename T>
-static void padding_3d_reflect_impl(TensorInfoCuda<T, 5> src, TensorInfoCuda<T, 5> dst, int pad_left, int pad_right,
-                                    int pad_top, int pad_bottom, int pad_front, int pad_back)
+static void padding_3d_impl(TensorInfoCuda<T, 5> src, TensorInfoCuda<T, 5> dst, int pad_left, int pad_right,
+                            int pad_top, int pad_bottom, int pad_front, int pad_back, PaddingMode mode)
 {
 #pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < dst.numel(); ++i)
     {
-        int64_t b = 0; // Keeping identical batch assumption as 2D
+        int64_t b = 0;  // Keeping identical batch assumption as 2D
 
         // 1D to 5D Index Unrolling
         int64_t x = i % dst.size(4);
@@ -1072,44 +1079,49 @@ static void padding_3d_reflect_impl(TensorInfoCuda<T, 5> src, TensorInfoCuda<T, 
         auto y_src = y - pad_top;
         auto z_src = z - pad_front;
 
-        // Lower Boundary Reflection
-        if (x_src < 0)
+        if (mode == kZero)
         {
-            x_src = -x_src;
+            if (x_src < 0 || x_src >= src.size(4) || y_src < 0 || y_src >= src.size(3) || z_src < 0 ||
+                z_src >= src.size(2))
+            {
+                dst(b, c, z, y, x) = T(0.);
+                continue;
+            }
         }
-        if (y_src < 0)
+        else if (mode == kReflect)
         {
-            y_src = -y_src;
-        }
-        if (z_src < 0)
-        {
-            z_src = -z_src;
+            // Lower Boundary Reflection
+            if (x_src < 0) x_src = -x_src;
+            if (y_src < 0) y_src = -y_src;
+            if (z_src < 0) z_src = -z_src;
+
+            // Upper Boundary Reflection
+            if (x_src >= src.size(4)) x_src -= 2 * (x_src - (src.size(4) - 1));
+            if (y_src >= src.size(3)) y_src -= 2 * (y_src - (src.size(3) - 1));
+            if (z_src >= src.size(2)) z_src -= 2 * (z_src - (src.size(2) - 1));
         }
 
-        // Upper Boundary Reflection
-        if (x_src >= src.size(4))
-        {
-            x_src -= 2 * (x_src - (src.size(4) - 1));
-        }
-        if (y_src >= src.size(3))
-        {
-            y_src -= 2 * (y_src - (src.size(3) - 1));
-        }
-        if (z_src >= src.size(2))
-        {
-            z_src -= 2 * (z_src - (src.size(2) - 1));
-        }
+        // Clamp applied for kBorder (replicate), and as a safety fallback for extreme kReflect bounds
+        if (x_src < 0) x_src = 0;
+        if (x_src >= src.size(4)) x_src = src.size(4) - 1;
 
-        // Map the mirrored source voxel to the destination padding
+        if (y_src < 0) y_src = 0;
+        if (y_src >= src.size(3)) y_src = src.size(3) - 1;
+
+        if (z_src < 0) z_src = 0;
+        if (z_src >= src.size(2)) z_src = src.size(2) - 1;
+
+        // Map the source voxel to the destination padding
         dst(b, c, z, y, x) = src(b, c, z_src, y_src, x_src);
     }
 }
 
-void padding_3d_reflect_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back)
+void padding_3d_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front,
+                     int pad_back, PaddingMode mode)
 {
-    SWITCH_MACRO_ALL(src.scalar_type(), padding_3d_reflect_impl, src, result, pad_left, pad_right, pad_top, pad_bottom, pad_front, pad_back);
+    SWITCH_MACRO_ALL(src.scalar_type(), padding_3d_impl, src, result, pad_left, pad_right, pad_top, pad_bottom,
+                     pad_front, pad_back, mode);
 }
-
 template <typename T>
 static void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInfo<T> result)
 {
