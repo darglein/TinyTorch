@@ -54,6 +54,7 @@ TINYTORCH_API Tensor padding_2d(Tensor data, int pad_left, int pad_right, int pa
 TINYTORCH_API void padding_3d(Tensor data, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back, PaddingMode mode = kReflect);
 TINYTORCH_API Tensor padding_3d(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back, PaddingMode mode = kReflect);
 
+TINYTORCH_API Tensor matmul(Tensor a, Tensor b);
 inline void load(Tensor&, const std::filesystem::path&)
 {
     throw std::runtime_error("not implemented");
@@ -94,6 +95,7 @@ struct GridSampleFuncOptions
 };
 
 TINYTORCH_API Tensor grid_sample(Tensor data, Tensor uv, GridSampleFuncOptions options);
+
 
 }  // namespace functional
 }  // namespace nn

@@ -67,5 +67,7 @@ void prod_backward_impl(Tensor a, int64_t dim, Tensor grad_output, Tensor& grad_
 void min_backward_impl(Tensor grad_output, Tensor& grad_a, Tensor& grad_b);
 void max_backward_impl(Tensor grad_output, Tensor& grad_a, Tensor& grad_b);
 
+void matmul_impl(Tensor a, Tensor b, Tensor result);
+
 }  // namespace cpu_impl
 }  // namespace tinytorch

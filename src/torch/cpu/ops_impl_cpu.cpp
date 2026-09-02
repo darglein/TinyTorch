@@ -1161,6 +1161,62 @@ void repeat_impl(Tensor t, SizeType sizes, Tensor result)
     SWITCH_MACRO_ALL(t.scalar_type(), repeat_impl, t, result);
 }
 
+template <typename T>
+static void matmul_impl_kernel(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
+{
+    using G = typename CpuComputeFloatType<T>::Type;
+
+    int a_dim = a.dim();
+    int b_dim = b.dim();
+    int res_dim = result.dim();
+
+    int64_t K = a.size(a_dim - 1);
+
+#pragma omp parallel for num_threads(get_num_threads())
+    for (int64_t i = 0; i < result.numel(); ++i)
+    {
+        // 1. Get the multi-dimensional index for the result tensor
+        auto idx_res = result.LinearIndexToDimIndex(i);
+
+        // 2. Map the result index to the input A index
+        // Since result sizes are derived directly from A sizes (except the last dim),
+        // the batch and M dimensions perfectly align.
+        auto idx_a = idx_res;
+
+        // 3. Map the result index to the input B index
+        // We initialize with a zeroed index struct for B's dimensionality
+        auto idx_b = b.LinearIndexToDimIndex(0);
+
+        // Handle batch dimensions for B (if B is batched)
+        // This maps the trailing batch dimensions of result to B
+        int batch_offset_b = res_dim - b_dim;
+        for (int d = 0; d < b_dim - 2; ++d)
+        {
+            idx_b[d] = idx_res[batch_offset_b + d];
+        }
+
+        // Set the N dimension for B
+        idx_b[b_dim - 1] = idx_res[res_dim - 1];
+
+        // 4. Compute the dot product along the K dimension
+        G sum = G(0);
+        for (int64_t k = 0; k < K; ++k)
+        {
+            idx_a[a_dim - 1] = k;
+            idx_b[b_dim - 2] = k;
+
+            sum += G(a[idx_a]) * G(b[idx_b]);
+        }
+
+        result[idx_res] = T(sum);
+    }
+}
+
+void matmul_impl(Tensor a, Tensor b, Tensor result)
+{
+    // Dispatch to the correct scalar type kernel based on the tensor's dtype
+    SWITCH_MACRO_ALL(a.scalar_type(), matmul_impl_kernel, a, b, result);
+}
 
 }  // namespace cpu_impl
 }  // namespace tinytorch

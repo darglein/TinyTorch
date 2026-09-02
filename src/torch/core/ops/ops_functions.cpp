@@ -127,16 +127,48 @@ Tensor repeat_interleave(Tensor t, int64_t count)
     return result;
 }
 
+namespace autograd
+{
+struct TransposeNode : public FunctionNode<TransposeNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor t, IValue dim0, IValue dim1)
+    {
+        ctx->saved_data["dim0"] = dim0;
+        ctx->saved_data["dim1"] = dim1;
+
+        SizeType new_sizes = t.sizes();
+        std::swap(new_sizes[dim0.toInt()], new_sizes[dim1.toInt()]);
+
+        Tensor result = empty(new_sizes, t.options());
+        SELECT_DEVICE(t.device(), transpose_impl, t, dim0.toInt(), dim1.toInt(), result);
+
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        int64_t dim0 = ctx->saved_data["dim0"].toInt();
+        int64_t dim1 = ctx->saved_data["dim1"].toInt();
+
+        auto g = grad[0];
+
+        // The derivative of a transpose is simply transposing the gradient back
+        // across the exact same two dimensions.
+        SizeType grad_sizes = g.sizes();
+        std::swap(grad_sizes[dim0], grad_sizes[dim1]);
+
+        Tensor grad_t = empty(grad_sizes, g.options());
+        SELECT_DEVICE(g.device(), transpose_impl, g, dim0, dim1, grad_t);
+
+        // We return empty bracket lists {} for the two IValue inputs (dim0, dim1)
+        return {grad_t, {}, {}};
+    }
+};
+}  // namespace autograd
+
 Tensor transpose(Tensor t, int64_t dim0, int64_t dim1)
 {
-    CHECK(!t.requires_grad() || !GradMode::is_enabled());
-    TINYTORCH_LOG_FUNCTION_CALL();
-    SizeType new_sizes = t.sizes();
-    std::swap(new_sizes[dim0], new_sizes[dim1]);
-
-    Tensor result = empty(new_sizes, t.options());
-    SELECT_DEVICE(t.device(), transpose_impl, t, dim0, dim1, result);
-    return result;
+    return autograd::TransposeNode::apply(t, dim0, dim1)[0];
 }
 
 void transpose(Tensor src, Tensor dst, int64_t dim0, int64_t dim1)
@@ -740,4 +772,68 @@ Tensor nn::functional::grid_sample(Tensor data, Tensor uv, nn::functional::GridS
     return autograd::GridsampleNode::apply(data, uv, options.it, options.pm, options.ac)[0];
 }
 
+namespace autograd
+{
+struct MatmulNode : public FunctionNode<MatmulNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
+    {
+        ctx->save_for_backward({a, b});
+
+        auto a_sizes = a.sizes().vec();
+        auto b_sizes = b.sizes().vec();
+
+        CHECK_GE(a_sizes.size(), 2);
+        CHECK_GE(b_sizes.size(), 2);
+
+        int a_dim = a_sizes.size();
+        int b_dim = b_sizes.size();
+
+        // Inner dimensions must match for matrix multiplication
+        CHECK_EQ(a_sizes[a_dim - 1], b_sizes[b_dim - 2]);
+
+        // Output size: [..., M, N]
+        std::vector<int64_t> out_sizes = a_sizes;
+        out_sizes[a_dim - 1] = b_sizes[b_dim - 1];
+
+        Tensor result = empty(out_sizes, a.options());
+
+        // Dispatch to device-specific kernel (to be implemented later)
+        SELECT_DEVICE(a.device(), matmul_impl, a, b, result);
+
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        auto l = ctx->get_saved_variables();
+        auto a = l[0];
+        auto b = l[1];
+        auto g = grad[0];
+
+        int a_dim = a.dim();
+        int b_dim = b.dim();
+
+        // Transpose the last two dimensions for the backward passes
+        Tensor b_T = transpose(b, b_dim - 2, b_dim - 1);
+        Tensor a_T = transpose(a, a_dim - 2, a_dim - 1);
+
+        auto grad_a = empty_like(a);
+        auto grad_b = empty_like(b);
+
+        // dL/dA = dL/dC * B^T
+        SELECT_DEVICE(a.device(), matmul_impl, g, b_T, grad_a);
+
+        // dL/dB = A^T * dL/dC
+        SELECT_DEVICE(b.device(), matmul_impl, a_T, g, grad_b);
+
+        return {grad_a, grad_b};
+    }
+};
+}  // namespace autograd
+
+Tensor matmul(Tensor a, Tensor b)
+{
+    return autograd::MatmulNode::apply(a, b)[0];
+}
 }  // namespace tinytorch

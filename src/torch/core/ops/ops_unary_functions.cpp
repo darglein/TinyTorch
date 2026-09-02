@@ -162,6 +162,45 @@ struct SoftplusNode : public FunctionNode<SoftplusNode>
         return {g_a, {}};
     }
 };
+
+struct SinNode : public FunctionNode<SinNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a)
+    {
+        ctx->save_for_backward({a});
+        auto result = empty_like(a);
+        SELECT_DEVICE(a.device(), sin_impl, a, result);
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        auto l      = ctx->get_saved_variables();
+        auto a      = l[0];
+        auto g      = grad[0];
+        auto grad_a = cos(a) * g;
+        return {grad_a};
+    }
+};
+struct CosNode : public FunctionNode<CosNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor a)
+    {
+        ctx->save_for_backward({a});
+        auto result = empty_like(a);
+        SELECT_DEVICE(a.device(), cos_impl, a, result);
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        auto l      = ctx->get_saved_variables();
+        auto a      = l[0];
+        auto g      = grad[0];
+        auto grad_a = -sin(a) * g;
+        return {grad_a};
+    }
+};
 }  // namespace autograd
 
 using namespace autograd;
@@ -169,7 +208,7 @@ using namespace autograd;
 
 Tensor abs(Tensor a)
 {
-    return autograd::AbsNode::apply(a)[0];
+    return autograd::AbsNode::forward_and_build_graph(a)[0];
 }
 
 Tensor round(Tensor a)
@@ -209,17 +248,12 @@ Tensor sign(Tensor a)
 }
 Tensor sin(Tensor a)
 {
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    auto result = empty_like(a);
-    SELECT_DEVICE(a.device(), sin_impl, a, result);
-    return result;
+    return SinNode::forward_and_build_graph(a)[0];
 }
 Tensor cos(Tensor a)
 {
-    CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    auto result = empty_like(a);
-    SELECT_DEVICE(a.device(), cos_impl, a, result);
-    return result;
+
+    return CosNode::forward_and_build_graph(a)[0];
 }
 
 Tensor relu(Tensor a)
@@ -234,11 +268,11 @@ Tensor softplus(Tensor a, double beta)
 {
     return SoftplusNode::forward_and_build_graph(a, beta)[0];
 }
-Tensor softmax(Tensor a)
+Tensor softmax(Tensor a, int dim)
 {
-    a      = a - a.detach().max();
+    a      = a - a.detach().max(dim, true).first;
     auto t = exp(a);
-    auto k = t.sum();
+    auto k = t.sum(dim, true);
     return t / k;
 }
 

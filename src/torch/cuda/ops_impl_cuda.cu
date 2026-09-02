@@ -479,5 +479,58 @@ void repeat_impl(Tensor t, SizeType sizes, Tensor result)
 }
 
 
+template <typename T>
+__launch_bounds__(128) static __global__
+    void matmul_impl_kernel(TensorInfoCuda<T> a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= result.numel()) return;
+
+    using G = typename CpuComputeFloatType<T>::Type;
+
+    int a_dim = a.dim();
+    int b_dim = b.dim();
+    int res_dim = result.dim();
+
+    int64_t K = a.size(a_dim - 1);
+
+    // 1. Get the multi-dimensional index for the result tensor
+    auto idx_res = result.LinearIndexToDimIndex(i);
+
+    // 2. Map the result index to the input A index
+    auto idx_a = idx_res;
+
+    // 3. Map the result index to the input B index
+    auto idx_b = b.LinearIndexToDimIndex(0);
+
+    // Handle batch dimensions for B (if B is batched)
+    int batch_offset_b = res_dim - b_dim;
+    for (int d = 0; d < b_dim - 2; ++d)
+    {
+        idx_b[d] = idx_res[batch_offset_b + d];
+    }
+
+    // Set the N dimension for B
+    idx_b[b_dim - 1] = idx_res[res_dim - 1];
+
+    // 4. Compute the dot product along the K dimension
+    G sum = G(0);
+    for (int64_t k = 0; k < K; ++k)
+    {
+        idx_a[a_dim - 1] = k;
+        idx_b[b_dim - 2] = k;
+
+        sum += G(a[idx_a]) * G(b[idx_b]);
+    }
+
+    result[idx_res] = T(sum);
+}
+
+void matmul_impl(Tensor a, Tensor b, Tensor result)
+{
+    // Launch a 1D grid with a thread for every element in the output matrix
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), result.numel(), matmul_impl_kernel, a, b, result);
+}
+
 }  // namespace cuda_impl
 }  // namespace tinytorch

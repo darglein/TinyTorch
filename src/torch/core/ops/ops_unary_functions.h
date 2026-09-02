@@ -28,7 +28,7 @@ TINYTORCH_API Tensor sigmoid(Tensor b);
 TINYTORCH_API Tensor softplus(Tensor b, double beta);
 
 
-TINYTORCH_API Tensor softmax(Tensor a);
+TINYTORCH_API Tensor softmax(Tensor a, int dim);
 
 
 
