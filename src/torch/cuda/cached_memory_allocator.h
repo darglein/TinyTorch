@@ -22,6 +22,12 @@ enum class AllocatorAlgorithm
 };
 TINYTORCH_API void set_allocator_algorithm(AllocatorAlgorithm algo);
 TINYTORCH_API AllocatorAlgorithm get_allocator_algorithm();
+struct TINYTORCH_API AllocatorAlgorithmGuard
+{
+    AllocatorAlgorithmGuard(AllocatorAlgorithm value) : prev_mode(get_allocator_algorithm()) { set_allocator_algorithm(value); }
+    ~AllocatorAlgorithmGuard() { set_allocator_algorithm(prev_mode); }
+    AllocatorAlgorithm prev_mode;
+};
 
 // 0: on_error
 // 1: on_out_of_memory
