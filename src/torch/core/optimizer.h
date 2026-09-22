@@ -99,7 +99,8 @@ struct TINYTORCH_API SGDOptimizer : public OptimizerBase
     int step        = 0;
     float lr;
     float momentum = 0.9f;
-    std::vector<Tensor> params;
+    // NOTE: params live in OptimizerBase::params (this class used to declare its own,
+    // which hid the base member and made OptimizerBase::zero_grad() a silent no-op)
     std::vector<Tensor> velocities;
 };
 }  // namespace optim

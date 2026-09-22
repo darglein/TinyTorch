@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(TT_BUILD_SAMPLES "Build the tt samples" ON)
+option(TT_BUILD_TESTS "Build the tt tests (requires the googletest submodule)" ON)
 option(TT_WITH_CUDA "Enable CUDA if possible" ON)
 option(TT_ALL_OUTPUT_TO_BIN "Writes all .dll and .exe to the bin directory" OFF)
 
@@ -48,6 +49,20 @@ add_subdirectory(src)
 
 if (TT_BUILD_SAMPLES)
     add_subdirectory(samples)
+endif ()
+
+############# TESTS ###############
+
+if (TT_BUILD_TESTS)
+    include(CTest)
+
+    if (NOT TARGET gtest)
+        set(BUILD_GTEST ON CACHE BOOL "" FORCE)
+        set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+        add_subdirectory(External/googletest EXCLUDE_FROM_ALL)
+    endif ()
+
+    add_subdirectory(tests)
 endif ()
 
 

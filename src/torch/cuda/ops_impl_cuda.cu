@@ -310,6 +310,67 @@ void normal_random_impl(Tensor& a)
                           uint32_t(seed));
 }
 
+// mirrors cpu_impl::add_poisson_noise_impl (gaussian approximation for lambda > 15,
+// Knuth's method below that)
+template <typename T>
+__launch_bounds__(128) static __global__
+    void poisson_noise_impl(TensorInfoCuda<T> a, uint32_t seed)
+{
+    int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    int64_t grid_size = (int64_t)blockDim.x * gridDim.x;
+
+    uint32_t state = seed ^ (uint32_t)i;
+    state *= 0x85ebca6b;
+    state ^= state >> 13;
+    xorshift32(state);
+
+    const float uint_to_float = 2.3283064365386963e-10f;
+
+    for (; i < a.numel(); i += grid_size)
+    {
+        float lambda = float(a[i]);
+
+        if (lambda <= 0.0f)
+        {
+            a[i] = T(0.0);
+            continue;
+        }
+
+        if (lambda > 15.0f)
+        {
+            // Box-Muller standard normal from two uniforms
+            float u1 = float(xorshift32(state)) * uint_to_float;
+            float u2 = float(xorshift32(state)) * uint_to_float;
+            float n  = std::sqrt(-2.0f * std::log(u1 + 1e-10f)) * std::cos(2.0f * 3.14159265358979323846f * u2);
+
+            float sample = lambda + std::sqrt(lambda) * n;
+            a[i]         = T(std::max(0.0f, std::round(sample)));
+        }
+        else
+        {
+            // Knuth's method
+            float L = std::exp(-lambda);
+            float p = 1.0f;
+            int k   = 0;
+
+            do
+            {
+                k++;
+                p *= float(xorshift32(state)) * uint_to_float;
+            } while (p > L);
+
+            a[i] = T(k - 1);
+        }
+    }
+}
+void add_poisson_noise_impl(Tensor& a)
+{
+    std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+    uint64_t seed       = dist(generator());
+    int64_t max_threads = std::min<int64_t>(a.numel(), int64_t(1024) * 1024 * 1024);
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, poisson_noise_impl, a, uint32_t(seed));
+}
+
 template <typename T>
 __launch_bounds__(128) static __global__ void clamp_impl_(TensorInfoCuda<T> src, double low, double high)
 {

@@ -118,47 +118,135 @@ void std_helper_impl(Tensor a, Tensor mean, Tensor result)
 }
 
 
+// Monotone key: smaller floating point value <-> smaller key (total order, NaNs sort last)
+template <typename T>
+__device__ inline unsigned long long min_key(T v)
+{
+    if (std::is_same<T, double>::value)
+    {
+        unsigned long long b = __double_as_longlong(v);
+        return (b & 0x8000000000000000ULL) ? ~b : (b | 0x8000000000000000ULL);
+    }
+    if (std::is_same<T, __half>::value)
+    {
+        v = __half2float(v);
+    }
+    float f      = float(v);
+    unsigned int b = __float_as_uint(f);
+    unsigned int k = (b & 0x80000000u) ? ~b : (b | 0x80000000u);
+    return (unsigned long long)k;
+}
+
+template <typename T>
+__device__ inline T unkey(unsigned long long k)
+{
+    if (std::is_same<T, double>::value)
+    {
+        unsigned long long b = (k & 0x8000000000000000ULL) ? (k ^ 0x8000000000000000ULL) : ~k;
+        return T(__longlong_as_double(b));
+    }
+    unsigned int kk = (unsigned int)k;
+    unsigned int b  = (kk & 0x80000000u) ? (kk ^ 0x80000000u) : ~kk;
+    float f         = __uint_as_float(b);
+    if (std::is_same<T, __half>::value)
+    {
+        return __float2half(f);
+    }
+    return T(f);
+}
+
+// scatter: one thread per input element, atomically selects (value, index) per output slot
 template <typename T>
 __launch_bounds__(128) static __global__
-    void min_max_impl(TensorInfoCuda<T> input, int64_t dim, TensorInfoCuda<int64_t> indices, TensorInfoCuda<T> result,
+    void min_max_impl(TensorInfoCuda<T> input, TensorInfoCuda<T> result, int64_t dim, unsigned long long* keys,
                       bool calc_min)
 {
-    using G = typename CpuComputeFloatType<T>::Type;
-
-
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= input.numel()) return;
 
+    T v               = input[i];
+    auto index_input  = input.LinearIndexToDimIndex(i);
+    int64_t idx       = index_input[dim];
+    auto index_result = index_input;
+    index_result[dim] = 0;
+
+    unsigned long long packed = (min_key<T>(v) << 32) | (unsigned int)idx;
+    if (calc_min)
     {
-        G v               = input[i];
-        auto index_input  = input.LinearIndexToDimIndex(i);
-        auto index_result = index_input;
-        index_result[dim] = 0;
-
-        auto& result_value = result[index_result];
-        auto& result_index = indices[index_result];
-
-
-        if (calc_min)
-        {
-            atomicMinSelect(&result_value, v);
-        }
-        else
-        {
-            atomicMaxSelect(&result_value, v);
-        }
+        atomicMin(keys + result.IndexToOffset(index_result), packed);
+    }
+    else
+    {
+        atomicMax(keys + result.IndexToOffset(index_result), packed);
     }
 }
+
+// gather: one thread per output slot, unpacks (key, index) into result/indices
+template <typename T>
+__launch_bounds__(128) static __global__
+    void min_max_unpack_impl(TensorInfoCuda<T> result, TensorInfoCuda<int64_t> indices, const unsigned long long* keys)
+{
+    int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
+    if (i >= result.numel()) return;
+
+    unsigned long long packed = keys[i];
+    result[i]                 = unkey<T>(packed >> 32);
+    indices[i]                = (int64_t)(packed & 0xFFFFFFFFULL);
+}
+
+template <typename TT>
+static void min_max_run(Tensor input, int64_t dim, Tensor result, Tensor indices, unsigned long long* keys_ptr,
+                        int64_t numel, int64_t out_numel, bool calc_min)
+{
+    min_max_impl<TT><<<iDivUp(numel, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
+        TensorInfoCuda<TT>(input), TensorInfoCuda<TT>(result), dim, keys_ptr, calc_min);
+    min_max_unpack_impl<TT><<<iDivUp(out_numel, 128), 128, 0, cuda::getCurrentCUDAStream()>>>(
+        TensorInfoCuda<TT>(result), TensorInfoCuda<int64_t>(indices), keys_ptr);
+}
+
+static void min_max_dispatch(Tensor input, int64_t dim, Tensor result, Tensor indices, bool calc_min)
+{
+    int64_t out_numel = result.numel();
+    int64_t numel     = input.numel();
+
+    // scratch buffer holding packed (monotone key << 32 | index)
+    Tensor keys = empty(result.sizes(), TensorOptions().dtype(kLong).device(input.device()));
+    unsigned long long* keys_ptr = reinterpret_cast<unsigned long long*>(keys.data_ptr<int64_t>());
+    TT_CHECK_CUDA_ERROR(cudaMemsetAsync(keys_ptr, calc_min ? 0xFF : 0x00, sizeof(unsigned long long) * (size_t)out_numel,
+                                        cuda::getCurrentCUDAStream()));
+
+    switch (input.scalar_type())
+    {
+        case kHalf:
+            min_max_run<__half>(input, dim, result, indices, keys_ptr, numel, out_numel, calc_min);
+            break;
+        case kFloat:
+            min_max_run<float>(input, dim, result, indices, keys_ptr, numel, out_numel, calc_min);
+            break;
+        case kDouble:
+            min_max_run<double>(input, dim, result, indices, keys_ptr, numel, out_numel, calc_min);
+            break;
+        default:
+            CHECK(false) << "invalid input type " << (int)input.scalar_type();
+    }
+}
+
 void min_impl(Tensor input, int64_t dim, Tensor result, Tensor& indices)
 {
-    CUDA_SWITCH_MACRO_FLOAT(input.device(), input.scalar_type(), input.numel(), min_max_impl, input, dim, indices, result, true);
-    indices = Tensor();
+    cuda::DeviceGuard guard(input.device());
+    if (input.numel() > 0 && result.numel() > 0)
+    {
+        min_max_dispatch(input, dim, result, indices, true);
+    }
 }
 
 void max_impl(Tensor input, int64_t dim, Tensor result, Tensor& indices)
 {
-    CUDA_SWITCH_MACRO_FLOAT(input.device(), input.scalar_type(), input.numel(), min_max_impl, input, dim, indices, result, false);
-    indices = Tensor();
+    cuda::DeviceGuard guard(input.device());
+    if (input.numel() > 0 && result.numel() > 0)
+    {
+        min_max_dispatch(input, dim, result, indices, false);
+    }
 }
 }  // namespace cuda_impl
 }  // namespace tinytorch

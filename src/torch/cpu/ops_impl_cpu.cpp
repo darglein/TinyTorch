@@ -999,7 +999,7 @@ void clamp_impl_(Tensor& a, double low, double high)
 }
 
 template <typename T>
-static void padding_2d_impl(TensorInfoCuda<T, 4> src, TensorInfoCuda<T, 4> dst, int pad_left, int pad_right,
+static void padding_2d_impl(TensorInfo<T, 4> src, TensorInfo<T, 4> dst, int pad_left, int pad_right,
                             int pad_top, int pad_bottom, PaddingMode mode)
 {
 #pragma omp parallel for num_threads(get_num_threads())
@@ -1060,7 +1060,7 @@ void padding_2d_impl(Tensor src, Tensor result, int pad_left, int pad_right, int
 }
 
 template <typename T>
-static void padding_3d_impl(TensorInfoCuda<T, 5> src, TensorInfoCuda<T, 5> dst, int pad_left, int pad_right,
+static void padding_3d_impl(TensorInfo<T, 5> src, TensorInfo<T, 5> dst, int pad_left, int pad_right,
                             int pad_top, int pad_bottom, int pad_front, int pad_back, PaddingMode mode)
 {
 #pragma omp parallel for num_threads(get_num_threads())

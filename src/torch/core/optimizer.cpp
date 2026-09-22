@@ -166,8 +166,9 @@ void SGDOptimizer::Step()
     }
     step++;
 }
-SGDOptimizer::SGDOptimizer(const std::vector<Tensor>& t, float lr) : lr(lr), params(t)
+SGDOptimizer::SGDOptimizer(const std::vector<Tensor>& t, float lr) : lr(lr)
 {
+    params = t;  // OptimizerBase::params
     velocities.resize(t.size());
     for (int i = 0; i < t.size(); ++i)
     {

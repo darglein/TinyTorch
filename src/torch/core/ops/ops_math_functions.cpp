@@ -21,18 +21,17 @@ struct AbsSumNode : public FunctionNode<AbsSumNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
         Tensor result = zeros({1}, a.options());
+        ctx->save_for_backward({a});
         SELECT_DEVICE(a.device(), abs_sum_impl, a, result);
         return {result};
     }
 
+    // d/dx sum(|x|) = sign(x) * grad
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        CHECK(false);
         CHECK_EQ(grad.size(), 1);
-        CHECK_EQ(grad[0].numel(), 1);
-        auto g        = grad[0];
-        Tensor grad_a = empty(ctx->next_meta[0].size, g.options());
-        SELECT_DEVICE(grad_a.device(), fill_impl, grad_a, g);
+        auto a       = ctx->get_saved_variables()[0];
+        Tensor grad_a = sign(a) * grad[0];
         return {grad_a};
     }
 };
@@ -41,14 +40,18 @@ struct ProdSumNode : public FunctionNode<ProdSumNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor a)
     {
         Tensor result = zeros({1}, a.options());
+        ctx->save_for_backward({a});
         SELECT_DEVICE(a.device(), prod_sum_impl, a, result);
         return {result};
     }
 
+    // prod_sum(a) = sum(x^2)  ->  d/dx = 2*x*grad
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
-        CHECK(false);
-        return {};
+        CHECK_EQ(grad.size(), 1);
+        auto a       = ctx->get_saved_variables()[0];
+        Tensor grad_a = (a * 2.0) * grad[0];
+        return {grad_a};
     }
 };
 struct SumNode : public FunctionNode<SumNode>
@@ -401,10 +404,10 @@ Tensor mean(Tensor a, SizeType s, bool keepdim)
 }
 Tensor median(Tensor a, double percentile )
 {
-    CHECK_EQ(a.device(), kCPU);
-    auto result = ones({1}, a.options());
-    cpu_impl::median_impl(a, result, percentile);
-    return result;
+    auto initial_device = a.device();
+    auto result         = ones({1}, TensorOptions().dtype(a.scalar_type()).device(kCPU));
+    cpu_impl::median_impl(a.cpu(), result, percentile);
+    return result.to(initial_device);
 }
 
 Tensor std(Tensor a)
@@ -433,8 +436,11 @@ Tensor std(Tensor a)
 
 Tensor std(Tensor a, int64_t dim)
 {
-    CHECK(false);
-    return Tensor();
+    // population std along dim, computed from differentiable ops so it works on any device
+    auto mean = a.mean(dim, true);
+    auto d    = a - mean;
+    auto var  = d.square().mean(dim, true);
+    return var.sqrt().squeeze(dim);
 }
 
 Tensor clamp(Tensor a, double low, double high)
@@ -461,8 +467,7 @@ Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
 
 void add_poisson_noise_(Tensor a)
 {
-    CHECK_EQ(a.device(), kCPU);
-    cpu_impl::add_poisson_noise_impl(a);
+    SELECT_DEVICE(a.device(), add_poisson_noise_impl, a);
 }
 
 Tensor prod(Tensor a, int64_t dim, bool keepdim)

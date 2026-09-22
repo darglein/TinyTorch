@@ -85,6 +85,19 @@ static __global__ void grid_sample_2d_impl_kernel(TensorInfoCuda<T, 4> input, Te
 
     auto [ix, iy] = UVToPixel(u, v, IW, IH, align_corners);
 
+    if (interpolation == InterpolationType::kNearest)
+    {
+        int ix_n = (int)round(ix);
+        int iy_n = (int)round(iy);
+        CLIP_COORDINATES(ix_n, ix_n, IW);
+        CLIP_COORDINATES(iy_n, iy_n, IH);
+        for (int c = 0; c < input.sizes[1]; ++c)
+        {
+            result(b, c, sample_i, sample_j) = T(input(b, c, iy_n, ix_n));
+        }
+        return;
+    }
+
     int ix_tnw = floor((ix));
     int iy_tnw = floor((iy));
 
@@ -307,6 +320,23 @@ static __global__ void grid_sample_2d_backward_impl_kernel(TensorInfoCuda<T, 4> 
     int IW = input.sizes[3];
 
     auto [ix, iy] = UVToPixel(u, v, IW, IH, align_corners);
+
+    if (interpolation == InterpolationType::kNearest)
+    {
+        int ix_n = (int)round(ix);
+        int iy_n = (int)round(iy);
+        CLIP_COORDINATES(ix_n, ix_n, IW);
+        CLIP_COORDINATES(iy_n, iy_n, IH);
+        for (int c = 0; c < C; ++c)
+        {
+            float g = grad_result(b, c, sample_i, sample_j);
+            atomicAdd(&grad_input(b, c, iy_n, ix_n), g);
+        }
+        // nearest sampling is independent of the grid coordinates -> no grid gradient
+        grad_grid(b, sample_i, sample_j, 0) = 0;
+        grad_grid(b, sample_i, sample_j, 1) = 0;
+        return;
+    }
 
     int ix_tnw = floor((ix));
     int iy_tnw = floor((iy));

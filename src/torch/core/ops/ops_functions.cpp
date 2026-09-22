@@ -741,7 +741,6 @@ std::pair<Tensor, Tensor> sort(Tensor t, int64_t dim)
 Tensor conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding, int dilation, int groups)
 {
     CHECK(!input.requires_grad() || !GradMode::is_enabled());
-    CHECK(input.is_cpu());
     CHECK(!bias.defined());
     CHECK_EQ(input.dim(), 4);
     CHECK_EQ(weight.dim(), 4);
@@ -762,7 +761,7 @@ Tensor conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding,
 
     auto result = zeros({out_batch, out_channels, out_height, out_width}, input.options());
 
-    cpu_impl::conv2d(input, weight, bias, stride, padding, dilation, groups, result);
+    SELECT_DEVICE(input.device(), conv2d, input, weight, bias, stride, padding, dilation, groups, result);
 
     return result;
 }
