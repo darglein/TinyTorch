@@ -294,8 +294,11 @@ struct TINYTORCH_API Tensor
     bool is_leaf() const;
     inline bool is_cuda() const { return device().type() == kCUDA; } // Compare only type here, not device_index.
     bool is_cpu() const { return device() == kCPU; }
+    bool is_32bit_addressable() const;
 
     Tensor contiguous() const;
+
+
 
    private:
     std::shared_ptr<TensorImpl> impl_;

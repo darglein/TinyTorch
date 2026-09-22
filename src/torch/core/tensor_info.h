@@ -20,6 +20,7 @@
 #include "tensor_data.h"
 #include "torch/tiny_torch_config.h"
 #include "torch/tiny_torch_cuda.h"
+#include <limits>
 #include <type_traits>
 
 #if defined(__CUDACC__)
@@ -232,14 +233,11 @@ struct TensorInfoBase
         }
         data  = t.template data_ptr<T>();
         dims_ = (int)t.dim();
-        CHECK_LE(t.dim(), MAX_TENSORINFO_DIMS);
+        CHECK_LE(t.dim(), max_dims);
         for (int i = 0; i < max_dims; ++i)
         {
             if (i < t.dim())
             {
-                // check for overflow, if 32bit indexing is used
-                CHECK_LE(t.size(i), std::numeric_limits<IndexType>::max());
-                CHECK_LE(t.stride(i), std::numeric_limits<IndexType>::max());
                 sizes[i]   = (IndexType)t.size(i);
                 strides[i] = (IndexType)t.stride(i);
             }
@@ -250,6 +248,15 @@ struct TensorInfoBase
             }
         }
         contiguous = t.is_contiguous();
+
+        if (!std::is_same_v<_IndexType,int64_t>)
+        {
+            // make sure that neither element offsets nor the element count can overflow the
+            // (32 bit) index type; both checks are performed with 64 bit arithmetic
+            CHECK(t.is_32bit_addressable());
+            CHECK_LE(t.numel(), std::numeric_limits<_IndexType>::max());
+        }
+
         if (TIS_CUDA)
         {
             CHECK(t.is_cuda());

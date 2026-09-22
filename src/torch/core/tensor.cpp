@@ -466,6 +466,18 @@ bool Tensor::is_contiguous() const
     }
     return true;
 }
+bool Tensor::is_32bit_addressable() const
+{
+    // the maximum element offset has to fit in a 32 bit index type. It is computed in 64 bit
+    // to avoid overflowing the check itself.
+    int64_t max_voxel_index = 0;
+    for (int64_t i = 0; i < dim(); ++i)
+    {
+        max_voxel_index += stride(i) * (size(i) - 1);
+    }
+    return max_voxel_index <= std::numeric_limits<int>::max();
+}
+
 Tensor Tensor::contiguous() const
 {
     if (is_contiguous())
