@@ -122,10 +122,18 @@ inline Tensor make_tensor(const std::vector<int64_t>& data, const SizeType& size
 // Brace lists ({1, 2, ...}) are ambiguous between the vector overloads above;
 // this initializer_list overload wins for them and always builds a float tensor.
 // Use an explicit std::vector<int64_t> for integer data.
-inline Tensor make_tensor(std::initializer_list<float> data, const SizeType& sizes, Device device,
+// The list takes doubles (not floats) so that expressions like std::log(2.0) are
+// accepted without a narrowing conversion (a hard error under Clang).
+inline Tensor make_tensor(std::initializer_list<double> data, const SizeType& sizes, Device device,
                           ScalarType dtype = kFloat)
 {
-    return make_tensor(std::vector<float>(data), sizes, device, dtype);
+    std::vector<float> v;
+    v.reserve(data.size());
+    for (double x : data)
+    {
+        v.push_back(static_cast<float>(x));
+    }
+    return make_tensor(v, sizes, device, dtype);
 }
 
 // -------------------------------------------------------------- comparison

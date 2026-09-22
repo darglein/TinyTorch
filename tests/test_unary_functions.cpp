@@ -181,8 +181,8 @@ TEST_P(UnarySigmoid, ValuesAndGradient)
     Tensor a = tttest::leaf({-1, 0, 1, 2}, {2, 2}, device());
 
     Tensor r = tinytorch::sigmoid(a);
-    std::vector<float> expected = {1.0f / (1.0f + std::exp(1.0)), 0.5f, 1.0f - 1.0f / (1.0f + std::exp(1.0)),
-                                   1.0f - 1.0f / (1.0f + std::exp(2.0))};
+    std::vector<float> expected = {1.0f / (1.0f + std::exp(1.0f)), 0.5f, 1.0f - 1.0f / (1.0f + std::exp(1.0f)),
+                                   1.0f - 1.0f / (1.0f + std::exp(2.0f))};
     TT_EXPECT_CLOSE(r, tttest::make_tensor(expected, {2, 2}, device()), 1e-5, 1e-6);
 
     // d(sigma(x))/dx = sigma(x) * (1 - sigma(x))
@@ -197,8 +197,8 @@ TEST_P(UnarySoftplus, ValuesAndGradient)
     const double beta = 1.0;
 
     Tensor r = tinytorch::softplus(a, beta);
-    std::vector<float> expected = {std::log1p(std::exp(-1.0)), std::log(2.0), std::log1p(std::exp(1.0)),
-                                   std::log1p(std::exp(2.0))};
+    std::vector<float> expected = {std::log1p(std::exp(-1.0f)), std::log(2.0f), std::log1p(std::exp(1.0f)),
+                                   std::log1p(std::exp(2.0f))};
     TT_EXPECT_CLOSE(r, tttest::make_tensor(expected, {2, 2}, device()), 1e-5, 1e-6);
 
     // d(log(1+e^x))/dx = 1 / (1 + e^-x) = sigmoid(x)
