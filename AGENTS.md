@@ -74,7 +74,8 @@ samples/
   CMakeLists.txt            Builds tt_sample
   main.cpp                  Runs an Adam optimization loop on CPU (and CUDA if TT_HAS_CUDA)
 tests/
-  CMakeLists.txt            Builds tt_tests (links torch + gtest_main), registers it with CTest
+  CMakeLists.txt            Builds test_tiny_torch_all (links torch + gtest_main), registers
+                            the individual gtest cases with CTest via gtest_discover_tests
   test_utils.h              Shared machinery: DeviceTest fixture (CPU + CUDA when TT_HAS_CUDA),
                             make_tensor/leaf helpers, tensor_near/TT_EXPECT_CLOSE, check_grads
                             (central finite-difference gradient checker), TT_INSTANTIATE_DEVICE_TESTS
@@ -255,12 +256,13 @@ Expected output: 50 Adam optimization steps with decreasing loss
 ### Run the tests
 
 ```shell
-cd build && ctest --output-on-failure   # or: ./build/bin/tt_tests to run the binary directly
+cd build && ctest --output-on-failure   # or: ./build/bin/test_tiny_torch_all to run the binary directly
 ```
 
-The whole googletest suite runs as a single ctest entry named `tt_tests`; use
-`./build/bin/tt_tests --gtest_filter='...'` to run a subset (e.g.
-`--gtest_filter='AllDevices/SliceOps*'` or `--gtest_filter='*-CPU'`).
+Every gtest case is registered as its own ctest entry (suite names carry a `TinyTorch`
+prefix, e.g. `TinyTorchSliceOps`); use `./build/bin/test_tiny_torch_all --gtest_filter='...'`
+to run a subset (e.g. `--gtest_filter='AllDevices/TinyTorchSliceOps*'` or
+`--gtest_filter='*-CPU'`).
 
 ### Build options (CMake)
 
@@ -268,7 +270,7 @@ The whole googletest suite runs as a single ctest entry named `tt_tests`; use
 |----------------------|---------|---------------------------------------------------------------|
 | `TT_WITH_CUDA`       | ON      | Try `find_package(CUDAToolkit 11.8)`; auto-disables if absent |
 | `TT_BUILD_SAMPLES`   | ON      | Build `tt_sample`                                              |
-| `TT_BUILD_TESTS`     | ON      | Build `tt_tests` (needs the googletest submodule) + ctest      |
+| `TT_BUILD_TESTS`     | ON      | Build `test_tiny_torch_all` (needs the googletest submodule) + ctest |
 | `TT_ALL_OUTPUT_TO_BIN` | OFF   | Put the library into `build/bin` as well                     |
 
 CPU-only build: `-DTT_WITH_CUDA=OFF` (or simply don't have CUDA installed).
@@ -284,7 +286,7 @@ entries are JIT-compiled by the driver) — do not change it.
 - `build/src/libtorch.so` — the library (target name `torch`)
 - `build/src/include/torch/tiny_torch_build_config.h` — generated config (`TT_HAS_CUDA`)
 - `build/bin/tt_sample` — sample executable
-- `build/bin/tt_tests` — unit-test executable (registered with CTest as one `ctest` case)
+- `build/bin/test_tiny_torch_all` — unit-test executable (each gtest case registered as its own `ctest` entry)
 
 ### Linking your own code
 

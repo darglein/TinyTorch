@@ -13,7 +13,7 @@ namespace
 
 // The graph is one-shot: forward must be re-run every iteration, gradients
 // accumulate on the leaf unless zeroed.
-TEST(Autograd, GradientAccumulation)
+TEST(TinyTorchAutograd, GradientAccumulation)
 {
     Tensor a = tttest::leaf({2.0f}, {1}, kCPU);
 
@@ -27,7 +27,7 @@ TEST(Autograd, GradientAccumulation)
 }
 
 // An explicit upstream gradient is propagated: backward(loss, grad)
-TEST(Autograd, CustomUpstreamGradient)
+TEST(TinyTorchAutograd, CustomUpstreamGradient)
 {
     Tensor a = tttest::leaf({2.0f}, {1}, kCPU);
 
@@ -43,7 +43,7 @@ TEST(Autograd, CustomUpstreamGradient)
 
 // ------------------------------------------------------------------ grad mode
 
-TEST(Autograd, GradModeDefaults)
+TEST(TinyTorchAutograd, GradModeDefaults)
 {
     // grad mode is on by default
     EXPECT_TRUE(tinytorch::GradMode::is_enabled());
@@ -53,7 +53,7 @@ TEST(Autograd, GradModeDefaults)
     EXPECT_TRUE(b.requires_grad());
 }
 
-TEST(Autograd, NoGradGuardDisablesTracking)
+TEST(TinyTorchAutograd, NoGradGuardDisablesTracking)
 {
     {
         tinytorch::NoGradGuard ngg;
@@ -70,7 +70,7 @@ TEST(Autograd, NoGradGuardDisablesTracking)
     EXPECT_TRUE(tinytorch::GradMode::is_enabled());
 }
 
-TEST(Autograd, AutoGradModeRestoresPreviousState)
+TEST(TinyTorchAutograd, AutoGradModeRestoresPreviousState)
 {
     {
         tinytorch::AutoGradMode on(true);
@@ -84,7 +84,7 @@ TEST(Autograd, AutoGradModeRestoresPreviousState)
 
 // ------------------------------------------------------------------ leaf properties
 
-TEST(Autograd, LeafProperties)
+TEST(TinyTorchAutograd, LeafProperties)
 {
     Tensor t = tttest::leaf({1, 2}, {2}, kCPU);
 
@@ -96,7 +96,7 @@ TEST(Autograd, LeafProperties)
     TT_EXPECT_CLOSE(t.grad(), tinytorch::zeros({2}, TensorOptions().device(kCPU)), 0, 0);
 }
 
-TEST(Autograd, BackwardRequiresEdge)
+TEST(TinyTorchAutograd, BackwardRequiresEdge)
 {
     // A tensor that never required grad has no edge; using it as a loss must fail the
     // CHECK in backward(). We only verify the preconditions here (the CHECK itself
@@ -113,7 +113,7 @@ TEST(Autograd, BackwardRequiresEdge)
 
 // ------------------------------------------------------------------ retain_grad flag
 
-TEST(Autograd, BackwardWithExplicitGradOnVectorLoss)
+TEST(TinyTorchAutograd, BackwardWithExplicitGradOnVectorLoss)
 {
     // backward(loss, grad) with a non-scalar loss requires matching shapes
     Tensor a = tttest::leaf({1, 2}, {2}, kCPU);

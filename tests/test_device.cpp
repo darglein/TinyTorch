@@ -19,7 +19,7 @@ Tensor base_tensor(Device d)
 
 // ------------------------------------------------------------------ device transfer
 
-TEST(Device, ToDeviceRoundTrip)
+TEST(TinyTorchDevice, ToDeviceRoundTrip)
 {
     if (!tttest::has_cuda())
     {
@@ -37,7 +37,7 @@ TEST(Device, ToDeviceRoundTrip)
     TT_EXPECT_CLOSE(back, a, 0, 0);
 }
 
-TEST(Device, CudaCpuMethods)
+TEST(TinyTorchDevice, CudaCpuMethods)
 {
     if (!tttest::has_cuda())
     {
@@ -54,7 +54,7 @@ TEST(Device, CudaCpuMethods)
     TT_EXPECT_CLOSE(b, a, 0, 0);
 }
 
-TEST(Device, ToInPlace)
+TEST(TinyTorchDevice, ToInPlace)
 {
     if (!tttest::has_cuda())
     {
@@ -69,7 +69,7 @@ TEST(Device, ToInPlace)
     EXPECT_EQ(a.device(), kCPU);
 }
 
-TEST(Device, CopyCrossDevice)
+TEST(TinyTorchDevice, CopyCrossDevice)
 {
     if (!tttest::has_cuda())
     {
@@ -86,7 +86,7 @@ TEST(Device, CopyCrossDevice)
     TT_EXPECT_CLOSE(a, base_tensor(kCPU), 0, 0);
 }
 
-TEST(Device, DtypeConversionCrossDevice)
+TEST(TinyTorchDevice, DtypeConversionCrossDevice)
 {
     if (!tttest::has_cuda())
     {
@@ -103,7 +103,7 @@ TEST(Device, DtypeConversionCrossDevice)
 
 // ------------------------------------------------------------------ autograd across devices
 
-TEST(Device, AutogradOnCuda)
+TEST(TinyTorchDevice, AutogradOnCuda)
 {
     if (!tttest::has_cuda())
     {
@@ -120,7 +120,7 @@ TEST(Device, AutogradOnCuda)
     TT_EXPECT_CLOSE(b.grad(), a, 0, 0);
 }
 
-TEST(Device, AutogradWithDeviceMove)
+TEST(TinyTorchDevice, AutogradWithDeviceMove)
 {
     if (!tttest::has_cuda())
     {
@@ -140,7 +140,7 @@ TEST(Device, AutogradWithDeviceMove)
 // ------------------------------------------------------------------ CPU/CUDA agreement
 
 // Runs the same computation on both devices and compares the results.
-class DeviceAgreement : public ::testing::Test
+class TinyTorchDeviceAgreement : public ::testing::Test
 {
   protected:
     void SetUp() override
@@ -157,7 +157,7 @@ class DeviceAgreement : public ::testing::Test
     }
 };
 
-TEST_F(DeviceAgreement, ElementwiseOpsMatch)
+TEST_F(TinyTorchDeviceAgreement, ElementwiseOpsMatch)
 {
     Tensor a_cpu = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, kCPU);
     Tensor b_cpu = tttest::make_tensor({5, 6, 7, 8}, {2, 2}, kCPU);
@@ -184,7 +184,7 @@ TEST_F(DeviceAgreement, ElementwiseOpsMatch)
 // ------------------------------------------------------------------ MultiDeviceTensor (CUDA only)
 
 #ifdef TT_HAS_CUDA
-TEST(MultiDevice, SingleDeviceBasics)
+TEST(TinyTorchMultiDevice, SingleDeviceBasics)
 {
     if (!tttest::has_cuda())
     {

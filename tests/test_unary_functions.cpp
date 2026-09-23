@@ -14,7 +14,7 @@ namespace
 // Folds in the cases from the former tests/test_backward.cpp.
 
 // d(sqrt(a))/da = 1 / (2 * sqrt(a));  a = 4  ->  0.25
-TEST(Backward, Sqrt)
+TEST(TinyTorchBackward, Sqrt)
 {
     Tensor a = tttest::leaf({4.0f}, {1}, kCPU);
 
@@ -24,7 +24,7 @@ TEST(Backward, Sqrt)
 }
 
 // d(exp(a))/da = exp(a)
-TEST(Backward, Exp)
+TEST(TinyTorchBackward, Exp)
 {
     Tensor a = tttest::leaf({1.0f}, {1}, kCPU);
 
@@ -34,7 +34,7 @@ TEST(Backward, Exp)
 }
 
 // d(log(a))/da = 1 / a
-TEST(Backward, Log)
+TEST(TinyTorchBackward, Log)
 {
     Tensor a = tttest::leaf({2.0f}, {1}, kCPU);
 
@@ -44,7 +44,7 @@ TEST(Backward, Log)
 }
 
 // d(relu(a))/da = 1 if a > 0 else 0
-TEST(Backward, Relu)
+TEST(TinyTorchBackward, Relu)
 {
     Tensor a = tttest::leaf({2.0f}, {1}, kCPU);
     Tensor b = tttest::leaf({-2.0f}, {1}, kCPU);
@@ -59,8 +59,8 @@ TEST(Backward, Relu)
 
 // ------------------------------------------------------------------ elementwise
 
-TT_INSTANTIATE_DEVICE_TESTS(UnaryAbs);
-TEST_P(UnaryAbs, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnaryAbs);
+TEST_P(TinyTorchUnaryAbs, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({-2, 1, -3, 4}, {2, 2}, device());
 
@@ -71,8 +71,8 @@ TEST_P(UnaryAbs, ValuesAndGradient)
     TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({-1, 1, -1, 1}, {2, 2}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UnarySqrt);
-TEST_P(UnarySqrt, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnarySqrt);
+TEST_P(TinyTorchUnarySqrt, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({1, 4, 9, 16}, {2, 2}, device());
 
@@ -83,8 +83,8 @@ TEST_P(UnarySqrt, ValuesAndGradient)
     TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({0.5, 0.25, 1.0 / 6, 0.125}, {2, 2}, device()), 1e-4, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UnarySquare);
-TEST_P(UnarySquare, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnarySquare);
+TEST_P(TinyTorchUnarySquare, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({1, -2, 3, -4}, {2, 2}, device());
 
@@ -95,8 +95,8 @@ TEST_P(UnarySquare, ValuesAndGradient)
     TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({2, -4, 6, -8}, {2, 2}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UnaryLog);
-TEST_P(UnaryLog, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnaryLog);
+TEST_P(TinyTorchUnaryLog, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({1, 2, 4, 8}, {2, 2}, device());
 
@@ -108,8 +108,8 @@ TEST_P(UnaryLog, ValuesAndGradient)
     TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({1, 0.5, 0.25, 0.125}, {2, 2}, device()), 1e-4, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UnaryLog1p);
-TEST_P(UnaryLog1p, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnaryLog1p);
+TEST_P(TinyTorchUnaryLog1p, Values)
 {
     Tensor a = tttest::make_tensor({0, 1, 2, 3}, {2, 2}, device());
     TT_EXPECT_CLOSE(tinytorch::log1p(a),
@@ -117,8 +117,8 @@ TEST_P(UnaryLog1p, Values)
                     1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UnaryExp);
-TEST_P(UnaryExp, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnaryExp);
+TEST_P(TinyTorchUnaryExp, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({0, 1, 2, 3}, {2, 2}, device());
 
@@ -131,8 +131,8 @@ TEST_P(UnaryExp, ValuesAndGradient)
     TT_EXPECT_CLOSE(a.grad(), r, 1e-4, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UnarySinCos);
-TEST_P(UnarySinCos, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnarySinCos);
+TEST_P(TinyTorchUnarySinCos, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({0, 1, 2, 3}, {2, 2}, device());
 
@@ -154,8 +154,8 @@ TEST_P(UnarySinCos, ValuesAndGradient)
     TT_EXPECT_CLOSE(a.grad(), -s, 1e-4, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UnarySignRound);
-TEST_P(UnarySignRound, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnarySignRound);
+TEST_P(TinyTorchUnarySignRound, Values)
 {
     Tensor a = tttest::make_tensor({-1.5, 0, 2.7, -0.2}, {2, 2}, device());
 
@@ -163,8 +163,8 @@ TEST_P(UnarySignRound, Values)
     TT_EXPECT_CLOSE(tinytorch::round(a), tttest::make_tensor({-2, 0, 3, 0}, {2, 2}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UnaryRelu);
-TEST_P(UnaryRelu, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnaryRelu);
+TEST_P(TinyTorchUnaryRelu, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({-1, 0.5, 2, -0.5}, {2, 2}, device());
 
@@ -175,8 +175,8 @@ TEST_P(UnaryRelu, ValuesAndGradient)
     TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({0, 1, 1, 0}, {2, 2}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UnarySigmoid);
-TEST_P(UnarySigmoid, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnarySigmoid);
+TEST_P(TinyTorchUnarySigmoid, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({-1, 0, 1, 2}, {2, 2}, device());
 
@@ -190,8 +190,8 @@ TEST_P(UnarySigmoid, ValuesAndGradient)
     TT_EXPECT_CLOSE(a.grad(), r * (1.0 - r), 1e-4, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UnarySoftplus);
-TEST_P(UnarySoftplus, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnarySoftplus);
+TEST_P(TinyTorchUnarySoftplus, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({-1, 0, 1, 2}, {2, 2}, device());
     const double beta = 1.0;
@@ -206,8 +206,8 @@ TEST_P(UnarySoftplus, ValuesAndGradient)
     TT_EXPECT_CLOSE(a.grad(), tinytorch::sigmoid(a), 1e-4, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UnarySoftmax);
-TEST_P(UnarySoftmax, SumsToOneAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnarySoftmax);
+TEST_P(TinyTorchUnarySoftmax, SumsToOneAndGradient)
 {
     Tensor a = tttest::leaf({1, 2, 3, 4}, {2, 2}, device());
 

@@ -10,7 +10,7 @@ using tttest::DeviceTest;
 
 // ----------------------------------------------------------------- empty
 
-TEST(Create, EmptyProperties)
+TEST(TinyTorchCreate, EmptyProperties)
 {
     Tensor t = tinytorch::empty({2, 3});
 
@@ -25,7 +25,7 @@ TEST(Create, EmptyProperties)
     EXPECT_FALSE(t.requires_grad());
 }
 
-TEST(Create, EmptyOptions)
+TEST(TinyTorchCreate, EmptyOptions)
 {
     if (!tttest::has_cuda())
     {
@@ -41,8 +41,8 @@ TEST(Create, EmptyOptions)
     EXPECT_EQ(t.element_size(), 8);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(EmptyLike);
-TEST_P(EmptyLike, SameShapeAndDevice)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchEmptyLike);
+TEST_P(TinyTorchEmptyLike, SameShapeAndDevice)
 {
     Tensor t = tinytorch::zeros({2, 3}, TensorOptions().device(device()));
     Tensor e = tinytorch::empty_like(t);
@@ -54,36 +54,36 @@ TEST_P(EmptyLike, SameShapeAndDevice)
 
 // ----------------------------------------------------------------- zeros/ones/full
 
-TEST(Create, Zeros)
+TEST(TinyTorchCreate, Zeros)
 {
     Tensor t = tinytorch::zeros({2, 3});
     TT_EXPECT_CLOSE(t, tinytorch::zeros({2, 3}), 0.0, 0.0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(ZerosLike);
-TEST_P(ZerosLike, Works)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchZerosLike);
+TEST_P(TinyTorchZerosLike, Works)
 {
     Tensor t = tinytorch::ones({2, 2}, TensorOptions().device(device()));
     TT_EXPECT_CLOSE(tinytorch::zeros_like(t), tinytorch::zeros({2, 2}, TensorOptions().device(device())), 0.0, 0.0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(Ones);
-TEST_P(Ones, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchOnes);
+TEST_P(TinyTorchOnes, Values)
 {
     std::vector<float> expected(6, 1.0f);
     TT_EXPECT_CLOSE(tinytorch::ones({2, 3}, TensorOptions().device(device())),
                     tttest::make_tensor(expected, {2, 3}, device()), 0.0, 0.0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(Full);
-TEST_P(Full, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchFull);
+TEST_P(TinyTorchFull, Values)
 {
     std::vector<float> expected(4, 7.5f);
     TT_EXPECT_CLOSE(tinytorch::full({2, 2}, 7.5f, TensorOptions().device(device())),
                     tttest::make_tensor(expected, {2, 2}, device()), 0.0, 0.0);
 }
 
-TEST(Create, FullLike)
+TEST(TinyTorchCreate, FullLike)
 {
     Tensor t = tinytorch::zeros({2, 2});
     std::vector<float> expected(4, 3.0f);
@@ -92,8 +92,8 @@ TEST(Create, FullLike)
 
 // ----------------------------------------------------------------- random
 
-TT_INSTANTIATE_DEVICE_TESTS(Rand);
-TEST_P(Rand, UniformRangeAndDevice)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchRand);
+TEST_P(TinyTorchRand, UniformRangeAndDevice)
 {
     Tensor t = tinytorch::rand({64}, TensorOptions().device(device()));
 
@@ -108,7 +108,7 @@ TEST_P(Rand, UniformRangeAndDevice)
     }
 }
 
-TEST(Create, ManualSeedDeterministic)
+TEST(TinyTorchCreate, ManualSeedDeterministic)
 {
     tinytorch::manual_seed(42);
     Tensor a = tinytorch::rand({8});
@@ -120,8 +120,8 @@ TEST(Create, ManualSeedDeterministic)
     EXPECT_FALSE(tttest::tensor_near(a, c, 0.0, 0.0));
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(Randint);
-TEST_P(Randint, IntRange)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchRandint);
+TEST_P(TinyTorchRandint, IntRange)
 {
     Tensor t = tinytorch::randint(2, 5, {16}, TensorOptions().device(device()).dtype(kLong));
 
@@ -135,8 +135,8 @@ TEST_P(Randint, IntRange)
     }
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(Randn);
-TEST_P(Randn, ApproximatelyStandardNormal)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchRandn);
+TEST_P(TinyTorchRandn, ApproximatelyStandardNormal)
 {
     // zero-mean check (loose): over 4096 samples the mean is ~ N(0, 1/64)
     Tensor t = tinytorch::randn({4096}, TensorOptions().device(device()));
@@ -144,7 +144,7 @@ TEST_P(Randn, ApproximatelyStandardNormal)
     EXPECT_NEAR(t.std().toDouble(), 1.0, 0.05);
 }
 
-TEST(Create, RandLikeRandnLike)
+TEST(TinyTorchCreate, RandLikeRandnLike)
 {
     Tensor t = tinytorch::zeros({3, 2});
     EXPECT_EQ(tinytorch::rand_like(t).sizes(), (SizeType{3, 2}));
@@ -153,7 +153,7 @@ TEST(Create, RandLikeRandnLike)
 
 // ----------------------------------------------------------------- range
 
-TEST(Create, Range)
+TEST(TinyTorchCreate, Range)
 {
     // end is inclusive
     Tensor t = tinytorch::range(1, 5, 1);
@@ -161,7 +161,7 @@ TEST(Create, Range)
     TT_EXPECT_CLOSE(t, tttest::make_tensor(expected, {5}, kCPU), 0.0, 0.0);
 }
 
-TEST(Create, RangeNegativeStep)
+TEST(TinyTorchCreate, RangeNegativeStep)
 {
     Tensor t = tinytorch::range(3, -1, -2);
     std::vector<float> expected = {3, 1, -1};
@@ -170,7 +170,7 @@ TEST(Create, RangeNegativeStep)
 
 // ----------------------------------------------------------------- from_blob
 
-TEST(Create, FromBlobFloat)
+TEST(TinyTorchCreate, FromBlobFloat)
 {
     std::vector<float> data = {1, 2, 3, 4};
     Tensor t                = tinytorch::from_blob(data.data(), {2, 2});
@@ -180,7 +180,7 @@ TEST(Create, FromBlobFloat)
     TT_EXPECT_CLOSE(t, tttest::make_tensor(data, {2, 2}, kCPU), 0.0, 0.0);
 }
 
-TEST(Create, FromBlobDtype)
+TEST(TinyTorchCreate, FromBlobDtype)
 {
     std::vector<int64_t> data = {7, 8, 9};
     Tensor t                  = tinytorch::from_blob(data.data(), {3}, kLong);
@@ -189,7 +189,7 @@ TEST(Create, FromBlobDtype)
     TT_EXPECT_CLOSE(t, tttest::make_tensor(data, {3}, kCPU), 0.0, 0.0);
 }
 
-TEST(Create, FromBlobCustomStrides)
+TEST(TinyTorchCreate, FromBlobCustomStrides)
 {
     // 2x2 tensor reading a 2x3 buffer with row stride 3 (non-contiguous):
     // t[i][j] = data[i * 3 + j]
@@ -201,7 +201,7 @@ TEST(Create, FromBlobCustomStrides)
     TT_EXPECT_CLOSE(t, tttest::make_tensor(expected, {2, 2}, kCPU), 0.0, 0.0);
 }
 
-TEST(Create, FromBlobDoesNotTakeOwnership)
+TEST(TinyTorchCreate, FromBlobDoesNotTakeOwnership)
 {
     // The tensor must still be valid after this scope: the buffer stays alive in `data`.
     std::vector<float> data = {1, 2, 3, 4, 5, 6};

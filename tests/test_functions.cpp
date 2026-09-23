@@ -15,7 +15,7 @@ namespace
 
 // d(sum(A*B))/dA[p][q] = sum_n B[q][n] (row sums of B),
 // d(sum(A*B))/dB[q][n] = sum_p A[p][q] (column sums of A, repeated over n)
-TEST(Backward, Matmul)
+TEST(TinyTorchBackward, Matmul)
 {
     // The from_blob tensors do not own their storage, keep the buffers alive.
     std::vector<float> av = {1, 2, 3, 4, 5, 6};
@@ -42,8 +42,8 @@ TEST(Backward, Matmul)
 
 // ------------------------------------------------------------------ reshape
 
-TT_INSTANTIATE_DEVICE_TESTS(ReshapeOps);
-TEST_P(ReshapeOps, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchReshapeOps);
+TEST_P(TinyTorchReshapeOps, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({1, 2, 3, 4, 5, 6}, {2, 3}, device());
 
@@ -61,8 +61,8 @@ TEST_P(ReshapeOps, ValuesAndGradient)
 
 // ------------------------------------------------------------------ repeat
 
-TT_INSTANTIATE_DEVICE_TESTS(RepeatOps);
-TEST_P(RepeatOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchRepeatOps);
+TEST_P(TinyTorchRepeatOps, Values)
 {
     // repeat requires one count per dimension
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
@@ -78,8 +78,8 @@ TEST_P(RepeatOps, Values)
 
 // ------------------------------------------------------------------ transpose / permute / flip
 
-TT_INSTANTIATE_DEVICE_TESTS(TransposeOps);
-TEST_P(TransposeOps, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTransposeOps);
+TEST_P(TinyTorchTransposeOps, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({1, 2, 3, 4, 5, 6}, {2, 3}, device());
 
@@ -95,8 +95,8 @@ TEST_P(TransposeOps, ValuesAndGradient)
                         1e-4, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(PermuteOps);
-TEST_P(PermuteOps, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchPermuteOps);
+TEST_P(TinyTorchPermuteOps, ValuesAndGradient)
 {
     // 2x3x4 -> 4x3x2
     std::vector<float> data(24);
@@ -130,8 +130,8 @@ TEST_P(PermuteOps, ValuesAndGradient)
                         });
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(FlipOps);
-TEST_P(FlipOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchFlipOps);
+TEST_P(TinyTorchFlipOps, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
 
@@ -144,8 +144,8 @@ TEST_P(FlipOps, Values)
 
 // ------------------------------------------------------------------ copy / fill / uniform
 
-TT_INSTANTIATE_DEVICE_TESTS(CopyOps);
-TEST_P(CopyOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchCopyOps);
+TEST_P(TinyTorchCopyOps, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
     Tensor b = tinytorch::empty({2, 2}, TensorOptions().device(device()));
@@ -159,8 +159,8 @@ TEST_P(CopyOps, Values)
     TT_EXPECT_CLOSE(c, a, 1e-6, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(FillOps);
-TEST_P(FillOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchFillOps);
+TEST_P(TinyTorchFillOps, Values)
 {
     Tensor a = tinytorch::zeros({2, 3}, TensorOptions().device(device()));
     tinytorch::fill(a, 7.0);
@@ -177,8 +177,8 @@ TEST_P(FillOps, Values)
     TT_EXPECT_CLOSE(c, tttest::make_tensor({5, 5, 5, 6, 6, 6}, {2, 3}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(UniformFillOps);
-TEST_P(UniformFillOps, Ranges)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUniformFillOps);
+TEST_P(TinyTorchUniformFillOps, Ranges)
 {
     Tensor a = tinytorch::empty({256}, TensorOptions().device(device()));
     tinytorch::uniform(a, -2.0, 2.0);
@@ -205,7 +205,7 @@ TEST_P(UniformFillOps, Ranges)
 
 // ------------------------------------------------------------------ sort
 
-TEST(SortOps, ValuesAndIndices)
+TEST(TinyTorchSortOps, ValuesAndIndices)
 {
     Tensor a = tttest::make_tensor({3, 1, 4, 1, 5, 9}, {2, 3}, kCPU);
 
@@ -217,8 +217,8 @@ TEST(SortOps, ValuesAndIndices)
 
 // ------------------------------------------------------------------ clone
 
-TT_INSTANTIATE_DEVICE_TESTS(CloneOps);
-TEST_P(CloneOps, ValuesAndIndependence)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchCloneOps);
+TEST_P(TinyTorchCloneOps, ValuesAndIndependence)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
 
@@ -232,8 +232,8 @@ TEST_P(CloneOps, ValuesAndIndependence)
 
 // ------------------------------------------------------------------ to / dtype
 
-TT_INSTANTIATE_DEVICE_TESTS(ToOps);
-TEST_P(ToOps, DtypeConversion)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchToOps);
+TEST_P(TinyTorchToOps, DtypeConversion)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
 
@@ -246,8 +246,8 @@ TEST_P(ToOps, DtypeConversion)
     TT_EXPECT_CLOSE(f, a, 1e-6, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorToMethod);
-TEST_P(TensorToMethod, InPlaceDtype)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorToMethod);
+TEST_P(TinyTorchTensorToMethod, InPlaceDtype)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {4}, device());
     a.to_(kFloat64);
@@ -257,8 +257,8 @@ TEST_P(TensorToMethod, InPlaceDtype)
 
 // ------------------------------------------------------------------ slice
 
-TT_INSTANTIATE_DEVICE_TESTS(SliceOps);
-TEST_P(SliceOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchSliceOps);
+TEST_P(TinyTorchSliceOps, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {6}, device());
 
@@ -271,16 +271,16 @@ TEST_P(SliceOps, Values)
     TT_EXPECT_CLOSE(tinytorch::slice(m, 1, 0, 2, 1), tttest::make_tensor({1, 2, 4, 5}, {2, 2}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(SliceView);
-TEST_P(SliceView, WritesThroughToOriginal)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchSliceView);
+TEST_P(TinyTorchSliceView, WritesThroughToOriginal)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {4}, device());
     a.slice_view(0, 1, 3).copy_(tttest::make_tensor({9, 9}, {2}, device()));
     TT_EXPECT_CLOSE(a, tttest::make_tensor({1, 9, 9, 4}, {4}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(SliceGradient);
-TEST_P(SliceGradient, ZerosOutsideTheSlice)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchSliceGradient);
+TEST_P(TinyTorchSliceGradient, ZerosOutsideTheSlice)
 {
     Tensor a = tttest::leaf({1, 2, 3, 4}, {4}, device());
 
@@ -291,8 +291,8 @@ TEST_P(SliceGradient, ZerosOutsideTheSlice)
 
 // ------------------------------------------------------------------ stack / cat
 
-TT_INSTANTIATE_DEVICE_TESTS(StackOps);
-TEST_P(StackOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchStackOps);
+TEST_P(TinyTorchStackOps, Values)
 {
     Tensor a = tttest::make_tensor({1, 2}, {2}, device());
     Tensor b = tttest::make_tensor({3, 4}, {2}, device());
@@ -303,8 +303,8 @@ TEST_P(StackOps, Values)
     TT_EXPECT_CLOSE(s, tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(CatOps);
-TEST_P(CatOps, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchCatOps);
+TEST_P(TinyTorchCatOps, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({1, 2}, {2}, device());
     Tensor b = tttest::leaf({3, 4, 5}, {3}, device());
@@ -328,8 +328,8 @@ TEST_P(CatOps, ValuesAndGradient)
 
 // ------------------------------------------------------------------ indexing
 
-TT_INSTANTIATE_DEVICE_TESTS(IndexSelectOps);
-TEST_P(IndexSelectOps, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchIndexSelectOps);
+TEST_P(TinyTorchIndexSelectOps, ValuesAndGradient)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
     Tensor idx = tttest::make_tensor(std::vector<int64_t>{1, 0}, {2}, device());
@@ -348,8 +348,8 @@ TEST_P(IndexSelectOps, ValuesAndGradient)
     TT_EXPECT_CLOSE(al.grad(), tttest::make_tensor({1, 1, 1, 1, 1, 1}, {2, 3}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(IndexAddOps);
-TEST_P(IndexAddOps, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchIndexAddOps);
+TEST_P(TinyTorchIndexAddOps, ValuesAndGradient)
 {
     // out[row] = a[row] + a[index[row]]  (index maps rows onto each other)
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
@@ -365,8 +365,8 @@ TEST_P(IndexAddOps, ValuesAndGradient)
     TT_EXPECT_CLOSE(al.grad(), tttest::make_tensor({2, 2, 2, 2}, {2, 2}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(IndexCopyOps);
-TEST_P(IndexCopyOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchIndexCopyOps);
+TEST_P(TinyTorchIndexCopyOps, Values)
 {
     Tensor target = tinytorch::zeros({2, 2}, TensorOptions().device(device()));
     Tensor source = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
@@ -376,8 +376,8 @@ TEST_P(IndexCopyOps, Values)
     TT_EXPECT_CLOSE(target, tttest::make_tensor({3, 4, 1, 2}, {2, 2}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(GatherOps);
-TEST_P(GatherOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchGatherOps);
+TEST_P(TinyTorchGatherOps, Values)
 {
     // out[i][j] = data[i][index[i][j]]  (dim == 1)
     Tensor data = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
@@ -390,8 +390,8 @@ TEST_P(GatherOps, Values)
 
 // ------------------------------------------------------------------ padding
 
-TT_INSTANTIATE_DEVICE_TESTS(Padding2dZero);
-TEST_P(Padding2dZero, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchPadding2dZero);
+TEST_P(TinyTorchPadding2dZero, Values)
 {
     // padding_2d requires 4D input with batch/channel == 1
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {1, 1, 2, 2}, device());
@@ -402,8 +402,8 @@ TEST_P(Padding2dZero, Values)
                     0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(Padding2dBorder);
-TEST_P(Padding2dBorder, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchPadding2dBorder);
+TEST_P(TinyTorchPadding2dBorder, Values)
 {
     // kBorder replicates the edge values (clamp)
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {1, 1, 2, 2}, device());
@@ -414,8 +414,8 @@ TEST_P(Padding2dBorder, Values)
                     0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(Padding2dReflect);
-TEST_P(Padding2dReflect, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchPadding2dReflect);
+TEST_P(TinyTorchPadding2dReflect, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {1, 1, 2, 2}, device());
 
@@ -427,8 +427,8 @@ TEST_P(Padding2dReflect, Values)
                     0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(Padding3dZero);
-TEST_P(Padding3dZero, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchPadding3dZero);
+TEST_P(TinyTorchPadding3dZero, Values)
 {
     // padding_3d requires 5D input with batch/channel == 1
     std::vector<float> a(2 * 2 * 2);
@@ -452,8 +452,8 @@ TEST_P(Padding3dZero, Values)
 
 // ------------------------------------------------------------------ matmul
 
-TT_INSTANTIATE_DEVICE_TESTS(MatmulOps);
-TEST_P(MatmulOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchMatmulOps);
+TEST_P(TinyTorchMatmulOps, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
     Tensor b = tttest::make_tensor({7, 8, 9, 10, 11, 12}, {3, 2}, device());
@@ -462,8 +462,8 @@ TEST_P(MatmulOps, Values)
     TT_EXPECT_CLOSE(m, tttest::make_tensor({58, 64, 139, 154}, {2, 2}, device()), 1e-5, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(MatmulBatched);
-TEST_P(MatmulBatched, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchMatmulBatched);
+TEST_P(TinyTorchMatmulBatched, ValuesAndGradient)
 {
     // two 2x2 @ 2x2 matrices stacked along dim 0
     Tensor a = tttest::leaf({1, 2, 3, 4, 10, 20, 30, 40}, {2, 2, 2}, device());
@@ -482,7 +482,7 @@ TEST_P(MatmulBatched, ValuesAndGradient)
 
 // ------------------------------------------------------------------ conv2d
 
-TEST(Conv2d, BoxFilter)
+TEST(TinyTorchConv2d, BoxFilter)
 {
     // 4x4 input with distinct values, 3x3 all-ones kernel, padding 1 -> 4x4 output
     std::vector<float> data = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
@@ -502,8 +502,8 @@ TEST(Conv2d, BoxFilter)
 }
 
 // conv2d must produce the same result on CPU and CUDA
-TT_INSTANTIATE_DEVICE_TESTS(Conv2dDevice);
-TEST_P(Conv2dDevice, BoxFilter)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchConv2dDevice);
+TEST_P(TinyTorchConv2dDevice, BoxFilter)
 {
     std::vector<float> data = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
     std::vector<float> w(9, 1.0f);
@@ -523,8 +523,8 @@ TEST_P(Conv2dDevice, BoxFilter)
 
 // ------------------------------------------------------------------ poisson noise
 
-TT_INSTANTIATE_DEVICE_TESTS(PoissonNoise);
-TEST_P(PoissonNoise, RunsAndModifies)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchPoissonNoise);
+TEST_P(TinyTorchPoissonNoise, RunsAndModifies)
 {
     Tensor a = tinytorch::full({16}, 5.0f, TensorOptions().device(device()));
     tinytorch::add_poisson_noise_(a);
@@ -556,8 +556,8 @@ Tensor make_grid(const std::vector<float>& uv, Device d)
 
 }  // namespace
 
-TT_INSTANTIATE_DEVICE_TESTS(GridSample2d);
-TEST_P(GridSample2d, BilinearAlignCorners)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchGridSample2d);
+TEST_P(TinyTorchGridSample2d, BilinearAlignCorners)
 {
     Tensor input = tttest::make_tensor({1, 2, 3, 4}, {1, 1, 2, 2}, device());
     // corners: (-1,-1) -> px(0,0) -> 1,  (1,-1) -> px(0,1) -> 2,  (-1,1) -> px(1,0) -> 3,  (1,1) -> px(1,1) -> 4
@@ -571,7 +571,7 @@ TEST_P(GridSample2d, BilinearAlignCorners)
     TT_EXPECT_CLOSE(out, tttest::make_tensor({1, 2, 3, 4}, {1, 1, 1, 4}, device()), 1e-5, 1e-6);
 }
 
-TEST_P(GridSample2d, BilinearCenter)
+TEST_P(TinyTorchGridSample2d, BilinearCenter)
 {
     Tensor input = tttest::make_tensor({1, 2, 3, 4}, {1, 1, 2, 2}, device());
     // center: (0,0) -> px(0.5,0.5) -> (1+2+3+4)/4 = 2.5
@@ -583,7 +583,7 @@ TEST_P(GridSample2d, BilinearCenter)
     TT_EXPECT_CLOSE(out, tttest::make_tensor({2.5f}, {1, 1, 1, 1}, device()), 1e-5, 1e-6);
 }
 
-TEST_P(GridSample2d, Nearest)
+TEST_P(TinyTorchGridSample2d, Nearest)
 {
     Tensor input = tttest::make_tensor({1, 2, 3, 4}, {1, 1, 2, 2}, device());
     // (0.5,0.5) -> px(0.5,0.5); nearest rounds to (1,1) -> 4 (bilinear would give 2.5)
@@ -595,7 +595,7 @@ TEST_P(GridSample2d, Nearest)
     TT_EXPECT_CLOSE(out, tttest::make_tensor({4.0f}, {1, 1, 1, 1}, device()), 0, 0);
 }
 
-TEST_P(GridSample2d, Gradient)
+TEST_P(TinyTorchGridSample2d, Gradient)
 {
     Tensor input = tttest::leaf({1, 2, 3, 4}, {1, 1, 2, 2}, device());
 
@@ -620,8 +620,8 @@ TEST_P(GridSample2d, Gradient)
                         });
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(GridSample3d);
-TEST_P(GridSample3d, BilinearAndNearest)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchGridSample3d);
+TEST_P(TinyTorchGridSample3d, BilinearAndNearest)
 {
     // input (1,1,2,2,2) with values 1..8; grid layout (N,D,H,W,3)
     std::vector<float> data(8);

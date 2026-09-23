@@ -14,7 +14,7 @@ namespace
 // Folds in the cases from the former tests/test_backward.cpp.
 
 // d(a+b)/da = 1, d(a+b)/db = 1
-TEST(Backward, Add)
+TEST(TinyTorchBackward, Add)
 {
     Tensor a = tttest::leaf({3.0f}, {1}, kCPU);
     Tensor b = tttest::leaf({2.0f}, {1}, kCPU);
@@ -27,7 +27,7 @@ TEST(Backward, Add)
 }
 
 // d(a-b)/da = 1, d(a-b)/db = -1
-TEST(Backward, Sub)
+TEST(TinyTorchBackward, Sub)
 {
     Tensor a = tttest::leaf({3.0f}, {1}, kCPU);
     Tensor b = tttest::leaf({2.0f}, {1}, kCPU);
@@ -39,7 +39,7 @@ TEST(Backward, Sub)
 }
 
 // d(a*b)/da = b, d(a*b)/db = a
-TEST(Backward, Mult)
+TEST(TinyTorchBackward, Mult)
 {
     Tensor a = tttest::leaf({3.0f}, {1}, kCPU);
     Tensor b = tttest::leaf({4.0f}, {1}, kCPU);
@@ -51,7 +51,7 @@ TEST(Backward, Mult)
 }
 
 // d(a/b)/da = 1/b, d(a/b)/db = -a/b^2
-TEST(Backward, Div)
+TEST(TinyTorchBackward, Div)
 {
     Tensor a = tttest::leaf({6.0f}, {1}, kCPU);
     Tensor b = tttest::leaf({3.0f}, {1}, kCPU);
@@ -66,8 +66,8 @@ TEST(Backward, Div)
 
 // ------------------------------------------------------------------ binary ops
 
-TT_INSTANTIATE_DEVICE_TESTS(BinaryOpAdd);
-TEST_P(BinaryOpAdd, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchBinaryOpAdd);
+TEST_P(TinyTorchBinaryOpAdd, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({1, 2, 3, 4}, {2, 2}, device());
     Tensor b = tttest::leaf({10, 20, 30, 40}, {2, 2}, device());
@@ -80,8 +80,8 @@ TEST_P(BinaryOpAdd, ValuesAndGradient)
     TT_EXPECT_CLOSE(b.grad(), tinytorch::ones({2, 2}, TensorOptions().device(device())), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(BinaryOpSub);
-TEST_P(BinaryOpSub, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchBinaryOpSub);
+TEST_P(TinyTorchBinaryOpSub, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({10, 20, 30, 40}, {2, 2}, device());
     Tensor b = tttest::leaf({1, 2, 3, 4}, {2, 2}, device());
@@ -94,8 +94,8 @@ TEST_P(BinaryOpSub, ValuesAndGradient)
     TT_EXPECT_CLOSE(b.grad(), -tinytorch::ones({2, 2}, TensorOptions().device(device())), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(BinaryOpMult);
-TEST_P(BinaryOpMult, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchBinaryOpMult);
+TEST_P(TinyTorchBinaryOpMult, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({1, 2, 3, 4}, {2, 2}, device());
     Tensor b = tttest::leaf({10, 20, 30, 40}, {2, 2}, device());
@@ -108,8 +108,8 @@ TEST_P(BinaryOpMult, ValuesAndGradient)
     TT_EXPECT_CLOSE(b.grad(), a, 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(BinaryOpDiv);
-TEST_P(BinaryOpDiv, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchBinaryOpDiv);
+TEST_P(TinyTorchBinaryOpDiv, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({10, 20, 30, 40}, {2, 2}, device());
     Tensor b = tttest::leaf({1, 2, 3, 4}, {2, 2}, device());
@@ -125,8 +125,8 @@ TEST_P(BinaryOpDiv, ValuesAndGradient)
 
 // ------------------------------------------------------------------ scalar ops
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorScalarOps);
-TEST_P(TensorScalarOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorScalarOps);
+TEST_P(TinyTorchTensorScalarOps, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
 
@@ -141,8 +141,8 @@ TEST_P(TensorScalarOps, Values)
     TT_EXPECT_CLOSE(-a, tttest::make_tensor({-1, -2, -3, -4}, {2, 2}, device()), 1e-6, 1e-5);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorScalarGradient);
-TEST_P(TensorScalarGradient, MultAndDiv)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorScalarGradient);
+TEST_P(TinyTorchTensorScalarGradient, MultAndDiv)
 {
     // d(a * c)/da = c
     Tensor a = tttest::leaf({1, 2}, {2}, device());
@@ -157,8 +157,8 @@ TEST_P(TensorScalarGradient, MultAndDiv)
 
 // ------------------------------------------------------------------ comparisons
 
-TT_INSTANTIATE_DEVICE_TESTS(ComparisonOps);
-TEST_P(ComparisonOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchComparisonOps);
+TEST_P(TinyTorchComparisonOps, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
     Tensor b = tttest::make_tensor({2, 2, 4, 4}, {2, 2}, device());
@@ -172,8 +172,8 @@ TEST_P(ComparisonOps, Values)
 
 // ------------------------------------------------------------------ compound ops
 
-TT_INSTANTIATE_DEVICE_TESTS(CompoundAssignOps);
-TEST_P(CompoundAssignOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchCompoundAssignOps);
+TEST_P(TinyTorchCompoundAssignOps, Values)
 {
     // In-place semantics: the same underlying tensor is modified.
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
@@ -202,8 +202,8 @@ TEST_P(CompoundAssignOps, Values)
 // a (2,1) * b (2,3): output (2,3)
 //   dL/da = [[3],[3]]       (sum-reduced over the broadcast dim)
 //   dL/db = [[2,2,2],[3,3,3]] (a broadcast to the output shape)
-TT_INSTANTIATE_DEVICE_TESTS(Broadcasting);
-TEST_P(Broadcasting, ValuesAndReducedGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchBroadcasting);
+TEST_P(TinyTorchBroadcasting, ValuesAndReducedGradient)
 {
     Tensor a = tttest::leaf({2, 3}, {2, 1}, device());
     Tensor b = tttest::leaf({1, 1, 1, 1, 1, 1}, {2, 3}, device());
@@ -216,8 +216,8 @@ TEST_P(Broadcasting, ValuesAndReducedGradient)
     TT_EXPECT_CLOSE(b.grad(), tttest::make_tensor({2, 2, 2, 3, 3, 3}, {2, 3}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(BroadcastingAdd);
-TEST_P(BroadcastingAdd, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchBroadcastingAdd);
+TEST_P(TinyTorchBroadcastingAdd, Values)
 {
     Tensor a = tttest::make_tensor({1, 2}, {2, 1}, device());
     Tensor b = tttest::make_tensor({10, 20, 30}, {1, 3}, device());
@@ -226,8 +226,8 @@ TEST_P(BroadcastingAdd, Values)
     TT_EXPECT_CLOSE(s, tttest::make_tensor({11, 21, 31, 12, 22, 32}, {2, 3}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(BroadcastingMismatch);
-TEST_P(BroadcastingMismatch, SameDimMustMatch)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchBroadcastingMismatch);
+TEST_P(TinyTorchBroadcastingMismatch, SameDimMustMatch)
 {
     // dims must be equal or 1; (2,1) + (2,2) is valid and broadcasts
     Tensor a = tttest::make_tensor({1, 2}, {2, 1}, device());

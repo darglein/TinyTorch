@@ -18,4 +18,7 @@ set_property(TARGET ${APP_NAME} PROPERTY CXX_STANDARD 17)
 
 #############  ctest #############
 
-add_test(NAME ${APP_NAME} COMMAND ${APP_NAME})
+#add_test(NAME ${APP_NAME} COMMAND ${APP_NAME})
+
+include(GoogleTest)
+gtest_discover_tests(${APP_NAME} DISCOVERY_MODE PRE_TEST)

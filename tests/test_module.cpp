@@ -31,7 +31,7 @@ TORCH_MODULE(Toy);
 
 // ------------------------------------------------------------------ nn::Module
 
-TEST(Module, RegisterParameter)
+TEST(TinyTorchModule, RegisterParameter)
 {
     Tensor w = tttest::make_tensor({1, 2, 3, 4}, {4}, kCPU);
     ToyImpl m(w);
@@ -45,7 +45,7 @@ TEST(Module, RegisterParameter)
     EXPECT_EQ(m.named_parameters().at("w").grad().numel(), 4);
 }
 
-TEST(Module, RegisterBuffer)
+TEST(TinyTorchModule, RegisterBuffer)
 {
     ToyImpl m(tttest::make_tensor({1}, {1}, kCPU));
 
@@ -56,7 +56,7 @@ TEST(Module, RegisterBuffer)
     EXPECT_EQ(m.named_parameters().size(), 1u);  // buffers are not parameters
 }
 
-TEST(Module, ZeroGrad)
+TEST(TinyTorchModule, ZeroGrad)
 {
     ToyImpl m(tttest::make_tensor({1, 2}, {2}, kCPU));
     m.parameters()[0].mutable_grad().fill_(5.0);
@@ -69,7 +69,7 @@ TEST(Module, ZeroGrad)
     EXPECT_FALSE(m.parameters()[0].grad().defined());
 }
 
-TEST(Module, SubModules)
+TEST(TinyTorchModule, SubModules)
 {
     ToyImpl outer(tttest::make_tensor({1}, {1}, kCPU));
     auto inner = std::make_shared<ToyImpl>(tttest::make_tensor({2, 3}, {2}, kCPU));
@@ -83,7 +83,7 @@ TEST(Module, SubModules)
     EXPECT_TRUE(inner->is_training());
 }
 
-TEST(Module, NameAndTraining)
+TEST(TinyTorchModule, NameAndTraining)
 {
     ToyImpl m(tttest::make_tensor({1}, {1}, kCPU));
     EXPECT_TRUE(m.name().size() > 0);
@@ -92,7 +92,7 @@ TEST(Module, NameAndTraining)
 
 // ------------------------------------------------------------------ ModuleHolder / TORCH_MODULE
 
-TEST(ModuleHolder, PtrAndOperators)
+TEST(TinyTorchModuleHolder, PtrAndOperators)
 {
     Tensor w = tttest::make_tensor({1, 2}, {2}, kCPU);
     Toy m(w);
@@ -104,7 +104,7 @@ TEST(ModuleHolder, PtrAndOperators)
     EXPECT_EQ((*m).parameters().size(), 1u);
 }
 
-TEST(ModuleHolder, NullState)
+TEST(TinyTorchModuleHolder, NullState)
 {
     Toy m = nullptr;
     EXPECT_FALSE(static_cast<bool>(m));
@@ -114,7 +114,7 @@ TEST(ModuleHolder, NullState)
 
 // ------------------------------------------------------------------ to(device)
 
-TEST(Module, ToDevice)
+TEST(TinyTorchModule, ToDevice)
 {
     if (!tttest::has_cuda())
     {

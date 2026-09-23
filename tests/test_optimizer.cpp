@@ -8,7 +8,7 @@
 
 // ------------------------------------------------------------------ Adam
 
-TEST(Adam, ConvergesToKnownMinimum)
+TEST(TinyTorchAdam, ConvergesToKnownMinimum)
 {
     // minimize (w - 3)^2  ->  w* = 3
     Tensor w = tttest::leaf({0.0f}, {1}, kCPU);
@@ -26,7 +26,7 @@ TEST(Adam, ConvergesToKnownMinimum)
     EXPECT_NEAR(w.toFloat(), 3.0, 0.05);
 }
 
-TEST(Adam, ZeroGradClearsGradient)
+TEST(TinyTorchAdam, ZeroGradClearsGradient)
 {
     Tensor w = tttest::leaf({0.0f}, {1}, kCPU);
     tinytorch::optim::Adam optim({w}, tinytorch::optim::AdamOptions(0.1));
@@ -39,7 +39,7 @@ TEST(Adam, ZeroGradClearsGradient)
     EXPECT_FLOAT_EQ(w.grad().toFloat(), 0.0f);
 }
 
-TEST(Adam, OptionsDefaults)
+TEST(TinyTorchAdam, OptionsDefaults)
 {
     tinytorch::optim::AdamOptions o;
     EXPECT_DOUBLE_EQ(o.lr(), 1e-3);
@@ -54,7 +54,7 @@ TEST(Adam, OptionsDefaults)
 // Hand-verified single step:
 //   w0 = 0, g0 = -6  (loss (w-3)^2)
 //   step 0: b = g = -6;  nesterov: g = g + 0.9*b = -11.4;  w1 = 0 - 0.1*(-11.4) = 1.14
-TEST(SGD, SingleStepHandVerified)
+TEST(TinyTorchSGD, SingleStepHandVerified)
 {
     Tensor w = tttest::leaf({0.0f}, {1}, kCPU);
 
@@ -68,7 +68,7 @@ TEST(SGD, SingleStepHandVerified)
     EXPECT_NEAR(w.toFloat(), 1.14f, 1e-5f);
 }
 
-TEST(SGD, ConvergesToKnownMinimum)
+TEST(TinyTorchSGD, ConvergesToKnownMinimum)
 {
     Tensor w = tttest::leaf({0.0f}, {1}, kCPU);
     tinytorch::optim::SGDOptimizer optim({w}, 0.1f);
@@ -85,7 +85,7 @@ TEST(SGD, ConvergesToKnownMinimum)
 }
 
 // zero_grad() must clear the gradients of the optimizer's parameters
-TEST(SGD, ZeroGradIsLowercase)
+TEST(TinyTorchSGD, ZeroGradIsLowercase)
 {
     Tensor w = tttest::leaf({0.0f}, {1}, kCPU);
     tinytorch::optim::SGDOptimizer optim({w}, 0.1f);
@@ -101,7 +101,7 @@ TEST(SGD, ZeroGradIsLowercase)
 
 // ------------------------------------------------------------------ multi param
 
-TEST(Optimizer, MultipleParams)
+TEST(TinyTorchOptimizer, MultipleParams)
 {
     // minimize (w0-1)^2 + (w1+2)^2  ->  w0*=1, w1*=-2
     Tensor w0 = tttest::leaf({0.0f}, {1}, kCPU);

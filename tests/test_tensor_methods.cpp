@@ -10,8 +10,8 @@ using tttest::DeviceTest;
 
 // ------------------------------------------------------------------ basic accessors
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorAccessors);
-TEST_P(TensorAccessors, Properties)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorAccessors);
+TEST_P(TinyTorchTensorAccessors, Properties)
 {
     Tensor t = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
 
@@ -34,8 +34,8 @@ TEST_P(TensorAccessors, Properties)
 
 // ------------------------------------------------------------------ view / reshape / squeeze
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorView);
-TEST_P(TensorView, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorView);
+TEST_P(TinyTorchTensorView, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
 
@@ -48,8 +48,8 @@ TEST_P(TensorView, Values)
     EXPECT_FLOAT_EQ(tttest::to_double_vec(a)[1], 9.0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorSqueezeUnsqueeze);
-TEST_P(TensorSqueezeUnsqueeze, Shapes)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorSqueezeUnsqueeze);
+TEST_P(TinyTorchTensorSqueezeUnsqueeze, Shapes)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {1, 2, 2}, device());
 
@@ -67,8 +67,8 @@ TEST_P(TensorSqueezeUnsqueeze, Shapes)
     EXPECT_EQ(sv.sizes(), (SizeType{2, 2}));
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorCollapseView);
-TEST_P(TensorCollapseView, CollapsesUnitDims)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorCollapseView);
+TEST_P(TinyTorchTensorCollapseView, CollapsesUnitDims)
 {
     // 2x1x1x3 with compact strides {3,3,3,1}
     std::vector<float> data(6);
@@ -92,8 +92,8 @@ TEST_P(TensorCollapseView, CollapsesUnitDims)
 
 // ------------------------------------------------------------------ permute / transpose / flip
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorPermuteView);
-TEST_P(TensorPermuteView, StridesAndValues)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorPermuteView);
+TEST_P(TinyTorchTensorPermuteView, StridesAndValues)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
 
@@ -110,15 +110,15 @@ TEST_P(TensorPermuteView, StridesAndValues)
     TT_EXPECT_CLOSE(c, p, 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorTransposeMethod);
-TEST_P(TensorTransposeMethod, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorTransposeMethod);
+TEST_P(TinyTorchTensorTransposeMethod, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
     TT_EXPECT_CLOSE(a.transpose(0, 1), tttest::make_tensor({1, 4, 2, 5, 3, 6}, {3, 2}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorFlipMethod);
-TEST_P(TensorFlipMethod, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorFlipMethod);
+TEST_P(TinyTorchTensorFlipMethod, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
     TT_EXPECT_CLOSE(a.flip({0}), tttest::make_tensor({3, 4, 1, 2}, {2, 2}, device()), 0, 0);
@@ -127,8 +127,8 @@ TEST_P(TensorFlipMethod, Values)
 
 // ------------------------------------------------------------------ reinterpret
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorReinterpretView);
-TEST_P(TensorReinterpretView, DtypeRoundTrip)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorReinterpretView);
+TEST_P(TinyTorchTensorReinterpretView, DtypeRoundTrip)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {4}, device());
 
@@ -143,8 +143,8 @@ TEST_P(TensorReinterpretView, DtypeRoundTrip)
 
 // ------------------------------------------------------------------ in-place ops
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorInPlace);
-TEST_P(TensorInPlace, ZeroFillUniform)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorInPlace);
+TEST_P(TinyTorchTensorInPlace, ZeroFillUniform)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {4}, device());
 
@@ -162,8 +162,8 @@ TEST_P(TensorInPlace, ZeroFillUniform)
     }
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorResize);
-TEST_P(TensorResize, GrowsAndKeepsData)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorResize);
+TEST_P(TinyTorchTensorResize, GrowsAndKeepsData)
 {
     Tensor a = tttest::make_tensor({1, 2}, {2}, device());
 
@@ -175,8 +175,8 @@ TEST_P(TensorResize, GrowsAndKeepsData)
 
 // ------------------------------------------------------------------ math member methods
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorMathMethods);
-TEST_P(TensorMathMethods, SumMeanMinMax)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorMathMethods);
+TEST_P(TinyTorchTensorMathMethods, SumMeanMinMax)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
 
@@ -198,15 +198,15 @@ TEST_P(TensorMathMethods, SumMeanMinMax)
     TT_EXPECT_CLOSE(a.cumprod(1), tttest::make_tensor({1, 2, 3, 12}, {2, 2}, device()), 1e-5, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorNormMethod);
-TEST_P(TensorNormMethod, Frobenius)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorNormMethod);
+TEST_P(TinyTorchTensorNormMethod, Frobenius)
 {
     Tensor a = tttest::make_tensor({3, 4, 5, 12}, {2, 2}, device());
     TT_EXPECT_CLOSE(a.norm(2, 1, true), tttest::make_tensor({5, 13}, {2, 1}, device()), 1e-5, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorClampMethods);
-TEST_P(TensorClampMethods, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorClampMethods);
+TEST_P(TinyTorchTensorClampMethods, Values)
 {
     Tensor a = tttest::make_tensor({-5, 0, 5}, {3}, device());
 
@@ -225,8 +225,8 @@ TEST_P(TensorClampMethods, Values)
 
 // ------------------------------------------------------------------ indexing member methods
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorIndexMethods);
-TEST_P(TensorIndexMethods, SliceAndIndexSelect)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorIndexMethods);
+TEST_P(TinyTorchTensorIndexMethods, SliceAndIndexSelect)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
 
@@ -246,8 +246,8 @@ TEST_P(TensorIndexMethods, SliceAndIndexSelect)
     TT_EXPECT_CLOSE(ia, tttest::make_tensor({5, 7, 9, 5, 7, 9}, {2, 3}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorIndexCopyMethod);
-TEST_P(TensorIndexCopyMethod, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorIndexCopyMethod);
+TEST_P(TinyTorchTensorIndexCopyMethod, Values)
 {
     Tensor target = tinytorch::zeros({2, 2}, TensorOptions().device(device()));
     Tensor source = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
@@ -259,8 +259,8 @@ TEST_P(TensorIndexCopyMethod, Values)
 
 // ------------------------------------------------------------------ scalar extraction
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorItem);
-TEST_P(TensorItem, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorItem);
+TEST_P(TinyTorchTensorItem, Values)
 {
     Tensor a = tttest::make_tensor({42}, {1}, device());
 
@@ -273,8 +273,8 @@ TEST_P(TensorItem, Values)
 
 // ------------------------------------------------------------------ allclose
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorAllClose);
-TEST_P(TensorAllClose, Comparison)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorAllClose);
+TEST_P(TinyTorchTensorAllClose, Comparison)
 {
     Tensor a = tttest::make_tensor({1, 2, 3}, {3}, device());
     Tensor b = tttest::make_tensor({1, 2, 3}, {3}, device());
@@ -288,8 +288,8 @@ TEST_P(TensorAllClose, Comparison)
 
 // ------------------------------------------------------------------ autograd helpers
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorDetach);
-TEST_P(TensorDetach, BreaksTheGraph)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorDetach);
+TEST_P(TinyTorchTensorDetach, BreaksTheGraph)
 {
     Tensor a = tttest::leaf({2.0f}, {1}, device());
     Tensor b = tttest::leaf({3.0f}, {1}, device());
@@ -305,8 +305,8 @@ TEST_P(TensorDetach, BreaksTheGraph)
     EXPECT_FLOAT_EQ(a.grad().toFloat(), 0.0f);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorRepeatMethods);
-TEST_P(TensorRepeatMethods, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorRepeatMethods);
+TEST_P(TinyTorchTensorRepeatMethods, Values)
 {
     // repeat takes one count per dimension
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
@@ -316,8 +316,8 @@ TEST_P(TensorRepeatMethods, Values)
     TT_EXPECT_CLOSE(b.repeat_interleave(2), tttest::make_tensor({1, 1, 2, 2}, {4}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorSetData);
-TEST_P(TensorSetData, Overwrites)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorSetData);
+TEST_P(TinyTorchTensorSetData, Overwrites)
 {
     Tensor a = tttest::make_tensor({1, 2}, {2}, device());
     Tensor b = tttest::make_tensor({7, 8}, {2}, device());

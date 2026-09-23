@@ -14,7 +14,7 @@ namespace
 // Folds in the cases from the former tests/test_backward.cpp.
 
 // d(sum(a))/da = 1 for every element
-TEST(Backward, Sum)
+TEST(TinyTorchBackward, Sum)
 {
     Tensor a = tinytorch::zeros({2, 3});
     a.set_requires_grad(true, true);
@@ -26,7 +26,7 @@ TEST(Backward, Sum)
 }
 
 // d(mean(a))/da = 1 / numel(a)
-TEST(Backward, Mean)
+TEST(TinyTorchBackward, Mean)
 {
     Tensor a = tinytorch::zeros({2, 3});
     a.set_requires_grad(true, true);
@@ -41,15 +41,15 @@ TEST(Backward, Mean)
 
 // ------------------------------------------------------------------ sum
 
-TT_INSTANTIATE_DEVICE_TESTS(SumOps);
-TEST_P(SumOps, Global)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchSumOps);
+TEST_P(TinyTorchSumOps, Global)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
     TT_EXPECT_CLOSE(tinytorch::sum(a), tttest::make_tensor({21}, {1}, device()), 1e-5, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(SumDim);
-TEST_P(SumDim, WithAndWithoutKeepDim)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchSumDim);
+TEST_P(TinyTorchSumDim, WithAndWithoutKeepDim)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
 
@@ -67,8 +67,8 @@ TEST_P(SumDim, WithAndWithoutKeepDim)
     TT_EXPECT_CLOSE(s12, tttest::make_tensor({21}, {1, 1}, device()), 1e-5, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(SumGradient);
-TEST_P(SumGradient, GlobalAndDim)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchSumGradient);
+TEST_P(TinyTorchSumGradient, GlobalAndDim)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
     a.set_requires_grad(true, true);
@@ -88,8 +88,8 @@ TEST_P(SumGradient, GlobalAndDim)
 
 // ------------------------------------------------------------------ mean
 
-TT_INSTANTIATE_DEVICE_TESTS(MeanOps);
-TEST_P(MeanOps, GlobalAndDim)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchMeanOps);
+TEST_P(TinyTorchMeanOps, GlobalAndDim)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
 
@@ -101,8 +101,8 @@ TEST_P(MeanOps, GlobalAndDim)
 
 // ------------------------------------------------------------------ min/max
 
-TT_INSTANTIATE_DEVICE_TESTS(MinMaxBinary);
-TEST_P(MinMaxBinary, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchMinMaxBinary);
+TEST_P(TinyTorchMinMaxBinary, Values)
 {
     Tensor a = tttest::make_tensor({1, 5, 3, 4}, {2, 2}, device());
     Tensor b = tttest::make_tensor({2, 4, 3, 9}, {2, 2}, device());
@@ -111,8 +111,8 @@ TEST_P(MinMaxBinary, Values)
     TT_EXPECT_CLOSE(tinytorch::max(a, b), tttest::make_tensor({2, 5, 3, 9}, {2, 2}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(MinMaxReduce);
-TEST_P(MinMaxReduce, ValuesAndIndices)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchMinMaxReduce);
+TEST_P(TinyTorchMinMaxReduce, ValuesAndIndices)
 {
     Tensor a = tttest::make_tensor({3, 1, 4, 1, 5, 9}, {2, 3}, device());
 
@@ -139,8 +139,8 @@ TEST_P(MinMaxReduce, ValuesAndIndices)
 
 // ------------------------------------------------------------------ prod/cumsum/cumprod
 
-TT_INSTANTIATE_DEVICE_TESTS(ProdOps);
-TEST_P(ProdOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchProdOps);
+TEST_P(TinyTorchProdOps, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
 
@@ -151,8 +151,8 @@ TEST_P(ProdOps, Values)
     TT_EXPECT_CLOSE(p0, tttest::make_tensor({4, 10, 18}, {1, 3}, device()), 1e-5, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(CumSum);
-TEST_P(CumSum, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchCumSum);
+TEST_P(TinyTorchCumSum, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
 
@@ -160,8 +160,8 @@ TEST_P(CumSum, Values)
     TT_EXPECT_CLOSE(tinytorch::cumsum(a, 1), tttest::make_tensor({1, 3, 3, 7}, {2, 2}, device()), 1e-5, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(CumProd);
-TEST_P(CumProd, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchCumProd);
+TEST_P(TinyTorchCumProd, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
 
@@ -170,8 +170,8 @@ TEST_P(CumProd, Values)
 
 // ------------------------------------------------------------------ pow
 
-TT_INSTANTIATE_DEVICE_TESTS(PowScalar);
-TEST_P(PowScalar, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchPowScalar);
+TEST_P(TinyTorchPowScalar, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({1, 2, 3, 4}, {2, 2}, device());
 
@@ -183,8 +183,8 @@ TEST_P(PowScalar, ValuesAndGradient)
     TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({2, 4, 6, 8}, {2, 2}, device()), 1e-4, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(PowTensor);
-TEST_P(PowTensor, ValuesAndGradient)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchPowTensor);
+TEST_P(TinyTorchPowTensor, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({2, 3}, {2}, device());
     Tensor b = tttest::leaf({2, 3}, {2}, device());
@@ -202,8 +202,8 @@ TEST_P(PowTensor, ValuesAndGradient)
 
 // ------------------------------------------------------------------ clamp
 
-TT_INSTANTIATE_DEVICE_TESTS(ClampOps);
-TEST_P(ClampOps, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchClampOps);
+TEST_P(TinyTorchClampOps, Values)
 {
     Tensor a = tttest::make_tensor({-5, -1, 0, 1, 5}, {1, 5}, device());
 
@@ -214,8 +214,8 @@ TEST_P(ClampOps, Values)
     TT_EXPECT_CLOSE(b, tttest::make_tensor({-2, -1, 0, 1, 2}, {1, 5}, device()), 0, 0);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(TensorClampMinMethods);
-TEST_P(TensorClampMinMethods, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorClampMinMethods);
+TEST_P(TinyTorchTensorClampMinMethods, Values)
 {
     Tensor a = tttest::make_tensor({-5, 0, 5}, {3}, device());
 
@@ -228,8 +228,8 @@ TEST_P(TensorClampMinMethods, Values)
 
 // ------------------------------------------------------------------ norm/std
 
-TT_INSTANTIATE_DEVICE_TESTS(NormOps);
-TEST_P(NormOps, FrobeniusAlongDim)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchNormOps);
+TEST_P(TinyTorchNormOps, FrobeniusAlongDim)
 {
     Tensor a = tttest::make_tensor({3, 4, 5, 12}, {2, 2}, device());
 
@@ -238,15 +238,15 @@ TEST_P(NormOps, FrobeniusAlongDim)
     TT_EXPECT_CLOSE(n, tttest::make_tensor({5, 13}, {2, 1}, device()), 1e-5, 1e-6);
 }
 
-TT_INSTANTIATE_DEVICE_TESTS(StdOps);
-TEST_P(StdOps, Global)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchStdOps);
+TEST_P(TinyTorchStdOps, Global)
 {
     // values {1, 2, 3, 4}: variance (population) = 1.25, std = sqrt(1.25)
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {4}, device());
     TT_EXPECT_CLOSE(tinytorch::std(a), tttest::make_tensor({std::sqrt(1.25)}, {1}, device()), 1e-4, 1e-6);
 }
 
-TEST_P(StdOps, PerDim)
+TEST_P(TinyTorchStdOps, PerDim)
 {
     // a = [[1,2,3],[4,5,6]]
     // per-column (dim 0): means {2.5,3.5,4.5}, deviations +-1.5 -> std = 1.5 each
@@ -260,14 +260,14 @@ TEST_P(StdOps, PerDim)
 
 // ------------------------------------------------------------------ abs_sum / prod_sum
 
-TT_INSTANTIATE_DEVICE_TESTS(AbsSum);
-TEST_P(AbsSum, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchAbsSum);
+TEST_P(TinyTorchAbsSum, Values)
 {
     Tensor a = tttest::make_tensor({-1, 2, -3, 4}, {2, 2}, device());
     TT_EXPECT_CLOSE(tinytorch::abs_sum(a), tttest::make_tensor({10}, {1}, device()), 1e-5, 1e-6);
 }
 
-TEST_P(AbsSum, Backward)
+TEST_P(TinyTorchAbsSum, Backward)
 {
     // d/dx sum(|x|) = sign(x); avoid the kinks at 0
     Tensor a = tttest::leaf({1.0f, -2.0f, 3.0f, -4.0f}, {4}, device());
@@ -280,14 +280,14 @@ TEST_P(AbsSum, Backward)
 }
 
 // "prod_sum" is the sum of squares: sum(v^2)
-TT_INSTANTIATE_DEVICE_TESTS(ProdSum);
-TEST_P(ProdSum, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchProdSum);
+TEST_P(TinyTorchProdSum, Values)
 {
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
     TT_EXPECT_CLOSE(tinytorch::prod_sum(a), tttest::make_tensor({30}, {1}, device()), 1e-5, 1e-6);
 }
 
-TEST_P(ProdSum, Backward)
+TEST_P(TinyTorchProdSum, Backward)
 {
     // d/dx sum(x^2) = 2x
     Tensor a = tttest::leaf({1.0f, -2.0f, 3.0f, -4.0f}, {4}, device());
@@ -301,8 +301,8 @@ TEST_P(ProdSum, Backward)
 
 // ------------------------------------------------------------------ median
 
-TT_INSTANTIATE_DEVICE_TESTS(Median);
-TEST_P(Median, Values)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchMedian);
+TEST_P(TinyTorchMedian, Values)
 {
     Tensor a = tttest::make_tensor({3, 1, 2}, {3}, device());
     TT_EXPECT_CLOSE(tinytorch::median(a, 0.5), tttest::make_tensor({2}, {1}, device()), 1e-5, 1e-6);
