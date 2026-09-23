@@ -1,4 +1,4 @@
-set(APP_NAME tt_tests)
+set(APP_NAME test_tiny_torch_all)
 
 add_executable(${APP_NAME} "")
 target_include_directories(${APP_NAME} PUBLIC ".")
