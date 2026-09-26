@@ -21,7 +21,8 @@ production framework.
 ## Repository Layout
 
 ```
-CMakeLists.txt              Root build: options, CUDA/OpenMP detection, subdirs
+CMakeLists.txt              Root build: options, CUDA/OpenMP detection, CUDA arch resolution, subdirs
+cmake/select_compute_arch.cmake  CUDA arch selection (copied from saiga): autodetect / All / explicit
 External/tiny-glog/         Vendored minimal glog (CHECK/LogMessage), provides glog::glog target
 External/glog/              git submodule (google/glog) — UNUSED by the build, leftover
 External/googletest/        git submodule (google/googletest @ v1.17.0), used by the tests
@@ -277,9 +278,12 @@ CPU-only build: `-DTT_WITH_CUDA=OFF` (or simply don't have CUDA installed).
 CUDA build: set the toolkit explicitly (it is not on PATH here):
 `cmake -S . -B build-cuda -DCUDAToolkit_ROOT=/home/dari/voxray/reconstruction/dependencies_linux/cuda_12_8 -DCMAKE_CUDA_COMPILER=<...>/cuda_12_8/bin/nvcc`
 then `cmake --build build-cuda -j$(nproc)`.
-The local GPU is an RTX 5080 (sm_120); the fixed architecture list
-`75;75-virtual;89;89-virtual` in `src/CMakeLists.txt` is sufficient (the `-virtual` PTX
-entries are JIT-compiled by the driver) — do not change it.
+CUDA architectures are resolved dynamically in the top-level `CMakeLists.txt` via
+`cmake/select_compute_arch.cmake` (copied from saiga). If a parent project (e.g.
+voxray-reconstruction) sets `TT_CUDA_ARCH`, TinyTorch uses it so the `torch` target and the
+rest of the build target the same archs; otherwise the installed GPUs are autodetected.
+Each resolved arch is compiled both as real code (`sm_N`) and virtual/PTX (`N-virtual`),
+so the library also runs on slightly newer GPUs. (The local GPU is an RTX 5080, sm_120.)
 
 ### Build outputs
 

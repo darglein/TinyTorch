@@ -107,7 +107,13 @@ target_link_libraries(torch PUBLIC glog::glog)
 
 if (TT_HAS_CUDA)
     target_link_libraries(torch PUBLIC CUDA::cudart)
-    set_target_properties(torch PROPERTIES CUDA_ARCHITECTURES "75;75-virtual;89;89-virtual")
+    # TT_CUDA_ARCHITECTURES is resolved in the top-level CMakeLists (from the parent
+    # project's TT_CUDA_ARCH, or autodetected). Fall back to the previous default.
+    if (TT_CUDA_ARCHITECTURES)
+        set_target_properties(torch PROPERTIES CUDA_ARCHITECTURES "${TT_CUDA_ARCHITECTURES}")
+    else ()
+        set_target_properties(torch PROPERTIES CUDA_ARCHITECTURES "75;75-virtual;89;89-virtual")
+    endif ()
 
     target_compile_options(torch PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 endif ()
