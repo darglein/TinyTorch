@@ -25,11 +25,11 @@ struct MultiGPUInputSimple
 
             if (i == 0)
             {
-                N = data.data[i].size(0);
+                N = data.data[i].numel();
             }
             else
             {
-                CHECK_EQ(N, data.data[i].size(0));
+                CHECK_EQ(N, data.data[i].numel());
             }
         }
     }
@@ -43,11 +43,11 @@ struct MultiGPUInputSimple
 
             if (i == 0)
             {
-                N = data[i].size(0);
+                N = data[i].numel();
             }
             else
             {
-                CHECK_EQ(N, data[i].size(0));
+                CHECK_EQ(N, data[i].numel());
             }
         }
     }
