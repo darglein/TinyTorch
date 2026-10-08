@@ -38,6 +38,12 @@ std::vector<int> reduce_device_counts()
     {
         counts.push_back(n);
     }
+    // Always return at least one count so the parameterized suite is instantiated (gtest
+    // errors on an empty one); the single case GTEST_SKIPs in SetUp when devices are missing.
+    if (counts.empty())
+    {
+        counts.push_back(2);
+    }
     return counts;
 }
 
