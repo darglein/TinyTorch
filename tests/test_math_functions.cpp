@@ -307,3 +307,108 @@ TEST_P(TinyTorchMedian, Values)
     Tensor a = tttest::make_tensor({3, 1, 2}, {3}, device());
     TT_EXPECT_CLOSE(tinytorch::median(a, 0.5), tttest::make_tensor({2}, {1}, device()), 1e-5, 1e-6);
 }
+
+// ------------------------------------------------------------------ determinism
+// Global reductions and the autograd traversal must be bit-reproducible across
+// repeated runs at a fixed configuration (thread count / grid geometry).
+
+namespace
+{
+// Fixed non-trivial input (varied signs/magnitudes) so FP accumulation order is observable.
+std::vector<float> det_input(int n)
+{
+    std::vector<float> v(n);
+    for (int i = 0; i < n; ++i)
+    {
+        v[i] = float((i % 97) - 48) * (1.0f + 0.125f * float(i % 7));
+    }
+    return v;
+}
+}  // namespace
+
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchDeterminism);
+
+TEST_P(TinyTorchDeterminism, GlobalSum)
+{
+    int n   = 10000;
+    Tensor a = tttest::make_tensor(det_input(n), SizeType{n}, device());
+    Tensor ref = tinytorch::sum(a);
+    for (int k = 1; k < 16; ++k)
+    {
+        TT_EXPECT_CLOSE(tinytorch::sum(a), ref, 0.0, 0.0);
+    }
+}
+
+TEST_P(TinyTorchDeterminism, AbsSum)
+{
+    int n   = 10000;
+    Tensor a = tttest::make_tensor(det_input(n), SizeType{n}, device());
+    Tensor ref = tinytorch::abs_sum(a);
+    for (int k = 1; k < 16; ++k)
+    {
+        TT_EXPECT_CLOSE(tinytorch::abs_sum(a), ref, 0.0, 0.0);
+    }
+}
+
+TEST_P(TinyTorchDeterminism, ProdSum)
+{
+    int n   = 10000;
+    Tensor a = tttest::make_tensor(det_input(n), SizeType{n}, device());
+    Tensor ref = tinytorch::prod_sum(a);
+    for (int k = 1; k < 16; ++k)
+    {
+        TT_EXPECT_CLOSE(tinytorch::prod_sum(a), ref, 0.0, 0.0);
+    }
+}
+
+TEST_P(TinyTorchDeterminism, Mean)
+{
+    int n   = 10000;
+    Tensor a = tttest::make_tensor(det_input(n), SizeType{n}, device());
+    Tensor ref = tinytorch::mean(a);
+    for (int k = 1; k < 16; ++k)
+    {
+        TT_EXPECT_CLOSE(tinytorch::mean(a), ref, 0.0, 0.0);
+    }
+}
+
+TEST_P(TinyTorchDeterminism, Std)
+{
+    int n   = 10000;
+    Tensor a = tttest::make_tensor(det_input(n), SizeType{n}, device());
+    Tensor ref = tinytorch::std(a);
+    for (int k = 1; k < 16; ++k)
+    {
+        TT_EXPECT_CLOSE(tinytorch::std(a), ref, 0.0, 0.0);
+    }
+}
+
+TEST_P(TinyTorchDeterminism, Backward)
+{
+    // Identical inputs must give bit-identical leaf gradients across independent
+    // forward+backward cycles (guards the sequence_nr / grad_map ordering).
+    auto run = [&]() -> std::vector<std::vector<double>>
+    {
+        Tensor x = tttest::leaf({1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f}, {2, 3}, device());
+        Tensor y = tttest::leaf({0.5f, 0.1f, 0.9f, 0.3f, 0.7f, 0.2f}, {2, 3}, device());
+        Tensor loss = tinytorch::sum(x * x + x * y + y);  // x used twice -> accumulation
+        tinytorch::backward(loss);
+
+        std::vector<std::vector<double>> out;
+        out.push_back(tttest::to_double_vec(x.grad()));
+        out.push_back(tttest::to_double_vec(y.grad()));
+        return out;
+    };
+
+    std::vector<std::vector<double>> r1 = run();
+    std::vector<std::vector<double>> r2 = run();
+    ASSERT_EQ(r1.size(), r2.size());
+    for (size_t p = 0; p < r1.size(); ++p)
+    {
+        ASSERT_EQ(r1[p].size(), r2[p].size());
+        for (size_t i = 0; i < r1[p].size(); ++i)
+        {
+            EXPECT_EQ(r1[p][i], r2[p][i]) << "param " << p << " grad[" << i << "]";
+        }
+    }
+}

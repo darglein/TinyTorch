@@ -12,6 +12,9 @@
 #include "torch/cuda/cached_memory_allocator.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
 
+#include <omp.h>
+#include <vector>
+
 
 
 namespace tinytorch
@@ -416,7 +419,9 @@ void add_poisson_noise_impl(Tensor& t)
 template <typename T>
 static void sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    T& r = result[0];
+    int n         = get_num_threads();
+    if (n < 1) n = 1;
+    std::vector<T> partial(n, T(0.));
 
 #pragma omp parallel num_threads(get_num_threads())
     {
@@ -429,11 +434,15 @@ static void sum_impl(TensorInfo<T> a, TensorInfo<T> result)
             local_sum = local_sum + v;
         }
 
-#pragma omp critical
-        {
-            r = r + local_sum;
-        }
+        partial[omp_get_thread_num()] = local_sum;
     }
+
+    T acc = result[0];
+    for (int i = 0; i < n; ++i)
+    {
+        acc = acc + partial[i];
+    }
+    result[0] = acc;
 }
 
 void sum_impl(Tensor a, Tensor result)
@@ -444,7 +453,9 @@ void sum_impl(Tensor a, Tensor result)
 template <typename T>
 static void abs_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    T& r = result[0];
+    int n         = get_num_threads();
+    if (n < 1) n = 1;
+    std::vector<T> partial(n, T(0.));
 
 #pragma omp parallel num_threads(get_num_threads())
     {
@@ -457,11 +468,15 @@ static void abs_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
             local_sum = local_sum + (v > T(0.) ? T(v) : T(-v));
         }
 
-#pragma omp critical
-        {
-            r = r + local_sum;
-        }
+        partial[omp_get_thread_num()] = local_sum;
     }
+
+    T acc = result[0];
+    for (int i = 0; i < n; ++i)
+    {
+        acc = acc + partial[i];
+    }
+    result[0] = acc;
 }
 
 void abs_sum_impl(Tensor a, Tensor result)
@@ -472,7 +487,9 @@ void abs_sum_impl(Tensor a, Tensor result)
 template <typename T>
 static void prod_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    T& r = result[0];
+    int n         = get_num_threads();
+    if (n < 1) n = 1;
+    std::vector<T> partial(n, T(0.));
 
 #pragma omp parallel num_threads(get_num_threads())
     {
@@ -485,11 +502,15 @@ static void prod_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
             local_sum = local_sum + v * v;
         }
 
-#pragma omp critical
-        {
-            r = r + local_sum;
-        }
+        partial[omp_get_thread_num()] = local_sum;
     }
+
+    T acc = result[0];
+    for (int i = 0; i < n; ++i)
+    {
+        acc = acc + partial[i];
+    }
+    result[0] = acc;
 }
 
 void prod_sum_impl(Tensor a, Tensor result)

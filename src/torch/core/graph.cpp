@@ -8,6 +8,8 @@
 #include "torch/core/ops/all.h"
 
 #include "torch/core/tensor_impl.h"
+
+#include <atomic>
 namespace tinytorch
 {
 
@@ -79,8 +81,8 @@ std::vector<Tensor> AccumulateGrad::accumulate(const std::vector<Tensor>& input_
 
 Node::Node()
 {
-    static thread_local int64_t current_seq_nr = 0;
-    this->sequence_nr                          = current_seq_nr++;
+    static std::atomic<int64_t> current_seq_nr{0};
+    this->sequence_nr = current_seq_nr++;
 }
 
 }  // namespace autograd

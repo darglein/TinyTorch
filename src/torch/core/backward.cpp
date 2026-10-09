@@ -41,8 +41,8 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
     while (!node_stack.empty())
     {
         // sort by sequence number
-        std::sort(node_stack.begin(), node_stack.end(),
-                  [](auto& n1, auto& n2) { return n1->sequence_nr < n2->sequence_nr; });
+        std::stable_sort(node_stack.begin(), node_stack.end(),
+                         [](auto& n1, auto& n2) { return n1->sequence_nr < n2->sequence_nr; });
 
         // remove duplicated nodes
         //  this can happen if one tensor is used multiple times
@@ -103,14 +103,20 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
         }
     }
 
+    std::vector<std::shared_ptr<autograd::Node>> acc_nodes;
     for (auto& it : grad_map)
     {
-        autograd::AccumulateGrad* acc_node = dynamic_cast<autograd::AccumulateGrad*>(it.first.get());
-        if (acc_node)
+        if (dynamic_cast<autograd::AccumulateGrad*>(it.first.get()))
         {
-            acc_node->accumulate(it.second);
-            // acc_node->t.SetEdge(nullptr);
+            acc_nodes.push_back(it.first);
         }
+    }
+    std::sort(acc_nodes.begin(), acc_nodes.end(),
+              [](auto& n1, auto& n2) { return n1->sequence_nr < n2->sequence_nr; });
+    for (auto& n : acc_nodes)
+    {
+        autograd::AccumulateGrad* acc_node = dynamic_cast<autograd::AccumulateGrad*>(n.get());
+        acc_node->accumulate(grad_map[n]);
     }
 
     if (1)

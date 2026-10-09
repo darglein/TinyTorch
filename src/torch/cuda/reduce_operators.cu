@@ -22,8 +22,7 @@ namespace cuda_impl
 
 
 template <typename InputType, typename OutputType, typename Op>
-static __global__ void global_reduce(TensorInfoCuda<InputType> a, TensorInfoCuda<OutputType> result, Op op,
-                                     OutputType default_value)
+static __global__ void global_reduce(TensorInfoCuda<InputType> a, Op op, OutputType default_value, OutputType* partial)
 {
     int64_t grid_size = blockDim.x * gridDim.x;
     int64_t num_steps = iDivUp(a.numel(), grid_size);
@@ -38,16 +37,45 @@ static __global__ void global_reduce(TensorInfoCuda<InputType> a, TensorInfoCuda
     }
     if (threadIdx.x == 0)
     {
-        op.atomic_reduce(&result[0], value);
+        partial[blockIdx.x] = value;
+    }
+}
+
+// Deterministic merge: a single block combines the per-block partials in a fixed
+// order (no atomics), so the global result is reproducible run-to-run.
+template <typename OutputType, typename Op>
+static __global__ void reduce_partial(OutputType* partial, int64_t n_blocks, TensorInfoCuda<OutputType> result,
+                                      Op op, OutputType default_value)
+{
+    int64_t num_steps = iDivUp(n_blocks, blockDim.x);
+    OutputType value  = default_value;
+    for (int64_t k = 0; k < num_steps; ++k)
+    {
+        int64_t i        = (int64_t)threadIdx.x + k * blockDim.x;
+        OutputType local = i < n_blocks ? partial[i] : default_value;
+        local            = blockReduce<REDUCE_BLOCK_SIZE, OutputType>(local, op, default_value);
+        value            = op(value, local);
+    }
+    if (threadIdx.x == 0)
+    {
+        result[0] = value;
     }
 }
 template <typename InputType, typename OutputType, typename Op>
-void global_reduce_launcher(TensorInfoCuda<InputType> a, TensorInfoCuda<OutputType> result, Op op)
+void global_reduce_launcher(TensorInfoCuda<InputType> a, Tensor result, Op op, Tensor partial, int64_t n_blocks)
 {
-    int64_t num_threads = std::min(int64_t(a.numel()), int64_t(1024) * 1024);
+    if (n_blocks == 0)
+    {
+        // empty input: nothing to reduce (result stays caller-initialized), matches prior behavior
+        return;
+    }
+    auto stream         = cuda::getCurrentCUDAStream();
+    OutputType* partial_ptr = partial.data_ptr<OutputType>();
     global_reduce<InputType, OutputType, Op>
-        <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
-            a, result, op, Op::template default_value<OutputType>());
+        <<<n_blocks, REDUCE_BLOCK_SIZE, 0, stream>>>(a, op, Op::template default_value<OutputType>(), partial_ptr);
+    reduce_partial<OutputType, Op>
+        <<<1, REDUCE_BLOCK_SIZE, 0, stream>>>(partial_ptr, n_blocks, TensorInfoCuda<OutputType>(result), op,
+                                               Op::template default_value<OutputType>());
     CUDA_SYNC_CHECK_ERROR();
 }
 
@@ -62,25 +90,30 @@ void global_reduce_helper(Tensor a, Tensor result, Op op)
     }
 
     cuda::DeviceGuard guard(a.device());
+
+    int64_t num_threads = std::min(int64_t(a.numel()), int64_t(1024) * 1024);
+    int64_t n_blocks    = iDivUp(num_threads, REDUCE_BLOCK_SIZE);
+    Tensor partial      = empty({n_blocks}, kernel_result.options());
+
     switch (a.scalar_type())
     {
         case kInt32:
-            global_reduce_launcher<int, int, Op>(a, kernel_result, op);
+            global_reduce_launcher<int, int, Op>(a, kernel_result, op, partial, n_blocks);
             break;
         case kInt64:
-            global_reduce_launcher<int64_t, int64_t, Op>(a, kernel_result, op);
+            global_reduce_launcher<int64_t, int64_t, Op>(a, kernel_result, op, partial, n_blocks);
             break;
         case kFloat16:
-            global_reduce_launcher<__half, float, Op>(a, kernel_result, op);
+            global_reduce_launcher<__half, float, Op>(a, kernel_result, op, partial, n_blocks);
             break;
         case kFloat:
-            global_reduce_launcher<float, float, Op>(a, kernel_result, op);
+            global_reduce_launcher<float, float, Op>(a, kernel_result, op, partial, n_blocks);
             break;
         case kDouble:
-            global_reduce_launcher<double, double, Op>(a, kernel_result, op);
+            global_reduce_launcher<double, double, Op>(a, kernel_result, op, partial, n_blocks);
             break;
         case kUInt16:
-            global_reduce_launcher<uint16_t, float, Op>(a, kernel_result, op);
+            global_reduce_launcher<uint16_t, float, Op>(a, kernel_result, op, partial, n_blocks);
             break;
         default:
             CHECK(false) << "invalid input type " << a.scalar_type();
