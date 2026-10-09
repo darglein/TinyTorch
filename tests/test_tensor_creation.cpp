@@ -138,8 +138,10 @@ TEST_P(TinyTorchRandint, IntRange)
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchRandn);
 TEST_P(TinyTorchRandn, ApproximatelyStandardNormal)
 {
-    // zero-mean check (loose): over 4096 samples the mean is ~ N(0, 1/64)
-    Tensor t = tinytorch::randn({4096}, TensorOptions().device(device()));
+    // Over 65536 samples the sample mean has std 1/sqrt(N) = 1/256 ≈ 0.0039 and the sample
+    // std has std-error ~ 1/sqrt(2N) ≈ 0.0028, so the 0.05 tolerance is >12 sigma for both
+    // checks (avoids the rare flaky failure of the small-sample 4096 version).
+    Tensor t = tinytorch::randn({65536}, TensorOptions().device(device()));
     EXPECT_NEAR(t.mean().toDouble(), 0.0, 0.05);
     EXPECT_NEAR(t.std().toDouble(), 1.0, 0.05);
 }
