@@ -6,9 +6,12 @@
 
 #pragma once
 
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <functional>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -269,6 +272,38 @@ inline void check_grads(std::vector<Tensor> params, const LossFn& f, double rtol
         }
     }
 }
+
+#ifdef TT_HAS_CUDA
+// Blocks the stream (with a host function) until the returned flag is set. Launch every kernel the test needs once
+// before stalling a stream: the first launch of a kernel loads its module (lazy loading), which synchronizes.
+inline std::atomic<bool>* StallStream(cudaStream_t stream)
+{
+    auto release = new std::atomic<bool>(false);
+    TT_CHECK_CUDA_ERROR(cudaLaunchHostFunc(
+        stream,
+        [](void* p)
+        {
+            while (!static_cast<std::atomic<bool>*>(p)->load())
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        },
+        release));
+    return release;
+}
+
+// Sets the flag from another thread after ms milliseconds
+inline void ReleaseLater(std::atomic<bool>* release, int ms)
+{
+    std::thread(
+        [release, ms]()
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+            *release = true;
+        })
+        .detach();
+}
+#endif
 
 }  // namespace tttest
 

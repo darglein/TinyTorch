@@ -93,6 +93,7 @@ tests/
   test_device.cpp           CPU<->CUDA transfers, cross-device autograd, CPU/CUDA agreement, MultiDeviceTensor
   test_cuda_allocator.cpp   CUDA allocator: stream ordering of reused pre-allocated blocks, frees after a CUDA error
                             don't throw (death tests that put the device into a sticky error state)
+  test_cuda_streams.cpp     Blocking copies are ordered on the current (non-blocking) stream: D2H, H2D, peer copies
 ```
 
 The test suite is parameterized per device: every `TT_INSTANTIATE_DEVICE_TESTS(Suite)` fixture runs
@@ -171,6 +172,13 @@ Tensor (value-type handle, shared_ptr<TensorImpl>)
 - Kernels: CPU uses OpenMP (`#pragma omp parallel for num_threads(get_num_threads())`,
   optionally `#pragma omp simd`); CUDA kernels use `__launch_bounds__(128)`,
   `cuda::DeviceGuard` to pin the device, and `TT_CHECK_CUDA_ERROR` for runtime calls.
+- Streams: all CUDA work (kernels and copies) runs on the current stream of the device
+  (`cuda::getCurrentCUDAStream()`, per thread and device, default: legacy stream). Nothing may rely on the implicit
+  synchronization of the legacy default stream, so everything also works with `cudaStreamNonBlocking` streams.
+  Copies between devices / host (`to_impl_cpu_cuda`) are ordered on the current stream(s); a blocking copy
+  (`non_blocking = false`, `.cpu()`, `.item()`) synchronizes that stream afterwards, but does *not* wait for work on
+  other streams (join them with events first). Peer copies run on the destination stream after an event from the
+  source stream (tests: `test_cuda_streams.cpp`).
 - `TensorInfoBase` (core/tensor_info.h) converts linear indices <-> dim indices via strides;
   `MAX_TENSORINFO_DIMS` is 8 and must not be redefined (compile error if already set).
 

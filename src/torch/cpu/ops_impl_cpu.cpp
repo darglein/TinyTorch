@@ -74,71 +74,58 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
 
     int64_t bytes = src.element_size() * src.numel();
 
+    // All copies are ordered on the current streams of the involved devices. A blocking copy (async == false) waits for
+    // its stream afterwards. Copies never go through the legacy default stream, so they are also correct for streams
+    // that don't synchronize with it (cudaStreamNonBlocking).
     if (src.is_cpu() || dest.is_cpu())
     {
         auto type = (dest.device() == kCPU) ? cudaMemcpyDeviceToHost : cudaMemcpyHostToDevice;
 
         cuda::DeviceGuard guard(src.device() == kCPU ? dest.device() : src.device());
-
-        if (async)
+        auto strm = cuda::getCurrentCUDAStream();
+        TT_CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, type, strm));
+        if (!async)
         {
-            auto strm = cuda::getCurrentCUDAStream();
-            TT_CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, type, strm));
-        }
-        else
-        {
-            TT_CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, type));
+            TT_CHECK_CUDA_ERROR(cudaStreamSynchronize(strm));
         }
     }
     else
     {
-        // p2p copy
+        // p2p copy on the stream of the destination device, ordered after the work on the source stream. The source
+        // stream waits for the copy, so the source buffer isn't modified before it has been read.
         bool use_uva = dest.is_uva() && src.is_uva();
-        if (async)
+        cudaEvent_t src_buffer_ready, mempcy_finished;
         {
-            cudaEvent_t src_buffer_ready, mempcy_finished;
-            {
-                cuda::DeviceGuard guard(src.device());
-                src_buffer_ready = cuda::getNextEvent();
-                TT_CHECK_CUDA_ERROR(cudaEventRecord(src_buffer_ready, cuda::getCurrentCUDAStream()));
-            }
-
-
-            {
-                cuda::DeviceGuard guard(dest.device());
-                TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCurrentCUDAStream(), src_buffer_ready));
-
-                if (use_uva)
-                {
-                    TT_CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault,
-                                                        cuda::getCurrentCUDAStream()));
-                }
-                else
-                {
-                    TT_CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(),
-                                                            src.device().index(), bytes, cuda::getCurrentCUDAStream()));
-                }
-                mempcy_finished = cuda::getNextEvent();
-                TT_CHECK_CUDA_ERROR(cudaEventRecord(mempcy_finished, cuda::getCurrentCUDAStream()));
-            }
-
-            {
-                cuda::DeviceGuard guard(src.device());
-                TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCurrentCUDAStream(), mempcy_finished));
-            }
+            cuda::DeviceGuard guard(src.device());
+            src_buffer_ready = cuda::getNextEvent();
+            TT_CHECK_CUDA_ERROR(cudaEventRecord(src_buffer_ready, cuda::getCurrentCUDAStream()));
         }
-        else
+
         {
             cuda::DeviceGuard guard(dest.device());
+            auto strm = cuda::getCurrentCUDAStream();
+            TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(strm, src_buffer_ready));
+
             if (use_uva)
             {
-                TT_CHECK_CUDA_ERROR(cudaMemcpy(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault));
+                TT_CHECK_CUDA_ERROR(cudaMemcpyAsync(dest.data_ptr(), src.data_ptr(), bytes, cudaMemcpyDefault, strm));
             }
             else
             {
-                TT_CHECK_CUDA_ERROR(cudaMemcpyPeer(dest.data_ptr(), dest.device().index(), src.data_ptr(),
-                                                   src.device().index(), bytes));
+                TT_CHECK_CUDA_ERROR(cudaMemcpyPeerAsync(dest.data_ptr(), dest.device().index(), src.data_ptr(),
+                                                        src.device().index(), bytes, strm));
             }
+            mempcy_finished = cuda::getNextEvent();
+            TT_CHECK_CUDA_ERROR(cudaEventRecord(mempcy_finished, strm));
+            if (!async)
+            {
+                TT_CHECK_CUDA_ERROR(cudaStreamSynchronize(strm));
+            }
+        }
+
+        {
+            cuda::DeviceGuard guard(src.device());
+            TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(cuda::getCurrentCUDAStream(), mempcy_finished));
         }
     }
 
@@ -419,7 +406,7 @@ void add_poisson_noise_impl(Tensor& t)
 template <typename T>
 static void sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    int n         = get_num_threads();
+    int n = get_num_threads();
     if (n < 1) n = 1;
     std::vector<T> partial(n, T(0.));
 
@@ -453,7 +440,7 @@ void sum_impl(Tensor a, Tensor result)
 template <typename T>
 static void abs_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    int n         = get_num_threads();
+    int n = get_num_threads();
     if (n < 1) n = 1;
     std::vector<T> partial(n, T(0.));
 
@@ -487,7 +474,7 @@ void abs_sum_impl(Tensor a, Tensor result)
 template <typename T>
 static void prod_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    int n         = get_num_threads();
+    int n = get_num_threads();
     if (n < 1) n = 1;
     std::vector<T> partial(n, T(0.));
 
@@ -1020,8 +1007,8 @@ void clamp_impl_(Tensor& a, double low, double high)
 }
 
 template <typename T>
-static void padding_2d_impl(TensorInfo<T, 4> src, TensorInfo<T, 4> dst, int pad_left, int pad_right,
-                            int pad_top, int pad_bottom, PaddingMode mode)
+static void padding_2d_impl(TensorInfo<T, 4> src, TensorInfo<T, 4> dst, int pad_left, int pad_right, int pad_top,
+                            int pad_bottom, PaddingMode mode)
 {
 #pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < dst.numel(); ++i)
@@ -1081,8 +1068,8 @@ void padding_2d_impl(Tensor src, Tensor result, int pad_left, int pad_right, int
 }
 
 template <typename T>
-static void padding_3d_impl(TensorInfo<T, 5> src, TensorInfo<T, 5> dst, int pad_left, int pad_right,
-                            int pad_top, int pad_bottom, int pad_front, int pad_back, PaddingMode mode)
+static void padding_3d_impl(TensorInfo<T, 5> src, TensorInfo<T, 5> dst, int pad_left, int pad_right, int pad_top,
+                            int pad_bottom, int pad_front, int pad_back, PaddingMode mode)
 {
 #pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < dst.numel(); ++i)
@@ -1187,8 +1174,8 @@ static void matmul_impl_kernel(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> r
 {
     using G = typename CpuComputeFloatType<T>::Type;
 
-    int a_dim = a.dim();
-    int b_dim = b.dim();
+    int a_dim   = a.dim();
+    int b_dim   = b.dim();
     int res_dim = result.dim();
 
     int64_t K = a.size(a_dim - 1);

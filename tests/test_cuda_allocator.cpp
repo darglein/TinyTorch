@@ -8,13 +8,10 @@
 
 #ifdef TT_HAS_CUDA
 
-#    include <atomic>
-#    include <chrono>
 #    include <cstdlib>
 #    include <iostream>
 #    include <optional>
 #    include <string>
-#    include <thread>
 
 #    ifdef __linux__
 #        include <sys/prctl.h>
@@ -24,34 +21,6 @@ using namespace tinytorch;
 
 namespace
 {
-
-// Blocks the stream until the returned flag is set
-std::atomic<bool>* StallStream(cudaStream_t stream)
-{
-    auto release = new std::atomic<bool>(false);
-    TT_CHECK_CUDA_ERROR(cudaLaunchHostFunc(
-        stream,
-        [](void* p)
-        {
-            while (!static_cast<std::atomic<bool>*>(p)->load())
-            {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            }
-        },
-        release));
-    return release;
-}
-
-void ReleaseLater(std::atomic<bool>* release, int ms)
-{
-    std::thread(
-        [release, ms]()
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(ms));
-            *release = true;
-        })
-        .detach();
-}
 
 // Called in the child of a death test. With a piped core_pattern (e.g. apport) the kernel runs the core dump handler
 // even with ulimit -c 0, which adds about a second to every expected crash.
@@ -112,7 +81,7 @@ TEST(TinyTorchCudaAllocator, PreallocWaitsForPendingWorkOnFreedMemory)
         // stream a: x = 1 is pending (behind the stall) when x is freed
         cuda::setCUDAStreamForThisThread(stream_a);
         // released long after the host side of this test is done
-        ReleaseLater(StallStream(stream_a), 200);
+        tttest::ReleaseLater(tttest::StallStream(stream_a), 200);
         void* x_ptr = nullptr;
         {
             auto x = empty({n}, options);
