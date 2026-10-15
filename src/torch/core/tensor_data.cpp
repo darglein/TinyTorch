@@ -208,7 +208,7 @@ static void print_memory_info(std::ostream& strm)
     strm << "[Memory Info]\n";
     strm << "Current Usage (MB): " << current_memory_used / (1000.0 * 1000.0) << "\n";
     strm << "Max Usage (MB):     " << max_memory_used / (1000.0 * 1000.0) << "\n";
-    strm << "Max Available (MB): " << max_memory_available / (1000.0 * 1000.0)<< "\n";
+    strm << "Max Available (MB): " << max_memory_available / (1000.0 * 1000.0) << "\n";
     strm << "Total used (MB): " << total_memory_used / (1000.0 * 1000.0) << std::endl;
 }
 
@@ -298,6 +298,19 @@ StorageImpl::StorageImpl(void* data_ptr, int64_t size, uint64_t alloc_info, Tens
 
 
 StorageImpl::~StorageImpl()
+{
+    // a destructor must not throw (std::terminate), also not after a CUDA error
+    try
+    {
+        Free();
+    }
+    catch (const std::exception& e)
+    {
+        std::cout << "[TinyTorch] ~StorageImpl: " << e.what() << std::endl;
+    }
+}
+
+void StorageImpl::Free()
 {
     if (has_ownership == true)
     {

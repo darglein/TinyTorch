@@ -5,6 +5,7 @@
  */
 
 #include <map>
+#include <memory>
 #include <mutex>
 
 #include "cached_memory_allocator.h"
@@ -49,15 +50,37 @@ static PerDeviceMemoryData& PinnedMemoryData()
     return data;
 }
 
+// The free events of a block are waited on by later allocations, possibly much later. They are owned by the block
+// (not taken from getNextEvent(), whose ring buffer re-records every event after a few more calls of the same thread).
+using OwnedEvent = std::shared_ptr<CUevent_st>;
+
+static OwnedEvent RecordOwnedEvent(cudaStream_t strm)
+{
+    cudaEvent_t e;
+    TT_CHECK_CUDA_ERROR(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+    OwnedEvent result(e, [](cudaEvent_t e) { cudaEventDestroy(e); });
+    TT_CHECK_CUDA_ERROR(cudaEventRecord(e, strm));
+    return result;
+}
+
+// Frees run in destructors (also after a CUDA error, e.g. a crashed kernel), so they must not throw
+static void LogFreeError(cudaError_t error, const char* function)
+{
+    if (error != cudaSuccess)
+    {
+        std::cout << "[TinyTorch] CUDA Error " << cudaGetErrorString(error) << " in function " << function << std::endl;
+    }
+}
+#define TT_LOG_FREE_ERROR(cudaFunction) LogFreeError(cudaFunction, #cudaFunction)
+
 struct PreallocBlock
 {
     uint8_t* ptr;
     int64_t size;
-    // cudaStream_t last_stream = 0;
 
     // recorded at the moment of free()
     // -> next usage should wait on this event
-    std::vector<std::pair<cudaEvent_t, cudaStream_t>> free_events;
+    std::vector<std::pair<OwnedEvent, cudaStream_t>> free_events;
 };
 
 bool operator<(const PreallocBlock& lhs, const PreallocBlock& rhs)
@@ -280,7 +303,7 @@ static void* premalloc(int64_t initial_size, int device_id)
                 if (e.second != strm)
                 {
                     // only wait if stream different
-                    TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(strm, e.first));
+                    TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(strm, e.first.get()));
                 }
             }
 
@@ -289,9 +312,7 @@ static void* premalloc(int64_t initial_size, int device_id)
                 // replace the large event list of the free block by just one event on the current stream,
                 // beecause we have just waited on all events
                 f.free_events.clear();
-                auto finished_event = getNextEvent();
-                TT_CHECK_CUDA_ERROR(cudaEventRecord(finished_event, strm));
-                f.free_events.push_back({finished_event, strm});
+                f.free_events.push_back({RecordOwnedEvent(strm), strm});
             }
 
 
@@ -343,15 +364,21 @@ static void prefree(void* ptr, int device_id)
     // std::cout << "prefree " << data.alloc_blocks[alloc_block_id].size << " free " <<  prealloc_free_memory()  <<
     // std::endl;
 
+    CHECK_GE(alloc_block_id, 0);
+
     {
         DeviceGuard dg(Device(kCUDA, device_id));
-        auto finished_event = getNextEvent();
-        auto strm           = getCurrentCUDAStream();
-        TT_CHECK_CUDA_ERROR(cudaEventRecord(finished_event, strm));
-        data.alloc_blocks[alloc_block_id].free_events.push_back({finished_event, strm});
+        auto strm = getCurrentCUDAStream();
+        try
+        {
+            data.alloc_blocks[alloc_block_id].free_events.push_back({RecordOwnedEvent(strm), strm});
+        }
+        catch (const std::exception& e)
+        {
+            // only fails after a CUDA error, then the device can't be used anyway
+            std::cout << "[TinyTorch] free: " << e.what() << std::endl;
+        }
     }
-
-    CHECK_GE(alloc_block_id, 0);
     data.free_blocks.emplace_back(data.alloc_blocks[alloc_block_id]);
     data.alloc_blocks.erase(data.alloc_blocks.begin() + alloc_block_id);
     CleanFreeList(device_id);
@@ -359,7 +386,7 @@ static void prefree(void* ptr, int device_id)
 
 static void free_async(void* ptr)
 {
-    TT_CHECK_CUDA_ERROR(cudaFreeAsync(ptr, cuda::getCurrentCUDAStream()));
+    TT_LOG_FREE_ERROR(cudaFreeAsync(ptr, cuda::getCurrentCUDAStream()));
 }
 
 static void* malloc_blocking(int64_t size, int device_id)
@@ -388,8 +415,8 @@ static void* malloc_blocking_check_free(int64_t size, int device_id)
 static void free_blocking(void* ptr)
 {
     // not quite sure why the cuda device synchronize is needed
-    TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-    TT_CHECK_CUDA_ERROR(cudaFree(ptr));
+    TT_LOG_FREE_ERROR(cudaDeviceSynchronize());
+    TT_LOG_FREE_ERROR(cudaFree(ptr));
 }
 
 std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
@@ -578,10 +605,11 @@ void* cuda_malloc_pinned(int64_t size)
 
 void cuda_pinned_free(void* ptr, int64_t size)
 {
+    std::unique_lock l(mu);
     if (ptr)
     {
         // TT_CHECK_CUDA_ERROR(cudaFreeHost(ptr));
-        TT_CHECK_CUDA_ERROR(cudaHostUnregister(ptr));
+        TT_LOG_FREE_ERROR(cudaHostUnregister(ptr));
         free(ptr);
 
         auto& d = PinnedMemoryData();
@@ -700,9 +728,9 @@ void prealloc_print_debug_line()
     auto& data     = PreallocDeviceData(device_id);
 
     std::cout << "pre_allocate: device " << getDevice() << " free_list_size " << prealloc_free_list_size()
-              << " free_mem " << (prealloc_free_memory()-data.reserved_bytes) <<
-        " free_mem_mib " << ((prealloc_free_memory()-data.reserved_bytes) / 1024.0 / 1024) << " reserved_mib "
-                         << (data.reserved_bytes / 1024.0 / 1024) << std::endl;
+              << " free_mem " << (prealloc_free_memory() - data.reserved_bytes) << " free_mem_mib "
+              << ((prealloc_free_memory() - data.reserved_bytes) / 1024.0 / 1024) << " reserved_mib "
+              << (data.reserved_bytes / 1024.0 / 1024) << std::endl;
 }
 void prealloc_allow_fallback_cudamalloc(bool value)
 {

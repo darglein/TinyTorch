@@ -42,6 +42,7 @@ struct StorageImpl
 
    TensorOptions options() const { return options_; }
    protected:
+    void Free();
     int64_t size_;
     uint64_t alloc_info = 0;
     TensorOptions options_;

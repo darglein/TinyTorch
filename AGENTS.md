@@ -91,6 +91,8 @@ tests/
   test_optimizer.cpp        Adam + SGDOptimizer convergence and single-step (hand-verified) updates
   test_module.cpp           nn::Module register/buffers/params/zero_grad/to, ModuleHolder + TORCH_MODULE
   test_device.cpp           CPU<->CUDA transfers, cross-device autograd, CPU/CUDA agreement, MultiDeviceTensor
+  test_cuda_allocator.cpp   CUDA allocator: stream ordering of reused pre-allocated blocks, frees after a CUDA error
+                            don't throw (death tests that put the device into a sticky error state)
 ```
 
 The test suite is parameterized per device: every `TT_INSTANTIATE_DEVICE_TESTS(Suite)` fixture runs
