@@ -9,6 +9,7 @@
 
 namespace tinytorch
 {
+// CPU random generator of the calling thread (see AGENTS.md for the seeding rules)
 TINYTORCH_API void manual_seed(int64_t seed);
 TINYTORCH_API std::mt19937& generator();
 
@@ -17,9 +18,9 @@ TINYTORCH_API Tensor empty(const SizeType& sizes, TensorOptions options = Tensor
 TINYTORCH_API Tensor empty_like(Tensor t, TensorOptions options);
 TINYTORCH_API Tensor empty_like(Tensor t);
 
-TINYTORCH_API Tensor full(const SizeType& sizes, float value, TensorOptions options = TensorOptions());
-TINYTORCH_API Tensor full_like(Tensor t, float value, TensorOptions options);
-TINYTORCH_API Tensor full_like(Tensor t, float value);
+TINYTORCH_API Tensor full(const SizeType& sizes, double value, TensorOptions options = TensorOptions());
+TINYTORCH_API Tensor full_like(Tensor t, double value, TensorOptions options);
+TINYTORCH_API Tensor full_like(Tensor t, double value);
 
 TINYTORCH_API Tensor zeros(const SizeType& sizes, TensorOptions options = TensorOptions());
 TINYTORCH_API Tensor zeros_like(Tensor t, TensorOptions options);

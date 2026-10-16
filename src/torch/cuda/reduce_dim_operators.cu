@@ -25,11 +25,11 @@ namespace cuda_impl
 // ====================================================================================================================
 
 
-
-template <typename InputType, typename OutputType, typename Op, int REDUCE_BLOCK_SIZE, int MAX_DIMS, int REDUCE_DIM>
+// One thread per reduction. Used for short reductions, where a block per reduction would waste most of its threads.
+template <typename InputType, typename AccType, typename Op, int MAX_DIMS, int REDUCE_DIM>
 static __global__ void dimensional_reduce_single_thread(TensorInfoCuda<InputType, MAX_DIMS> a, int64_t dynamic_dim,
-                                                        TensorInfoCuda<OutputType, MAX_DIMS> result, Op op,
-                                                        OutputType default_value)
+                                                        TensorInfoCuda<InputType, MAX_DIMS> result, Op op,
+                                                        AccType default_value)
 {
     int64_t dim = REDUCE_DIM == -1 ? dynamic_dim : REDUCE_DIM;
 
@@ -42,21 +42,22 @@ static __global__ void dimensional_reduce_single_thread(TensorInfoCuda<InputType
     if (tid < num_blocks_to_reduce)
     {
         auto index_input = a.LinearIndexToDimIndexSkipDim(tid, dim);
-        OutputType value = default_value;
+        AccType value    = default_value;
         for (IndexType k = 0; k < size_to_reduce; ++k)
         {
             index_input.set_index(dim, k);
-            OutputType local_value = op.load_op(OutputType(a[index_input]));
-            value                  = op(value, local_value);
+            AccType local_value = op.load_op(AccType(a[index_input]));
+            value               = op(value, local_value);
         }
-        result[tid] = value;
+        result[tid] = InputType(value);
     }
 }
 
-template <typename InputType, typename OutputType, typename Op, int REDUCE_BLOCK_SIZE, int MAX_DIMS, int REDUCE_DIM>
+template <typename InputType, typename AccType, typename Op, int REDUCE_BLOCK_SIZE, int MAX_DIMS, int REDUCE_DIM>
 static __global__ void dimensional_reduce(TensorInfoCuda<InputType, MAX_DIMS> a, int64_t dynamic_dim,
-                                          TensorInfoCuda<OutputType, MAX_DIMS> result, Op op, OutputType default_value)
+                                          TensorInfoCuda<InputType, MAX_DIMS> result, Op op, AccType default_value)
 {
+    static_assert(REDUCE_BLOCK_SIZE % 32 == 0, "the block reduction requires full warps");
     int64_t dim = REDUCE_DIM == -1 ? dynamic_dim : REDUCE_DIM;
 
     using IndexType                = typename TensorInfoCuda<InputType, MAX_DIMS>::IndexType;
@@ -68,110 +69,110 @@ static __global__ void dimensional_reduce(TensorInfoCuda<InputType, MAX_DIMS> a,
     for (IndexType block_id = blockIdx.x; block_id < num_blocks_to_reduce; block_id += gridDim.x)
     {
         auto index_input = a.LinearIndexToDimIndexSkipDim(block_id, dim);
-        OutputType value = default_value;
+        AccType value    = default_value;
 
 
         for (IndexType k = 0; k < num_steps; ++k)
         {
             IndexType i = k * REDUCE_BLOCK_SIZE + threadIdx.x;
             index_input.set_index(dim, i);
-            OutputType local_value = i < size_to_reduce ? op.load_op(OutputType(a[index_input])) : default_value;
-
-            if constexpr (REDUCE_BLOCK_SIZE <= 32)
-            {
-                local_value = warpReduce<OutputType, Op, REDUCE_BLOCK_SIZE>(local_value, op);
-            }
-            else
-            {
-                local_value = blockReduce<REDUCE_BLOCK_SIZE, OutputType>(local_value, op, default_value);
-            }
-            value = op(value, local_value);
+            AccType local_value = i < size_to_reduce ? op.load_op(AccType(a[index_input])) : default_value;
+            local_value         = blockReduce<REDUCE_BLOCK_SIZE, AccType>(local_value, op, default_value);
+            value               = op(value, local_value);
         }
         if (threadIdx.x == 0)
         {
             CUDA_KERNEL_ASSERT(block_id < result.numel());
-            result[block_id] = value;
+            result[block_id] = InputType(value);
         }
     }
 }
 
 
-template <typename InputType, typename OutputType, typename Op, int MAX_DIMS, int REDUCE_DIM>
+template <typename InputType, typename AccType, typename Op, int MAX_DIMS, int REDUCE_DIM>
 void dimensional_reduce_launcher_size_dim(TensorInfoCuda<InputType, MAX_DIMS> a, int64_t dim,
-                                          TensorInfoCuda<OutputType, MAX_DIMS> result)
+                                          TensorInfoCuda<InputType, MAX_DIMS> result)
 {
     int64_t size_to_reduce       = a.size(dim);
     int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
 
     CHECK_EQ(result.numel(), num_blocks_to_reduce);
 
-    if (a.contiguous && size_to_reduce < 16 && num_blocks_to_reduce > 20000 && dim == 0)
+    if (size_to_reduce <= 32)
     {
-        // this is the "simple" case, where just running one thread per reduce block is the most efficient
-        int64_t num_threads = num_blocks_to_reduce;
-
-        dimensional_reduce_single_thread<InputType, OutputType, Op, REDUCE_BLOCK_SIZE, MAX_DIMS, REDUCE_DIM>
-            <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
-                a, dim, result, Op(), Op::template default_value<OutputType>());
-    }
-    else if (size_to_reduce > 8)
-    {
-        int64_t num_threads = std::min(num_blocks_to_reduce * REDUCE_BLOCK_SIZE, int64_t(1024) * 1024);
-        dimensional_reduce<InputType, OutputType, Op, REDUCE_BLOCK_SIZE, MAX_DIMS, REDUCE_DIM>
-            <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
-                a, dim, result, Op(), Op::template default_value<OutputType>());
+        // short reductions: one thread per reduction
+        dimensional_reduce_single_thread<InputType, AccType, Op, MAX_DIMS, REDUCE_DIM>
+            <<<iDivUp(num_blocks_to_reduce, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
+                a, dim, result, Op(), Op::template default_value<AccType>());
     }
     else
     {
-        int64_t num_threads = std::min(num_blocks_to_reduce * REDUCE_BLOCK_SIZE, int64_t(1024) * 1024);
-        dimensional_reduce<InputType, OutputType, Op, 8, MAX_DIMS, REDUCE_DIM>
-            <<<iDivUp(num_threads, 8), 8, 0, cuda::getCurrentCUDAStream()>>>(a, dim, result, Op(),
-                                                                             Op::template default_value<OutputType>());
+        // one block per reduction (grid-stride over the reductions)
+        int64_t num_blocks = std::min(num_blocks_to_reduce, int64_t(1024) * 1024 / REDUCE_BLOCK_SIZE);
+        dimensional_reduce<InputType, AccType, Op, REDUCE_BLOCK_SIZE, MAX_DIMS, REDUCE_DIM>
+            <<<num_blocks, REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(a, dim, result, Op(),
+                                                                                 Op::template default_value<AccType>());
     }
     CUDA_SYNC_CHECK_ERROR();
 }
 
-template <typename InputType, typename OutputType, typename Op, int MAX_DIMS>
+template <typename InputType, typename AccType, typename Op, int MAX_DIMS>
 void dimensional_reduce_launcher_size(Tensor a, int64_t dim, Tensor result)
 {
     cuda::DeviceGuard guard(a.device());
     switch (dim)
     {
         case 0:
-            dimensional_reduce_launcher_size_dim<InputType, OutputType, Op, MAX_DIMS, 0>(a, dim, result);
+            dimensional_reduce_launcher_size_dim<InputType, AccType, Op, MAX_DIMS, 0>(a, dim, result);
             break;
         case 1:
-            dimensional_reduce_launcher_size_dim<InputType, OutputType, Op, MAX_DIMS, 1>(a, dim, result);
+            dimensional_reduce_launcher_size_dim<InputType, AccType, Op, MAX_DIMS, 1>(a, dim, result);
             break;
         default:
-            dimensional_reduce_launcher_size_dim<InputType, OutputType, Op, MAX_DIMS, -1>(a, dim, result);
+            dimensional_reduce_launcher_size_dim<InputType, AccType, Op, MAX_DIMS, -1>(a, dim, result);
             break;
     }
 }
 
-template <typename InputType, typename OutputType, typename Op>
+template <typename InputType, typename AccType, typename Op>
 void dimensional_reduce_launcher(Tensor a, int64_t dim, Tensor result)
 {
     if (a.dim() == 2 && result.dim() == 2)
     {
-        dimensional_reduce_launcher_size<InputType, OutputType, Op, 2>(a, dim, result);
+        dimensional_reduce_launcher_size<InputType, AccType, Op, 2>(a, dim, result);
     }
     else
     {
-        dimensional_reduce_launcher_size<InputType, OutputType, Op, -1>(a, dim, result);
+        dimensional_reduce_launcher_size<InputType, AccType, Op, -1>(a, dim, result);
     }
 }
 
 
+// half is accumulated in float and all integer types in int64
 template <typename Op>
 void dimensional_reduce_helper(Tensor a, int64_t dim, Tensor result)
 {
+    if (a.numel() == 0) return;
     cuda::DeviceGuard guard(a.device());
-    // std::cout << "dimensional reduce " << dim << " | " << a.sizes() << " | " << result.sizes() << "\n";
     switch (a.scalar_type())
     {
+        case kUInt8:
+            dimensional_reduce_launcher<uint8_t, int64_t, Op>(a, dim, result);
+            break;
+        case kInt16:
+            dimensional_reduce_launcher<int16_t, int64_t, Op>(a, dim, result);
+            break;
+        case kUInt16:
+            dimensional_reduce_launcher<uint16_t, int64_t, Op>(a, dim, result);
+            break;
+        case kInt32:
+            dimensional_reduce_launcher<int32_t, int64_t, Op>(a, dim, result);
+            break;
+        case kInt64:
+            dimensional_reduce_launcher<int64_t, int64_t, Op>(a, dim, result);
+            break;
         case kHalf:
-            dimensional_reduce_launcher<__half, __half, Op>(a, dim, result);
+            dimensional_reduce_launcher<__half, float, Op>(a, dim, result);
             break;
         case kFloat:
             dimensional_reduce_launcher<float, float, Op>(a, dim, result);
@@ -268,14 +269,14 @@ __device__ inline T blockInclusiveScan(T val, Op op, T default_value)
 
 
 
-template <typename InputType, typename OutputType, typename Op>
-static __global__ void dimensional_scan(TensorInfoCuda<InputType> a, int64_t dim, TensorInfoCuda<OutputType> result,
-                                        Op op, OutputType default_value)
+template <typename InputType, typename AccType, typename Op>
+static __global__ void dimensional_scan(TensorInfoCuda<InputType> a, int64_t dim, TensorInfoCuda<InputType> result,
+                                        Op op, AccType default_value)
 {
     int64_t size_to_reduce       = a.size(dim);
     int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
     int64_t num_steps            = iDivUp(size_to_reduce, REDUCE_BLOCK_SIZE);
-    __shared__ OutputType previous_block_sum;
+    __shared__ AccType previous_block_sum;
 
 
 
@@ -295,13 +296,13 @@ static __global__ void dimensional_scan(TensorInfoCuda<InputType> a, int64_t dim
             auto previous_block_sum_copy = previous_block_sum;
             int64_t i                    = k * REDUCE_BLOCK_SIZE + threadIdx.x;
             index_input.set_index(dim, i);
-            OutputType local_value = i < size_to_reduce ? OutputType(a[index_input]) : default_value;
-            auto value = blockInclusiveScan<REDUCE_BLOCK_SIZE, OutputType, Op>(local_value, op, default_value);
-            value      = op(value, previous_block_sum_copy);
+            AccType local_value = i < size_to_reduce ? AccType(a[index_input]) : default_value;
+            auto value          = blockInclusiveScan<REDUCE_BLOCK_SIZE, AccType, Op>(local_value, op, default_value);
+            value               = op(value, previous_block_sum_copy);
 
             if (i < size_to_reduce)
             {
-                result[index_input] = value;
+                result[index_input] = InputType(value);
             }
 
             if (threadIdx.x == REDUCE_BLOCK_SIZE - 1)
@@ -313,32 +314,43 @@ static __global__ void dimensional_scan(TensorInfoCuda<InputType> a, int64_t dim
     }
 }
 
-template <typename InputType, typename OutputType, typename Op>
-void dimensional_scan_launcher(TensorInfoCuda<InputType> a, int64_t dim, TensorInfoCuda<OutputType> result)
+template <typename InputType, typename AccType, typename Op>
+void dimensional_scan_launcher(TensorInfoCuda<InputType> a, int64_t dim, TensorInfoCuda<InputType> result)
 {
     int64_t size_to_reduce       = a.size(dim);
     int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
-    int64_t num_threads          = std::min(num_blocks_to_reduce * REDUCE_BLOCK_SIZE, int64_t(1024) * 1024);
+    int64_t num_blocks           = std::min(num_blocks_to_reduce, int64_t(1024) * 1024 / REDUCE_BLOCK_SIZE);
 
-
-
-    dimensional_scan<InputType, OutputType, Op>
-        <<<iDivUp(num_threads, REDUCE_BLOCK_SIZE), REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
-            a, dim, result, Op(), Op::template default_value<OutputType>());
+    dimensional_scan<InputType, AccType, Op><<<num_blocks, REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
+        a, dim, result, Op(), Op::template default_value<AccType>());
     CUDA_SYNC_CHECK_ERROR();
 }
 
+// half is accumulated in float and all integer types in int64
 template <typename Op>
 void dimensional_scan_helper(Tensor a, int64_t dim, Tensor result)
 {
+    if (a.numel() == 0) return;
     cuda::DeviceGuard guard(a.device());
     switch (a.scalar_type())
     {
-        case kHalf:
-            dimensional_scan_launcher<__half, __half, Op>(a, dim, result);
+        case kUInt8:
+            dimensional_scan_launcher<uint8_t, int64_t, Op>(a, dim, result);
+            break;
+        case kInt16:
+            dimensional_scan_launcher<int16_t, int64_t, Op>(a, dim, result);
+            break;
+        case kUInt16:
+            dimensional_scan_launcher<uint16_t, int64_t, Op>(a, dim, result);
             break;
         case kInt32:
-            dimensional_scan_launcher<int, int, Op>(a, dim, result);
+            dimensional_scan_launcher<int32_t, int64_t, Op>(a, dim, result);
+            break;
+        case kInt64:
+            dimensional_scan_launcher<int64_t, int64_t, Op>(a, dim, result);
+            break;
+        case kHalf:
+            dimensional_scan_launcher<__half, float, Op>(a, dim, result);
             break;
         case kFloat:
             dimensional_scan_launcher<float, float, Op>(a, dim, result);

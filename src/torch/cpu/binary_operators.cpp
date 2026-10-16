@@ -50,7 +50,7 @@ template <typename T, bool vectorize, typename Op>
 static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> result)
 {
     auto N = result.numel();
-    if (a.numel() == b.numel() && a.contiguous && b.contiguous)
+    if (a.numel() == N && b.numel() == N && a.contiguous && b.contiguous && result.contiguous)
     {
         // std::cout << "test" << std::endl;
         // fast implementation for contiguous case (without dim expansion)
@@ -89,24 +89,24 @@ static void element_wise_operator(Op op, TensorInfo<T> a, TensorInfo<T> b, Tenso
     }
 }
 template <typename T, bool vectorize, typename Op>
-static void element_wise_operator(Op op, TensorInfo<T> a, T b, TensorInfo<T> result)
+static void element_wise_operator(Op op, TensorInfo<T> a, double b_scalar, TensorInfo<T> result)
 {
-    using G = typename CpuComputeFloatType<T>::Type;
+    using S = typename ScalarComputeType<T>::Type;
     auto N  = result.numel();
+    S b     = S(b_scalar);
 
     if (a.contiguous && result.contiguous)
     {
         // fast implementation for contiguous case (without dim expansion)
         T* pa = a.data;
         T* pr = result.data;
-        //
 
         if constexpr (vectorize)
         {
 #pragma omp simd
             for (int64_t i = 0; i < N; ++i)
             {
-                pr[i] = T(G(op.forward(G(pa[i]), G(b))));
+                pr[i] = scalar_result_to<T>(op.forward(S(pa[i]), b));
             }
         }
         else
@@ -114,7 +114,7 @@ static void element_wise_operator(Op op, TensorInfo<T> a, T b, TensorInfo<T> res
 #pragma omp parallel for num_threads(get_num_threads())
             for (int64_t i = 0; i < N; ++i)
             {
-                pr[i] = T(G(op.forward(G(pa[i]), G(b))));
+                pr[i] = scalar_result_to<T>(op.forward(S(pa[i]), b));
             }
         }
     }
@@ -123,14 +123,16 @@ static void element_wise_operator(Op op, TensorInfo<T> a, T b, TensorInfo<T> res
 #pragma omp parallel for num_threads(get_num_threads())
         for (int64_t i = 0; i < N; ++i)
         {
-            result[i] = T(G(op.forward(G(a[i]), G(b))));
+            result[i] = scalar_result_to<T>(op.forward(S(a[i]), b));
         }
     }
 }
 template <typename T, bool vectorize, typename Op>
-static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> result)
+static void element_wise_operator(Op op, double a_scalar, TensorInfo<T> b, TensorInfo<T> result)
 {
-    auto N = result.numel();
+    using S = typename ScalarComputeType<T>::Type;
+    auto N  = result.numel();
+    S a     = S(a_scalar);
     if (b.contiguous && result.contiguous)
     {
         // fast implementation for contiguous case (without dim expansion)
@@ -141,7 +143,7 @@ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> res
 #pragma omp simd
             for (int64_t i = 0; i < N; ++i)
             {
-                pr[i] = op.forward(a, pb[i]);
+                pr[i] = scalar_result_to<T>(op.forward(a, S(pb[i])));
             }
         }
         else
@@ -149,7 +151,7 @@ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> res
 #pragma omp parallel for num_threads(get_num_threads())
             for (int64_t i = 0; i < N; ++i)
             {
-                pr[i] = op.forward(a, pb[i]);
+                pr[i] = scalar_result_to<T>(op.forward(a, S(pb[i])));
             }
         }
     }
@@ -158,7 +160,7 @@ static void element_wise_operator(Op op, T a, TensorInfo<T> b, TensorInfo<T> res
 #pragma omp parallel for num_threads(get_num_threads())
         for (int64_t i = 0; i < N; ++i)
         {
-            result[i] = op.forward(a, b[i]);
+            result[i] = scalar_result_to<T>(op.forward(a, S(b[i])));
         }
     }
 }

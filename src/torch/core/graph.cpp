@@ -25,7 +25,7 @@ void GradMode::set_enabled(bool enabled)
 }
 namespace autograd
 {
-NodeCallback* call_back = nullptr;
+std::atomic<NodeCallback*> call_back{nullptr};
 
 std::pair<Tensor, Tensor> MakeInplaceGradient(const Tensor& t, bool zero_init)
 {
@@ -70,7 +70,8 @@ std::vector<Tensor> AccumulateGrad::accumulate(const std::vector<Tensor>& input_
 
     if (!t.grad().defined())
     {
-        t.set_grad(g);
+        // g may be shared with other leaves or with the grad of another node
+        t.set_grad(g.clone());
     }
     else
     {

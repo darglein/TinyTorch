@@ -65,6 +65,48 @@ TEST_P(TinyTorchTensorSqueezeUnsqueeze, Shapes)
 
     Tensor sv = a.squeeze_view();
     EXPECT_EQ(sv.sizes(), (SizeType{2, 2}));
+
+    // squeeze(dim) of a dim with size != 1 is a no-op (PyTorch semantics)
+    EXPECT_EQ(a.squeeze(1).sizes(), (SizeType{1, 2, 2}));
+    EXPECT_EQ(a.unsqueeze(-1).sizes(), (SizeType{1, 2, 2, 1}));
+    EXPECT_EQ(a.unsqueeze(-4).sizes(), (SizeType{1, 1, 2, 2}));
+}
+
+// squeeze() works like reshape: on non-contiguous tensors and on tensors that require grad (in grad mode)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorSqueezeAll);
+TEST_P(TinyTorchTensorSqueezeAll, NonContiguousAndRequiresGrad)
+{
+    Tensor a = tttest::leaf({1, 2, 3, 4}, {1, 2, 1, 2}, device());
+    Tensor s = a.squeeze();
+    EXPECT_EQ(s.sizes(), (SizeType{2, 2}));
+    tinytorch::backward(tinytorch::sum(s * s));
+    TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({2, 4, 6, 8}, {1, 2, 1, 2}, device()), 0, 0);
+
+    Tensor b = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 1, 3}, device()).permute({2, 1, 0});
+    ASSERT_FALSE(b.is_contiguous());
+    Tensor sb = b.squeeze();
+    EXPECT_EQ(sb.sizes(), (SizeType{3, 2}));
+    TT_EXPECT_CLOSE(sb, tttest::make_tensor({1, 4, 2, 5, 3, 6}, {3, 2}, device()), 0, 0);
+
+    Tensor c = tttest::make_tensor({7}, {1, 1}, device()).squeeze();
+    EXPECT_EQ(c.dim(), 0);
+    EXPECT_EQ(c.numel(), 1);
+    EXPECT_EQ(c.strides().size(), 0);
+    EXPECT_FLOAT_EQ(c.toFloat(), 7.0f);
+}
+
+TEST(TinyTorchTensorReshape, CompactStrideAndInferredDim)
+{
+    EXPECT_EQ(tinytorch::CompactStrideForSize(SizeType{}).size(), 0);
+    EXPECT_EQ(tinytorch::CompactStrideForSize(SizeType{2, 3, 4}), (SizeType{12, 4, 1}));
+
+    EXPECT_EQ(tinytorch::zeros({0, 3}).reshape({-1, 3}).sizes(), (SizeType{0, 3}));
+    EXPECT_EQ(tinytorch::zeros({2, 3}).reshape({3, -1}).sizes(), (SizeType{3, 2}));
+
+    // 0 elements and -1: the size of the inferred dim is ambiguous
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    EXPECT_DEATH(tinytorch::zeros({0, 3}).reshape({0, -1}), "");
+    EXPECT_DEATH(tinytorch::zeros({0, 3}).view({-1, 0}), "");
 }
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorCollapseView);
@@ -246,6 +288,63 @@ TEST_P(TinyTorchTensorIndexMethods, SliceAndIndexSelect)
     TT_EXPECT_CLOSE(ia, tttest::make_tensor({5, 7, 9, 5, 7, 9}, {2, 3}, device()), 0, 0);
 }
 
+// Negative indices / starts / ends / dims count from the back (PyTorch semantics)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorNegativeIndices);
+TEST_P(TinyTorchTensorNegativeIndices, Values)
+{
+    Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
+
+    TT_EXPECT_CLOSE(a[-1], tttest::make_tensor({4, 5, 6}, {3}, device()), 0, 0);
+    TT_EXPECT_CLOSE(a[-2], tttest::make_tensor({1, 2, 3}, {3}, device()), 0, 0);
+    EXPECT_EQ(a.size(-1), 3);
+    EXPECT_EQ(a.stride(-2), 3);
+
+    TT_EXPECT_CLOSE(a.slice(0, -1, 2), tttest::make_tensor({4, 5, 6}, {1, 3}, device()), 0, 0);
+    TT_EXPECT_CLOSE(a.slice(-1, -2, 3), tttest::make_tensor({2, 3, 5, 6}, {2, 2}, device()), 0, 0);
+    TT_EXPECT_CLOSE(a.slice(1, 0, -1), tttest::make_tensor({1, 2, 4, 5}, {2, 2}, device()), 0, 0);
+    // out-of-range starts/ends are clamped, start >= end gives an empty slice
+    TT_EXPECT_CLOSE(a.slice(1, 1, 100), tttest::make_tensor({2, 3, 5, 6}, {2, 2}, device()), 0, 0);
+    TT_EXPECT_CLOSE(a.slice(1, -100, 1), tttest::make_tensor({1, 4}, {2, 1}, device()), 0, 0);
+    EXPECT_EQ(a.slice(1, 2, 1).sizes(), (SizeType{2, 0}));
+
+    // a step that does not divide the range
+    Tensor r = tttest::make_tensor({0, 1, 2, 3, 4}, {5}, device());
+    TT_EXPECT_CLOSE(r.slice(0, 0, 5, 2), tttest::make_tensor({0, 2, 4}, {3}, device()), 0, 0);
+    TT_EXPECT_CLOSE(r.slice(0, 1, 5, 3), tttest::make_tensor({1, 4}, {2}, device()), 0, 0);
+    TT_EXPECT_CLOSE(r.slice(0, -4, -1, 2), tttest::make_tensor({1, 3}, {2}, device()), 0, 0);
+
+    // negative dims
+    TT_EXPECT_CLOSE(a.transpose(-1, -2), tttest::make_tensor({1, 4, 2, 5, 3, 6}, {3, 2}, device()), 0, 0);
+    TT_EXPECT_CLOSE(a.permute({-1, 0}), tttest::make_tensor({1, 4, 2, 5, 3, 6}, {3, 2}, device()), 0, 0);
+    Tensor idx = tttest::make_tensor(std::vector<int64_t>{2, 0}, {2}, device());
+    TT_EXPECT_CLOSE(a.index_select(-1, idx), tttest::make_tensor({3, 1, 6, 4}, {2, 2}, device()), 0, 0);
+    TT_EXPECT_CLOSE(a.index_add(-1, idx, a.index_select(-1, idx)),
+                    tttest::make_tensor({2, 2, 6, 8, 5, 12}, {2, 3}, device()), 0, 0);
+    Tensor gidx = tttest::make_tensor(std::vector<int64_t>{2, 0}, {1, 2}, device());
+    TT_EXPECT_CLOSE(a.gather(-1, gidx), tttest::make_tensor({3, 1}, {1, 2}, device()), 0, 0);
+}
+
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorNegativeSliceGrad);
+TEST_P(TinyTorchTensorNegativeSliceGrad, Values)
+{
+    Tensor a = tttest::leaf({1, 2, 3, 4, 5, 6}, {2, 3}, device());
+    tinytorch::backward(tinytorch::sum(a.slice(1, -2, 3) * 2.0) + tinytorch::sum(a[-1]));
+    TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({0, 2, 2, 1, 3, 3}, {2, 3}, device()), 0, 0);
+
+    tttest::check_grads({a},
+                        [](const std::vector<Tensor>& p) { return tinytorch::sum(p[0].slice(-1, -3, -1).square()); });
+}
+
+TEST(TinyTorchTensorNegativeIndices, OutOfRangeIndexDies)
+{
+    Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, kCPU);
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    EXPECT_DEATH(a[2], "");
+    EXPECT_DEATH(a[-3], "");
+    EXPECT_DEATH(a.slice(2, 0, 1), "");
+    EXPECT_DEATH(a.permute({0, -2}), "");
+}
+
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchTensorIndexCopyMethod);
 TEST_P(TinyTorchTensorIndexCopyMethod, Values)
 {
@@ -280,10 +379,18 @@ TEST_P(TinyTorchTensorAllClose, Comparison)
     Tensor b = tttest::make_tensor({1, 2, 3}, {3}, device());
     Tensor c = tttest::make_tensor({1, 2, 4}, {3}, device());
 
-    // Note: allclose() compares max|diff| <= atol only (rtol is accepted but unused)
+    // allclose: |a - b| <= atol + rtol * |b| elementwise
     EXPECT_TRUE(a.allclose(b));
     EXPECT_TRUE(a.allclose(c, 0.0, 1.0));   // |3-4| = 1 <= atol 1
     EXPECT_FALSE(a.allclose(c, 0.0, 0.5));  // |3-4| = 1 > atol 0.5
+    EXPECT_TRUE(a.allclose(c, 0.25, 0.0));  // 1 <= 0.25 * 4
+    EXPECT_FALSE(a.allclose(c, 0.2, 0.0));  // 1 > 0.2 * 4
+    EXPECT_TRUE(a.allclose(c, 0.15, 0.4));  // 1 <= 0.4 + 0.15 * 4
+
+    // works on tensors that require grad (in grad mode)
+    Tensor l = tttest::leaf({1, 2, 3}, {3}, device());
+    EXPECT_TRUE(l.allclose(a));
+    EXPECT_FALSE(l.allclose(c));
 }
 
 // ------------------------------------------------------------------ autograd helpers

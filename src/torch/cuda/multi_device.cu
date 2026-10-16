@@ -98,11 +98,44 @@ static __global__ void ReduceToDevice0(MultiGPUInputSimple<NUM_INPUTS, T, Comput
     input.WriteToD0(sum, tid);
 }
 
+// The current stream of 'dst' waits for all work queued so far on the current stream of 'src'
+static void StreamWaitForDevice(Device dst, Device src)
+{
+    if (dst == src) return;
+    cudaEvent_t event;
+    {
+        DeviceGuard dg(src);
+        event = getNextEvent();
+        TT_CHECK_CUDA_ERROR(cudaEventRecord(event, getCurrentCUDAStream()));
+    }
+    DeviceGuard dg(dst);
+    TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(getCurrentCUDAStream(), event));
+}
+
+static void CheckUVATensors(const std::vector<Tensor>& tensors)
+{
+    for (auto& t : tensors)
+    {
+        CHECK(t.defined());
+        CHECK(t.is_contiguous());
+        CHECK_EQ(t.numel(), tensors[0].numel());
+        CHECK_EQ(t.scalar_type(), tensors[0].scalar_type());
+    }
+}
+
 template <typename T, typename ComputeType>
 static void ReduceToDevice0Launcher(std::vector<Tensor> grads)
 {
+    CheckUVATensors(grads);
     int num_gpus  = grads.size();
     int64_t numel = grads[0].numel();
+
+    // the kernel on device 0 reads the tensors of all other devices
+    for (int i = 1; i < num_gpus; ++i)
+    {
+        StreamWaitForDevice(grads[0].device(), grads[i].device());
+    }
+
     DeviceGuard dg(grads[0].device());
     switch (num_gpus)
     {
@@ -124,6 +157,12 @@ static void ReduceToDevice0Launcher(std::vector<Tensor> grads)
             CHECK(false);
     }
     CUDA_SYNC_CHECK_ERROR();
+
+    // the other devices must not overwrite their tensors before the kernel has read them
+    for (int i = 1; i < num_gpus; ++i)
+    {
+        StreamWaitForDevice(grads[i].device(), grads[0].device());
+    }
 }
 
 void MultiDeviceTensor::ReduceGradientSumToMainUVA()
@@ -184,9 +223,12 @@ void MultiDeviceTensor::ReduceSumToMainUVA()
 
 void MultiDeviceTensor::copy_parameters_from_main_to_others_uva()
 {
+    CheckUVATensors(data);
     for (int i = 1; i < data.size(); ++i)
     {
         int64_t numel = data[0].numel();
+        // the kernel on device i reads data[0] after the pending work on device 0 has written it
+        StreamWaitForDevice(data[i].device(), data[0].device());
         DeviceGuard dg(data[i].device());
 
         if (data[0].scalar_type() == kFloat32)
@@ -205,6 +247,11 @@ void MultiDeviceTensor::copy_parameters_from_main_to_others_uva()
             CHECK(false);
         }
         CUDA_SYNC_CHECK_ERROR();
+    }
+    // device 0 must not overwrite data[0] before the kernels of the other devices have read it
+    for (int i = 1; i < data.size(); ++i)
+    {
+        StreamWaitForDevice(data[0].device(), data[i].device());
     }
 }
 

@@ -73,20 +73,22 @@ __launch_bounds__(128) __global__
 }
 template <typename T, typename Op>
 __launch_bounds__(128) __global__
-    static void element_wise_operator_linear(Op op, T a, TensorInfoCuda<T> b, TensorInfoCuda<T> result, int64_t N)
+    static void element_wise_operator_linear(Op op, double a, TensorInfoCuda<T> b, TensorInfoCuda<T> result, int64_t N)
 {
+    using S   = typename ScalarComputeType<T>::Type;
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= N) return;
-    result.data[i] = op.forward(a, b.data[i]);
+    result.data[i] = scalar_result_to<T>(op.forward(S(a), S(b.data[i])));
 }
 
 template <typename T, typename Op>
 __launch_bounds__(128) __global__
-    static void element_wise_operator_linear(Op op, TensorInfoCuda<T> a, T b, TensorInfoCuda<T> result, int64_t N)
+    static void element_wise_operator_linear(Op op, TensorInfoCuda<T> a, double b, TensorInfoCuda<T> result, int64_t N)
 {
+    using S   = typename ScalarComputeType<T>::Type;
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= N) return;
-    result.data[i] = op.forward(a.data[i], b);
+    result.data[i] = scalar_result_to<T>(op.forward(S(a.data[i]), S(b)));
 }
 
 
@@ -106,19 +108,21 @@ __launch_bounds__(128) __global__
 
 template <typename T, typename Op>
 __launch_bounds__(128) __global__
-    static void element_wise_operator(Op op, TensorInfoCuda<T> a, T b, TensorInfoCuda<T> result)
+    static void element_wise_operator(Op op, TensorInfoCuda<T> a, double b, TensorInfoCuda<T> result)
 {
+    using S   = typename ScalarComputeType<T>::Type;
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
-    result[i] = op.forward(a[i], b);
+    result[i] = scalar_result_to<T>(op.forward(S(a[i]), S(b)));
 }
 template <typename T, typename Op>
 __launch_bounds__(128) __global__
-    static void element_wise_operator(Op op, T a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
+    static void element_wise_operator(Op op, double a, TensorInfoCuda<T> b, TensorInfoCuda<T> result)
 {
+    using S   = typename ScalarComputeType<T>::Type;
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
-    result[i] = op.forward(a, b[i]);
+    result[i] = scalar_result_to<T>(op.forward(S(a), S(b[i])));
 }
 
 

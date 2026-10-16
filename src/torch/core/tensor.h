@@ -25,7 +25,10 @@
 namespace tinytorch
 {
 
+// Number of threads of the CPU kernels: the per-thread value of set_num_threads() if > 0, else the process-wide
+// set_default_num_threads() value if > 0, else std::thread::hardware_concurrency(). Always >= 1.
 TINYTORCH_API void set_num_threads(int n);
+TINYTORCH_API void set_default_num_threads(int n);
 TINYTORCH_API int get_num_threads();
 
 struct TensorImpl;
@@ -105,12 +108,23 @@ struct TINYTORCH_API SizeType
 inline SizeType CompactStrideForSize(SizeType size)
 {
     std::vector<int64_t> result(size.size());
+    if (result.empty())
+    {
+        return SizeType(result);
+    }
     result.back() = 1;
     for (int64_t i = size.size() - 2; i >= 0; i--)
     {
         result[i] = result[i + 1] * size[i + 1];
     }
     return SizeType(result);
+}
+
+// Maps a possibly negative dimension index into [0, ndim) (PyTorch semantics).
+inline int64_t maybe_wrap_dim(int64_t dim, int64_t ndim)
+{
+    CHECK(dim >= -ndim && dim < ndim) << "dimension " << dim << " out of range for a tensor with " << ndim << " dims";
+    return dim < 0 ? dim + ndim : dim;
 }
 
 inline bool operator==(const SizeType& s1, const SizeType& s2)
@@ -189,7 +203,7 @@ struct TINYTORCH_API Tensor
     //  returns a view of the collapsed tensor and the new excluded dim
     std::pair<Tensor, int64_t> collapse_view(int64_t excludeDim = -1) const;
     Tensor view(const SizeType& sizes) const;
-    Tensor operator[](int64_t index) const { return slice(0, index, index + 1).squeeze(0); }
+    Tensor operator[](int64_t index) const;
 
     Tensor slice(int64_t dim, int64_t start, int64_t end, int64_t step = 1) const;
     // no grad version

@@ -47,6 +47,105 @@ TEST(TinyTorchAdam, OptionsDefaults)
     EXPECT_DOUBLE_EQ(std::get<1>(o.betas()), 0.999);
     EXPECT_DOUBLE_EQ(o.eps(), 1e-8);
     EXPECT_DOUBLE_EQ(o.weight_decay(), 0.0);
+    EXPECT_FALSE(o.amsgrad());
+}
+
+namespace
+{
+// Reference of TinyTorch's Adam update for a single weight and a fixed gradient sequence (the bias correction is
+// folded into the learning rate, eps is added to sqrt(m2 + 1e-10)). The betas are used as float, like in Adam::step.
+double AdamReference(double w, const std::vector<double>& grads, double lr, double weight_decay, bool amsgrad)
+{
+    double b1 = float(0.9), b2 = float(0.999), eps = 1e-8;
+    double m1 = 0, m2 = 0, m2_max = 0;
+    for (int t = 1; t <= (int)grads.size(); ++t)
+    {
+        double g = grads[t - 1] + weight_decay * w;
+        m1       = b1 * m1 + (1 - b1) * g;
+        m2       = b2 * m2 + (1 - b2) * g * g;
+        m2_max   = std::max(m2_max, m2);
+        double v = amsgrad ? m2_max : m2;
+        double l = lr * std::sqrt(1.0 - std::pow(b2, double(t))) / (1.0 - std::pow(b1, double(t)));
+        w -= std::min(std::max(l / (std::sqrt(v + 1e-10) + eps), 0.0), 1e36) * m1;
+    }
+    return w;
+}
+}  // namespace
+
+// weight_decay (L2, added to the gradient) and amsgrad (max of the second moments) follow the PyTorch semantics
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchAdamOptionsUsed);
+TEST_P(TinyTorchAdamOptionsUsed, WeightDecayAndAmsgrad)
+{
+    std::vector<double> grads(30, 0.01);
+    grads[0] = 1.0;
+    grads[3] = -0.5;
+    EXPECT_GT(std::abs(AdamReference(1, grads, 0.1, 0, true) - AdamReference(1, grads, 0.1, 0, false)), 1e-3);
+    EXPECT_GT(std::abs(AdamReference(1, grads, 0.1, 0.5, false) - AdamReference(1, grads, 0.1, 0, false)), 1e-3);
+
+    for (double weight_decay : {0.0, 0.5})
+    {
+        for (bool amsgrad : {false, true})
+        {
+            Tensor w = tttest::leaf({1.0f}, {1}, device(), tinytorch::kDouble);
+            tinytorch::optim::AdamOptions options(0.1);
+            options.weight_decay(weight_decay);
+            options.amsgrad(amsgrad);
+            tinytorch::optim::Adam optim({w}, options);
+            for (double g : grads)
+            {
+                optim.zero_grad();
+                tinytorch::backward(tinytorch::sum(w * g));
+                optim.step();
+            }
+            EXPECT_NEAR(w.toDouble(), AdamReference(1, grads, 0.1, weight_decay, amsgrad), 1e-6)
+                << "weight_decay " << weight_decay << " amsgrad " << amsgrad;
+        }
+    }
+}
+
+// Parameters without a gradient (unused or zero_grad(set_to_none)) are skipped
+TEST(TinyTorchAdam, SkipsParamsWithoutGrad)
+{
+    Tensor w0 = tttest::leaf({1.0f}, {1}, kCPU);
+    Tensor w1 = tttest::make_tensor({2.0f}, {1}, kCPU);
+    w1.set_requires_grad(true, false);
+    ASSERT_FALSE(w1.grad().defined());
+
+    tinytorch::optim::Adam adam({w0, w1}, tinytorch::optim::AdamOptions(0.1));
+    tinytorch::optim::SGDOptimizer sgd({w0, w1}, 0.1f);
+    tinytorch::backward(tinytorch::sum(w0 * 2.0));
+    adam.step();
+    sgd.Step();
+    EXPECT_LT(w0.toFloat(), 1.0f);
+    EXPECT_FLOAT_EQ(w1.toFloat(), 2.0f);
+}
+
+// The optimizer state follows the parameters when they are moved after the optimizer was created (e.g. module.to())
+TEST(TinyTorchAdam, StateFollowsParamDeviceAndDtype)
+{
+    std::vector<double> grads   = {1.0, 0.3, -0.5, 0.2};
+    std::vector<Device> devices = {kCPU};
+    if (tttest::has_cuda()) devices.push_back(kCUDA);
+    for (Device device : devices)
+    {
+        Tensor w = tttest::leaf({1.0f}, {1}, kCPU, kFloat);
+        tinytorch::optim::Adam optim({w}, tinytorch::optim::AdamOptions(0.1));
+        for (int i = 0; i < (int)grads.size(); ++i)
+        {
+            if (i == 2)
+            {
+                w.to_(tinytorch::kDouble);
+                w.to_(device);
+            }
+            optim.zero_grad();
+            tinytorch::backward(tinytorch::sum(w * grads[i]));
+            optim.step();
+            EXPECT_EQ(optim.m1[0].device(), w.device());
+            EXPECT_EQ(optim.m2[0].dtype(), w.dtype());
+        }
+        EXPECT_EQ(w.device(), device);
+        EXPECT_NEAR(w.toDouble(), AdamReference(1, grads, 0.1, 0, false), 1e-5);
+    }
 }
 
 // ------------------------------------------------------------------ SGD
@@ -66,6 +165,29 @@ TEST(TinyTorchSGD, SingleStepHandVerified)
     optim.Step();
 
     EXPECT_NEAR(w.toFloat(), 1.14f, 1e-5f);
+}
+
+// SGD works for every float dtype and device
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchSGDDevice);
+TEST_P(TinyTorchSGDDevice, TwoStepsHandVerified)
+{
+    for (ScalarType dtype : {kFloat, tinytorch::kDouble})
+    {
+        Tensor w = tttest::leaf({0.0f}, {1}, device(), dtype);
+        tinytorch::optim::SGDOptimizer optim({w}, 0.1f);
+
+        tinytorch::backward((w - 3.0) * (w - 3.0));
+        optim.Step();
+        EXPECT_NEAR(w.toDouble(), 1.14, 1e-5);
+
+        // step 1: g = 2 * (1.14 - 3) = -3.72;  b = 0.9 * -6 + 0.9 * -3.72 = -8.748
+        //         nesterov: g = -3.72 + 0.9 * -8.748 = -11.5932;  w = 1.14 + 1.15932 = 2.29932
+        optim.zero_grad();
+        tinytorch::backward((w - 3.0) * (w - 3.0));
+        optim.Step();
+        EXPECT_NEAR(w.toDouble(), 2.29932, 1e-5);
+        EXPECT_EQ(w.dtype(), dtype);
+    }
 }
 
 TEST(TinyTorchSGD, ConvergesToKnownMinimum)

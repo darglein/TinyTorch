@@ -6,7 +6,11 @@
 
 #include "ops_tensor_creation.h"
 
+#include <atomic>
 #include <chrono>
+#include <cmath>
+#include <mutex>
+#include <random>
 
 #include "torch/core/ops/ops_impl.h"
 #include "torch/core/tensor_impl.h"
@@ -23,10 +27,6 @@ namespace tinytorch
 
 Tensor empty(const SizeType& sizes, TensorOptions options)
 {
-    if (!GradMode::is_enabled())
-    {
-        options.requires_grad_ = false;
-    }
     Tensor t(TensorImpl::create(sizes, options));
     // for debugging
     // fill(t, -128356);
@@ -56,14 +56,14 @@ Tensor empty_like(Tensor t, TensorOptions options)
 // ================================================================================
 // Full Tensor Creation
 
-Tensor full(const SizeType& sizes, float value, TensorOptions options)
+Tensor full(const SizeType& sizes, double value, TensorOptions options)
 {
     Tensor t = empty(sizes, options);
     NoGradGuard ngg;
     fill(t, value);
     return t;
 }
-Tensor full_like(Tensor t, float value, TensorOptions options)
+Tensor full_like(Tensor t, double value, TensorOptions options)
 {
     if (!t.defined())
     {
@@ -72,7 +72,7 @@ Tensor full_like(Tensor t, float value, TensorOptions options)
     return full(t.sizes(), value, options.requires_grad(false));
 }
 
-Tensor full_like(Tensor t, float value)
+Tensor full_like(Tensor t, double value)
 {
     if (!t.defined())
     {
@@ -136,15 +136,79 @@ Tensor ones_like(Tensor t)
 // ================================================================================
 // Rand Tensor Creation
 
+namespace
+{
+std::mutex seed_mutex;
+uint64_t global_seed = 0;
+std::atomic<uint64_t> global_seed_generation{0};
+std::atomic<uint64_t> generator_thread_counter{0};
+
+struct ThreadGenerator
+{
+    std::mt19937 gen;
+    uint64_t thread_index = generator_thread_counter.fetch_add(1);
+    uint64_t generation   = 0;
+    // set by manual_seed() in this thread: manual_seed() calls of other threads don't re-seed it anymore
+    bool seeded_by_this_thread = false;
+
+    ThreadGenerator()
+    {
+        uint64_t t  = (uint64_t)std::chrono::high_resolution_clock::now().time_since_epoch().count();
+        uint32_t r0 = 0, r1 = 0;
+        try
+        {
+            std::random_device rd;
+            r0 = rd();
+            r1 = rd();
+        }
+        catch (...)
+        {
+        }
+        std::seed_seq seq{r0, r1, uint32_t(t), uint32_t(t >> 32), uint32_t(thread_index), uint32_t(thread_index >> 32)};
+        gen.seed(seq);
+    }
+};
+
+ThreadGenerator& thread_generator()
+{
+    static thread_local ThreadGenerator g;
+    return g;
+}
+}  // namespace
+
 std::mt19937& generator()
 {
-    static thread_local std::mt19937 gen((uint32_t)std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()));
-    return gen;
+    auto& g = thread_generator();
+    if (!g.seeded_by_this_thread && global_seed_generation.load(std::memory_order_acquire) != g.generation)
+    {
+        // manual_seed() was called in another thread: derive this thread's stream from (seed, thread index)
+        std::lock_guard<std::mutex> lock(seed_mutex);
+        std::seed_seq seq{uint32_t(global_seed), uint32_t(global_seed >> 32), uint32_t(g.thread_index),
+                          uint32_t(g.thread_index >> 32)};
+        g.gen.seed(seq);
+        g.generation = global_seed_generation.load(std::memory_order_relaxed);
+    }
+    return g.gen;
 }
 
 void manual_seed(int64_t seed)
 {
-    generator().seed((uint32_t)seed);
+    auto& g    = thread_generator();
+    uint64_t s = (uint64_t)seed;
+    if (s <= 0xFFFFFFFFull)
+    {
+        g.gen.seed((uint32_t)s);
+    }
+    else
+    {
+        std::seed_seq seq{uint32_t(s), uint32_t(s >> 32)};
+        g.gen.seed(seq);
+    }
+    g.seeded_by_this_thread = true;
+
+    std::lock_guard<std::mutex> lock(seed_mutex);
+    global_seed = s;
+    global_seed_generation.fetch_add(1, std::memory_order_release);
 }
 
 Tensor rand(const SizeType& sizes, TensorOptions options)
@@ -206,7 +270,16 @@ Tensor from_blob(void* data, const SizeType& sizes, const SizeType& stride, Scal
 
 Tensor range(double start, double end, double step, TensorOptions options)
 {
-    int64_t count = int64_t((end - start) / step) + 1;
+    CHECK(step != 0 && std::isfinite(step)) << "invalid step " << step;
+    // end is inclusive; a quotient within rounding error of an integer counts as that integer (range(0, 0.3, 0.1)
+    // has 4 elements)
+    double q         = (end - start) / step;
+    double q_rounded = std::round(q);
+    if (std::abs(q - q_rounded) <= 1e-9 * std::max(1.0, std::abs(q)))
+    {
+        q = q_rounded;
+    }
+    int64_t count = q < 0 ? 0 : int64_t(std::floor(q)) + 1;
     Tensor t      = empty({count}, options);
     SELECT_DEVICE(t.device(), range_impl, t, start, end, step);
     return t;

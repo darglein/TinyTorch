@@ -7,6 +7,7 @@
 #pragma once
 #include "torch/core/tensor.h"
 
+#include "torch/core/ops/ops_impl_shared.h"
 #include "torch/core/tensor_options.h"
 #include "torch/cuda/atomic_minmax.h"
 #include "torch/tiny_torch_config.h"
@@ -127,7 +128,7 @@ struct ReduceMin
     template <typename T>
     TT_HD T operator()(T a, T b)
     {
-        return a < b ? a : b;
+        return BinaryOperators::Min().forward(a, b);
     }
     template <typename T>
     TT_HD T atomic_reduce(T* target, T value)
@@ -137,7 +138,8 @@ struct ReduceMin
     template <typename T>
     static constexpr T default_value()
     {
-        return std::numeric_limits<T>::max();
+        return std::numeric_limits<T>::has_infinity ? std::numeric_limits<T>::infinity()
+                                                    : std::numeric_limits<T>::max();
     }
 };
 struct ReduceMax
@@ -151,7 +153,7 @@ struct ReduceMax
     template <typename T>
     TT_HD T operator()(T a, T b)
     {
-        return a > b ? a : b;
+        return BinaryOperators::Max().forward(a, b);
     }
     template <typename T>
     TT_HD T atomic_reduce(T* target, T value)
@@ -161,7 +163,8 @@ struct ReduceMax
     template <typename T>
     static constexpr T default_value()
     {
-        return std::numeric_limits<T>::lowest();
+        return std::numeric_limits<T>::has_infinity ? -std::numeric_limits<T>::infinity()
+                                                    : std::numeric_limits<T>::lowest();
     }
 };
 struct StdHelper
@@ -218,13 +221,15 @@ __device__ inline T shfl_up(T var, unsigned int srcLane, int width = 32)
     return var;
 }
 
+// all 32 lanes of the warp must participate; LOCAL_WARP_SIZE reduces independent groups of that many lanes
 template <typename T, typename OP, unsigned int LOCAL_WARP_SIZE = 32>
 __device__ inline T warpReduce(T val, OP op)
 {
+    static_assert(LOCAL_WARP_SIZE <= 32 && (LOCAL_WARP_SIZE & (LOCAL_WARP_SIZE - 1)) == 0, "invalid warp size");
 #pragma unroll
     for (int offset = LOCAL_WARP_SIZE / 2; offset > 0; offset /= 2)
     {
-        auto v = shfl_xor<T, T>(val, offset);
+        auto v = shfl_xor<T, T>(val, offset, LOCAL_WARP_SIZE);
         val    = op(val, v);
     }
     return val;
@@ -234,6 +239,7 @@ __device__ inline T warpReduce(T val, OP op)
 template <int BLOCK_SIZE, typename T, typename OP>
 __device__ inline T blockReduce(T val, OP op, T default_val)
 {
+    static_assert(BLOCK_SIZE % 32 == 0, "blockReduce requires full warps");
     __shared__ T shared[BLOCK_SIZE / 32];
 
     int lane   = threadIdx.x % 32;

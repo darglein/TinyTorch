@@ -7,6 +7,7 @@
 #pragma once
 #include "torch/core/tensor.h"
 
+#include <atomic>
 #include <map>
 
 #ifdef TT_HAS_CUDA
@@ -213,17 +214,17 @@ struct NodeCallback
 };
 
 
-extern TINYTORCH_API NodeCallback* call_back;
+extern TINYTORCH_API std::atomic<NodeCallback*> call_back;
 
 struct FunctionCallbackScope
 {
     FunctionCallbackScope(std::string function_name) : function_name(function_name)
     {
-        if (call_back) call_back->ForwardStart(NodeInfo(function_name, &context));
+        if (auto* cb = call_back.load()) cb->ForwardStart(NodeInfo(function_name, &context));
     }
     ~FunctionCallbackScope()
     {
-        if (call_back) call_back->ForwardEnd(NodeInfo(function_name, &context));
+        if (auto* cb = call_back.load()) cb->ForwardEnd(NodeInfo(function_name, &context));
     }
     std::string function_name;
     Context context;
@@ -240,6 +241,7 @@ struct TINYTORCH_API Node
     void clear()
     {
         next.clear();
+        retained_outputs.clear();
         context = Context();
     }
     // Computes and returns the gradients of the input tensor of the forward operator.
@@ -251,6 +253,10 @@ struct TINYTORCH_API Node
 
     // The next edges are the inputs of the forward operator
     std::vector<std::shared_ptr<Edge>> next;
+
+    // Outputs (output index, tensor) of this node on which retain_grad() was called. backward() stores the
+    // incoming gradient of these outputs in the tensor's grad.
+    std::vector<std::pair<uint32_t, std::weak_ptr<TensorImpl>>> retained_outputs;
 
 
 
@@ -273,7 +279,7 @@ struct FunctionNode : public Node
         CHECK_EQ(fwd_output_grad.size(), num_input_gradients_of_backward);
 
 
-        if (call_back) call_back->BackwardStart(NodeInfo(std::string("bw_") + typeid(T).name(), &context));
+        if (auto* cb = call_back.load()) cb->BackwardStart(NodeInfo(std::string("bw_") + typeid(T).name(), &context));
 
         CHECK(context.requires_grad);
         // backward
@@ -314,7 +320,7 @@ struct FunctionNode : public Node
             }
         }
 
-        if (call_back) call_back->BackwardEnd(NodeInfo(std::string("bw_") + typeid(T).name(), &context));
+        if (auto* cb = call_back.load()) cb->BackwardEnd(NodeInfo(std::string("bw_") + typeid(T).name(), &context));
 
         // This is important, because if the node would store the output tensor here then
         // we get a shared_ptr cycle and leak memory.
@@ -365,7 +371,7 @@ struct FunctionNode : public Node
         node->context.requires_grad = need_grad;
 
 
-        if (call_back) call_back->ForwardStart(NodeInfo(typeid(T).name(), &node->context));
+        if (auto* cb = call_back.load()) cb->ForwardStart(NodeInfo(typeid(T).name(), &node->context));
 
         // Forward
         NoGradGuard ngg;
@@ -383,7 +389,7 @@ struct FunctionNode : public Node
             }
         }
 
-        if (call_back) call_back->ForwardEnd(NodeInfo(typeid(T).name(), &node->context));
+        if (auto* cb = call_back.load()) cb->ForwardEnd(NodeInfo(typeid(T).name(), &node->context));
         return result;
     }
 

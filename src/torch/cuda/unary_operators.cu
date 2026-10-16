@@ -75,6 +75,8 @@ static void unary_operator_backward_helper(Op op, Tensor input, Tensor grad_inpu
     {
         CUDA_CASE_MACRO((unary_operator_backward_kernel<uint8_t>), kUInt8, input.numel(), op, input, grad_input,
                         grad_result)
+        CUDA_CASE_MACRO((unary_operator_backward_kernel<uint16_t>), kUInt16, input.numel(), op, input, grad_input,
+                        grad_result)
         CUDA_CASE_MACRO((unary_operator_backward_kernel<int16_t>), kInt16, input.numel(), op, input, grad_input,
                         grad_result)
         CUDA_CASE_MACRO((unary_operator_backward_kernel<int32_t>), kInt32, input.numel(), op, input, grad_input,
@@ -145,11 +147,11 @@ void sigmoid_backward_impl(Tensor a, Tensor grad_a, Tensor grad_result)
 }
 void softplus_impl(Tensor a, double beta, Tensor result)
 {
-    unary_operator_forward_helper(UnaryOperators::Softplus((float)beta), a, result);
+    unary_operator_forward_helper(UnaryOperators::Softplus(beta), a, result);
 }
 void softplus_backward_impl(Tensor a, double beta, Tensor grad_a, Tensor grad_result)
 {
-    unary_operator_backward_helper(UnaryOperators::Softplus((float)beta), a, grad_a, grad_result);
+    unary_operator_backward_helper(UnaryOperators::Softplus(beta), a, grad_a, grad_result);
 }
 }  // namespace cuda_impl
 }  // namespace tinytorch

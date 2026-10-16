@@ -13,6 +13,13 @@
 namespace tinytorch
 {
 
+static int64_t normalize_dim(const Tensor& a, int64_t dim)
+{
+    int64_t n = a.dim();
+    if (dim < 0) dim += n;
+    CHECK(dim >= 0 && dim < n) << "dim out of range: " << dim << " for a tensor with " << n << " dims";
+    return dim;
+}
 
 namespace autograd
 {
@@ -82,6 +89,10 @@ struct SumDimNode : public FunctionNode<SumDimNode>
         out_size[dim.toInt()]  = 1;
 
         Tensor result = zeros(out_size, a.options());
+        if (a.numel() == 0)
+        {
+            return {result};
+        }
 
         auto [a_collapsed, new_dim] = a.collapse_view(dim.toInt());
         CHECK_NE(new_dim, -1);
@@ -202,27 +213,15 @@ static void fill_with_infinite(Tensor& a, bool positive_inf)
     double value;
 
 
-    if (std::is_integral<T>::value)
+    if constexpr (std::is_integral<T>::value)
     {
-        if (positive_inf)
-        {
-            value = (double)std::numeric_limits<T>::max();
-        }
-        else
-        {
-            value = (double)std::numeric_limits<T>::lowest();
-        }
+        // (double)max() of int64 rounds up to 2^63, which doesn't fit: use the largest double below it
+        value = positive_inf ? std::nextafter((double)std::numeric_limits<T>::max(), 0.0)
+                             : (double)std::numeric_limits<T>::lowest();
     }
     else
     {
-        if (positive_inf)
-        {
-            value = 1000000;  // std::numeric_limits<T>::max();
-        }
-        else
-        {
-            value = -100000;  // std::numeric_limits<T>::lowest();
-        }
+        value = positive_inf ? std::numeric_limits<double>::infinity() : -std::numeric_limits<double>::infinity();
     }
 
 
@@ -243,6 +242,9 @@ static void fill_with_infinite(Tensor& a, bool positive_inf)
             break;
         case kFloat64:
             fill_with_infinite<double>(a, positive_inf);
+            break;
+        case kUInt8:
+            fill_with_infinite<uint8_t>(a, positive_inf);
             break;
         case kInt16:
             fill_with_infinite<int16_t>(a, positive_inf);
@@ -281,6 +283,8 @@ Tensor max(Tensor a)
 std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    dim = normalize_dim(a, dim);
+    CHECK_GT(a.size(dim), 0) << "min() over an empty dimension";
 
     auto result_size = a.sizes();
     result_size[dim] = 1;
@@ -301,6 +305,8 @@ std::pair<Tensor, Tensor> min(Tensor a, int64_t dim, bool keepdim)
 std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    dim = normalize_dim(a, dim);
+    CHECK_GT(a.size(dim), 0) << "max() over an empty dimension";
     auto result_size = a.sizes();
     result_size[dim] = 1;
 
@@ -352,9 +358,9 @@ Tensor sum(Tensor a)
 
 Tensor sum(Tensor a, int64_t dim, bool keepdim)
 {
-    CHECK_LT(dim, a.dim());
+    dim = normalize_dim(a, dim);
     Tensor result;
-    if (a.size(dim) > 1)
+    if (a.size(dim) != 1)
     {
         result = autograd::SumDimNode::apply(a, dim)[0];
     }
@@ -371,6 +377,7 @@ Tensor sum(Tensor a, int64_t dim, bool keepdim)
 Tensor sum(Tensor a, SizeType s, bool keepdim)
 {
     auto sv = s.vec();
+    for (auto& d : sv) d = normalize_dim(a, d);
     std::sort(sv.begin(), sv.end(), std::greater<>());
     for (auto dim : sv)
     {
@@ -386,6 +393,7 @@ Tensor mean(Tensor a)
 
 Tensor mean(Tensor a, int64_t dim, bool keepdim)
 {
+    dim         = normalize_dim(a, dim);
     auto count  = a.size(dim);
     auto result = sum(a, dim, keepdim);
     return result / (double)count;
@@ -393,6 +401,7 @@ Tensor mean(Tensor a, int64_t dim, bool keepdim)
 Tensor mean(Tensor a, SizeType s, bool keepdim)
 {
     auto sv = s.vec();
+    for (auto& d : sv) d = normalize_dim(a, d);
     std::sort(sv.begin(), sv.end(), std::greater<>());
 
     for (auto dim : sv)
@@ -437,6 +446,7 @@ Tensor std(Tensor a)
 Tensor std(Tensor a, int64_t dim)
 {
     // population std along dim, computed from differentiable ops so it works on any device
+    dim       = normalize_dim(a, dim);
     auto mean = a.mean(dim, true);
     auto d    = a - mean;
     auto var  = d.square().mean(dim, true);
@@ -459,7 +469,8 @@ void clamp_(Tensor& a, double low, double high)
 Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
 {
     CHECK_EQ(norm, 2);
-    a = a.square();
+    dim = normalize_dim(a, dim);
+    a   = a.square();
     a = a.sum(dim, keep);
     a = a.sqrt();
     return a;
@@ -473,6 +484,7 @@ void add_poisson_noise_(Tensor a)
 Tensor prod(Tensor a, int64_t dim, bool keepdim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    dim           = normalize_dim(a, dim);
     auto new_size = a.sizes();
     new_size[dim] = 1;
     auto result   = ones(new_size, a.options());
@@ -488,6 +500,7 @@ Tensor prod(Tensor a, int64_t dim, bool keepdim)
 Tensor cumprod(Tensor a, int64_t dim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    dim         = normalize_dim(a, dim);
     auto result = ones_like(a);
     SELECT_DEVICE(a.device(), cumprod_impl, a, dim, result);
     return result;
@@ -495,6 +508,7 @@ Tensor cumprod(Tensor a, int64_t dim)
 Tensor cumsum(Tensor a, int64_t dim)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
+    dim         = normalize_dim(a, dim);
     auto result = ones_like(a);
     SELECT_DEVICE(a.device(), cumsum_impl, a, dim, result);
     return result;

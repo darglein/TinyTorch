@@ -29,10 +29,10 @@ struct StorageImpl
     StorageImpl(int64_t size, TensorOptions options);
     StorageImpl(void* data_ptr, int64_t size, uint64_t alloc_info, TensorOptions options);
 
-    StorageImpl& operator=(StorageImpl&& other) = default;
+    StorageImpl& operator=(StorageImpl&& other) = delete;
     StorageImpl& operator=(const StorageImpl&)  = delete;
     StorageImpl()                               = delete;
-    StorageImpl(StorageImpl&& other)            = default;
+    StorageImpl(StorageImpl&& other)            = delete;
     StorageImpl(const StorageImpl&)             = delete;
     ~StorageImpl();
 

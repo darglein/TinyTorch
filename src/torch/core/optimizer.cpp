@@ -58,29 +58,55 @@ void adam_step2(TensorInfo<T> param, TensorInfo<T> param_grad, TensorInfo<T> m1s
     }
 }
 
-void adam_step(Tensor param, Tensor param_grad, Tensor m1s, Tensor m2s, AdamOptions options, int& current_step)
+// Moves an optimizer state tensor to the device/dtype of its parameter (e.g. after module.to()).
+static void state_follow_param(Tensor& state, const Tensor& param)
+{
+    if (state.sizes() != param.sizes())
+    {
+        state = zeros_like(param);
+        return;
+    }
+    if (!(state.device() == param.device()) || state.dtype() != param.dtype())
+    {
+        state = state.to(param.device()).to(param.dtype());
+    }
+}
+
+static void adam_step(Tensor param, Tensor gradient, Tensor& m1s, Tensor& m2s, Tensor& m2s_max,
+                      const AdamOptions& options, int current_step)
 {
     NoGradGuard ngg;
     Tensor& w = param;
 
-    Tensor gradient = param_grad;
-    Tensor m1       = m1s;
-    Tensor m2       = m2s;
-    float beta1     = std::get<0>(options.betas_);
-    float beta2     = std::get<1>(options.betas_);
-    m1              = beta1 * m1 + (1 - beta1) * gradient;
-    m2              = beta2 * m2 + (1 - beta2) * (gradient * gradient);
-    m1s.copy_( m1);
-    m2s.copy_( m2);
+    CHECK_EQ(gradient.device(), param.device());
+    if (gradient.dtype() != param.dtype())
+    {
+        gradient = gradient.to(param.dtype());
+    }
+    if (options.weight_decay_ != 0)
+    {
+        gradient = gradient + options.weight_decay_ * w;
+    }
 
+    float beta1 = std::get<0>(options.betas_);
+    float beta2 = std::get<1>(options.betas_);
+    Tensor m1   = beta1 * m1s + (1 - beta1) * gradient;
+    Tensor m2   = beta2 * m2s + (1 - beta2) * (gradient * gradient);
+    m1s.copy_(m1);
+    m2s.copy_(m2);
 
+    if (options.amsgrad_)
+    {
+        m2s_max.copy_(max(m2s_max, m2));
+        m2 = m2s_max;
+    }
 
-    double learning_rate = options.lr();
+    double learning_rate = options.lr_;
     learning_rate *=
         std::sqrt(1.0 - std::pow(beta2, double(current_step))) / (1.0 - std::pow(beta1, double(current_step)));
 
 
-    Tensor effective_learning_rate = clamp(learning_rate / (sqrt(m2 + 1e-10) + options.eps()), 0.0, 1e36);
+    Tensor effective_learning_rate = clamp(learning_rate / (sqrt(m2 + 1e-10) + options.eps_), 0.0, 1e36);
 
 
     Tensor weight_change = effective_learning_rate * m1;
@@ -89,53 +115,27 @@ void adam_step(Tensor param, Tensor param_grad, Tensor m1s, Tensor m2s, AdamOpti
     w.copy_(new_weight);
 }
 
-template <typename T>
-void sgd_step(TensorInfo<T> param, TensorInfo<T> param_grad, TensorInfo<T> velocity, float momentum, float dampening,
-              int step, bool nesterov, float lr)
-{
-    for (int i = 0; i < param.numel(); ++i)
-    {
-        auto& w = param[i];
-
-        auto g  = param_grad[i];
-        auto& b = velocity[i];
-
-        if (momentum != 0)
-        {
-            if (step > 0)
-            {
-                b = momentum * b + (1 - dampening) * g;
-            }
-            else
-            {
-                b = g;
-            }
-
-            if (nesterov)
-            {
-                g = g + momentum * b;
-            }
-            else
-            {
-                g = b;
-            }
-        }
-
-        w = w - lr * g;
-    }
-}
-
 void Adam::step()
 {
     current_step++;
     for (int p = 0; p < params.size(); ++p)
     {
         auto& param = params[p];
-        if (param.numel() == 0)
+        if (param.numel() == 0 || !param.grad().defined())
         {
             continue;
         }
-        adam_step(param, param.mutable_grad(), m1[p], m2[p], options[p], current_step);
+        state_follow_param(m1[p], param);
+        state_follow_param(m2[p], param);
+        if (options[p].amsgrad_)
+        {
+            if (!m2_max[p].defined())
+            {
+                m2_max[p] = zeros_like(param);
+            }
+            state_follow_param(m2_max[p], param);
+        }
+        adam_step(param, param.grad(), m1[p], m2[p], m2_max[p], options[p], current_step);
     }
 }
 void Adam::add_param_group(std::pair<std::vector<Tensor>, std::unique_ptr<AdamOptions>> group)
@@ -145,6 +145,7 @@ void Adam::add_param_group(std::pair<std::vector<Tensor>, std::unique_ptr<AdamOp
         params.push_back(t);
         m1.push_back(zeros_like(t));
         m2.push_back(zeros_like(t));
+        m2_max.push_back(group.second->amsgrad_ ? zeros_like(t) : Tensor());
         options.push_back(*group.second);
     }
 }
@@ -154,15 +155,46 @@ Adam::Adam(std::vector<Tensor> params, AdamOptions options)
 }
 void SGDOptimizer::Step()
 {
+    NoGradGuard ngg;
     for (int p = 0; p < params.size(); ++p)
     {
-        auto& param    = params[p];
-        auto& velocity = velocities[p];
-        if (param.numel() == 0)
+        auto& param = params[p];
+        if (param.numel() == 0 || !param.grad().defined())
         {
             continue;
         }
-        sgd_step<float>(param, param.mutable_grad(), velocity, momentum, dampening, step, nesterov, lr);
+        auto& velocity = velocities[p];
+        state_follow_param(velocity, param);
+
+        Tensor g = param.grad();
+        CHECK_EQ(g.device(), param.device());
+        if (g.dtype() != param.dtype())
+        {
+            g = g.to(param.dtype());
+        }
+
+        if (momentum != 0)
+        {
+            if (step > 0)
+            {
+                velocity.copy_(momentum * velocity + (1 - dampening) * g);
+            }
+            else
+            {
+                velocity.copy_(g);
+            }
+
+            if (nesterov)
+            {
+                g = g + momentum * velocity;
+            }
+            else
+            {
+                g = velocity;
+            }
+        }
+
+        param.copy_(param - lr * g);
     }
     step++;
 }

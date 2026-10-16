@@ -19,9 +19,10 @@ static void fill_neg_one_dim(SizeType& new_sizes, int64_t old_numel)
     int64_t* neg_dim  = nullptr;
     for (int64_t& i : new_sizes.vec())
     {
+        CHECK_GE(i, -1) << "invalid shape " << new_sizes;
         if (i == -1)
         {
-            CHECK_EQ(neg_dim, nullptr);
+            CHECK_EQ(neg_dim, nullptr) << "only one dimension can be inferred";
             neg_dim = &i;
         }
         else
@@ -32,6 +33,8 @@ static void fill_neg_one_dim(SizeType& new_sizes, int64_t old_numel)
 
     if (neg_dim)
     {
+        CHECK_NE(new_numel, 0) << "cannot reshape a tensor of " << old_numel << " elements into shape " << new_sizes
+                               << " because the unspecified dimension size -1 can be any value and is ambiguous";
         CHECK_EQ(old_numel % new_numel, 0);
         *neg_dim = old_numel / new_numel;
         new_numel *= *neg_dim;
@@ -119,6 +122,8 @@ Tensor repeat_interleave(Tensor t, int64_t count)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
+    CHECK_GE(t.dim(), 1) << "repeat_interleave requires at least one dimension";
+    CHECK_GE(count, 0);
     SizeType new_sizes = t.sizes();
     new_sizes[0] *= count;
     Tensor result = empty(new_sizes, t.options());
@@ -168,6 +173,8 @@ struct TransposeNode : public FunctionNode<TransposeNode>
 
 Tensor transpose(Tensor t, int64_t dim0, int64_t dim1)
 {
+    dim0 = maybe_wrap_dim(dim0, t.dim());
+    dim1 = maybe_wrap_dim(dim1, t.dim());
     return autograd::TransposeNode::apply(t, dim0, dim1)[0];
 }
 
@@ -176,6 +183,8 @@ void transpose(Tensor src, Tensor dst, int64_t dim0, int64_t dim1)
     CHECK(!src.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
     CHECK_EQ(src.dim(), dst.dim());
+    dim0 = maybe_wrap_dim(dim0, src.dim());
+    dim1 = maybe_wrap_dim(dim1, src.dim());
     CHECK_EQ(src.size(dim0), dst.size(dim1));
     CHECK_EQ(src.size(dim1), dst.size(dim0));
     SELECT_DEVICE(src.device(), transpose_impl, src, dim0, dim1, dst);
@@ -263,8 +272,9 @@ struct ToDeviceNode : public FunctionNode<ToDeviceNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         Device old_device = ctx->next_meta[0].device;
-        Tensor grad_a     = empty_like(grad[0], grad[0].options().device(old_device));
-        cpu_impl::to_impl_cpu_cuda(grad[0], grad_a, false);
+        Tensor g          = grad[0].contiguous();
+        Tensor grad_a     = empty(g.sizes(), g.options().device(old_device).pinned_memory(false));
+        cpu_impl::to_impl_cpu_cuda(g, grad_a, false);
         return {grad_a, {}, {}};
     }
 };
@@ -365,6 +375,7 @@ struct IndexSelectNode : public FunctionNode<IndexSelectNode>
 
 Tensor index_select(Tensor input, int64_t dim, Tensor index)
 {
+    dim = maybe_wrap_dim(dim, input.dim());
     return autograd::IndexSelectNode::apply(input, dim, index)[0];
 }
 
@@ -407,6 +418,7 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
 
 Tensor index_add(Tensor input, int64_t dim, Tensor index, Tensor data)
 {
+    dim = maybe_wrap_dim(dim, input.dim());
     return autograd::IndexAddNode::apply(input, dim, index, data)[0];
 }
 
@@ -414,6 +426,7 @@ void index_copy(Tensor& target, int64_t dim, Tensor index, Tensor source)
 {
     CHECK(!target.requires_grad() || !GradMode::is_enabled());
     CHECK_EQ(target.dtype(), source.dtype());
+    dim = maybe_wrap_dim(dim, target.dim());
     TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(target.device(), index_copy_impl, target, dim, index, source);
 }
@@ -423,6 +436,7 @@ Tensor gather(Tensor data, int64_t dim, Tensor index)
     CHECK(!data.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
     CHECK_EQ(data.dim(), index.dim());
+    dim            = maybe_wrap_dim(dim, data.dim());
     auto out_sizes = index.sizes();
     auto result    = empty(out_sizes, data.options());
     SELECT_DEVICE(result.device(), gather_impl, data, dim, index, result);
@@ -430,12 +444,19 @@ Tensor gather(Tensor data, int64_t dim, Tensor index)
 }
 void padding_2d(Tensor data, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, PaddingMode mode)
 {
+    CHECK_EQ(data.dim(), 4);
+    CHECK_EQ(result.dim(), 4);
+    CHECK_EQ(data.device(), result.device());
+    CHECK_EQ(data.scalar_type(), result.scalar_type());
+    CHECK_GE(std::min({pad_left, pad_right, pad_top, pad_bottom}), 0);
+    CHECK_EQ(result.size(0), data.size(0));
+    CHECK_EQ(result.size(1), data.size(1));
+    CHECK_EQ(result.size(2), data.size(2) + pad_top + pad_bottom);
+    CHECK_EQ(result.size(3), data.size(3) + pad_left + pad_right);
     SELECT_DEVICE(result.device(), padding_2d_impl, data, result, pad_left, pad_right, pad_top, pad_bottom, mode);
 }
 Tensor padding_2d(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom, PaddingMode mode)
 {
-    CHECK_EQ(data.size(0), 1);
-    CHECK_EQ(data.size(1), 1);
     CHECK_EQ(data.dim(), 4);
     auto out_sizes = data.sizes();
     out_sizes[2] += pad_top + pad_bottom;
@@ -450,6 +471,16 @@ Tensor padding_2d(Tensor data, int pad_left, int pad_right, int pad_top, int pad
 void padding_3d(Tensor data, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front,
                 int pad_back, PaddingMode mode)
 {
+    CHECK_EQ(data.dim(), 5);
+    CHECK_EQ(result.dim(), 5);
+    CHECK_EQ(data.device(), result.device());
+    CHECK_EQ(data.scalar_type(), result.scalar_type());
+    CHECK_GE(std::min({pad_left, pad_right, pad_top, pad_bottom, pad_front, pad_back}), 0);
+    CHECK_EQ(result.size(0), data.size(0));
+    CHECK_EQ(result.size(1), data.size(1));
+    CHECK_EQ(result.size(2), data.size(2) + pad_front + pad_back);
+    CHECK_EQ(result.size(3), data.size(3) + pad_top + pad_bottom);
+    CHECK_EQ(result.size(4), data.size(4) + pad_left + pad_right);
     SELECT_DEVICE(result.device(), padding_3d_impl, data, result, pad_left, pad_right, pad_top, pad_bottom, pad_front,
                   pad_back, mode);
 }
@@ -457,8 +488,6 @@ void padding_3d(Tensor data, Tensor result, int pad_left, int pad_right, int pad
 Tensor padding_3d(Tensor data, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back,
                   PaddingMode mode)
 {
-    CHECK_EQ(data.size(0), 1);
-    CHECK_EQ(data.size(1), 1);
     CHECK_EQ(data.dim(), 5);  // 5D Tensor: [Batch, Channel, Depth, Height, Width]
 
     auto out_sizes = data.sizes();
@@ -514,6 +543,8 @@ struct SliceNode : public FunctionNode<SliceNode>
 }  // namespace autograd
 Tensor slice(Tensor a, int64_t dim, int64_t start, int64_t end, int64_t step)
 {
+    CHECK_GT(step, 0) << "slice step must be positive";
+    dim = maybe_wrap_dim(dim, a.dim());
     return autograd::SliceNode::apply(a, dim, start, end, step)[0];
 }
 
@@ -581,7 +612,13 @@ Tensor clone(Tensor a)
 }
 Tensor permute(Tensor t, const SizeType& size)
 {
-    return autograd::PermuteNode::apply(t, size)[0];
+    CHECK_EQ(size.size(), t.dim());
+    SizeType dims = size;
+    for (auto& d : dims.vec())
+    {
+        d = maybe_wrap_dim(d, t.dim());
+    }
+    return autograd::PermuteNode::apply(t, dims)[0];
 }
 
 
@@ -643,11 +680,20 @@ struct GridsampleNode : public FunctionNode<GridsampleNode>
     static std::vector<Tensor> forward(Context* ctx, Tensor input, Tensor grid, IValue _interpolation, IValue _padding,
                                        IValue _align_corners)
     {
-        CHECK(input.dim() == 4 || input.dim() == 5);
+        CHECK(input.dim() == 4 || input.dim() == 5) << "grid_sample: input must be 4D or 5D, got " << input.dim();
+        CHECK_EQ(grid.dim(), input.dim()) << "grid_sample: grid and input must have the same number of dims";
+        CHECK_EQ(grid.size(0), input.size(0)) << "grid_sample: grid and input must have the same batch size";
+        CHECK_EQ(grid.size(grid.dim() - 1), input.dim() - 2)
+            << "grid_sample: the last grid dim must have size " << input.dim() - 2;
+        CHECK_EQ(grid.device(), input.device()) << "grid_sample: grid and input must be on the same device";
+        CHECK_EQ(grid.scalar_type(), input.scalar_type()) << "grid_sample: grid and input must have the same dtype";
+        CHECK(input.scalar_type() == kHalf || input.scalar_type() == kFloat || input.scalar_type() == kDouble)
+            << "grid_sample: only half, float and double are supported, got " << input.scalar_type();
 
         InterpolationType interpolation = (InterpolationType)_interpolation.toInt();
         PaddingMode padding             = (PaddingMode)_padding.toInt();
-        // CHECK_EQ(padding, PaddingMode::kBorder);
+        CHECK(interpolation == kBilinear || interpolation == kNearest) << "grid_sample: invalid interpolation mode";
+        CHECK(padding == kBorder || padding == kZero || padding == kReflect) << "grid_sample: invalid padding mode";
         bool align_corners = _align_corners.toBool();
         auto size_out      = input.sizes();
         size_out[2]        = grid.size(1);
@@ -738,32 +784,90 @@ std::pair<Tensor, Tensor> sort(Tensor t, int64_t dim)
 
     return {result_t, result_index};
 }
+namespace autograd
+{
+struct Conv2dNode : public FunctionNode<Conv2dNode>
+{
+    static std::vector<Tensor> forward(Context* ctx, Tensor input, Tensor weight, Tensor bias, IValue _stride,
+                                       IValue _padding, IValue _dilation, IValue _groups)
+    {
+        int stride   = (int)_stride.toInt();
+        int padding  = (int)_padding.toInt();
+        int dilation = (int)_dilation.toInt();
+        int groups   = (int)_groups.toInt();
+
+        CHECK_EQ(input.dim(), 4) << "conv2d: input must be [N, Cin, H, W]";
+        CHECK_EQ(weight.dim(), 4) << "conv2d: weight must be [Cout, Cin / groups, kH, kW]";
+        CHECK_EQ(input.device(), weight.device());
+        CHECK_EQ(input.scalar_type(), weight.scalar_type());
+        CHECK_GE(stride, 1);
+        CHECK_GE(padding, 0);
+        CHECK_GE(dilation, 1);
+        CHECK_GE(groups, 1);
+        CHECK_EQ(input.size(1) % groups, 0);
+        CHECK_EQ(weight.size(0) % groups, 0);
+        CHECK_EQ(weight.size(1) * groups, input.size(1)) << "conv2d: weight and input channels do not match";
+        if (bias.defined())
+        {
+            CHECK_EQ(bias.dim(), 1);
+            CHECK_EQ(bias.size(0), weight.size(0));
+            CHECK_EQ(bias.device(), input.device());
+            CHECK_EQ(bias.scalar_type(), input.scalar_type());
+        }
+
+        int64_t out_height = (input.size(2) + 2 * padding - dilation * (weight.size(2) - 1) - 1) / stride + 1;
+        int64_t out_width  = (input.size(3) + 2 * padding - dilation * (weight.size(3) - 1) - 1) / stride + 1;
+        CHECK_GT(out_height, 0) << "conv2d: kernel larger than the padded input";
+        CHECK_GT(out_width, 0) << "conv2d: kernel larger than the padded input";
+
+        auto result = empty({input.size(0), weight.size(0), out_height, out_width}, input.options());
+        SELECT_DEVICE(input.device(), conv2d, input, weight, bias, stride, padding, dilation, groups, result);
+
+        ctx->saved_data["stride"]   = _stride;
+        ctx->saved_data["padding"]  = _padding;
+        ctx->saved_data["dilation"] = _dilation;
+        ctx->saved_data["groups"]   = _groups;
+        ctx->save_for_backward({input, weight});
+        return {result};
+    }
+
+    static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
+    {
+        auto l       = ctx->get_saved_variables();
+        auto input   = l[0];
+        auto weight  = l[1];
+        auto g       = grad[0];
+        int stride   = (int)ctx->saved_data["stride"].toInt();
+        int padding  = (int)ctx->saved_data["padding"].toInt();
+        int dilation = (int)ctx->saved_data["dilation"].toInt();
+        int groups   = (int)ctx->saved_data["groups"].toInt();
+
+        Tensor grad_input, grad_weight, grad_bias;
+        if (ctx->requires_grad_for_input(0))
+        {
+            grad_input = empty(input.sizes(), input.options());
+            SELECT_DEVICE(input.device(), conv2d_backward_input, weight, g, stride, padding, dilation, groups,
+                          grad_input);
+        }
+        if (ctx->requires_grad_for_input(1))
+        {
+            grad_weight = empty(weight.sizes(), weight.options());
+            SELECT_DEVICE(input.device(), conv2d_backward_weight, input, g, stride, padding, dilation, groups,
+                          grad_weight);
+        }
+        if (ctx->requires_grad_for_input(2))
+        {
+            grad_bias = g.sum({0, 2, 3}, false);
+        }
+        return {grad_input, grad_weight, grad_bias, {}, {}, {}, {}};
+    }
+};
+}  // namespace autograd
+
 Tensor conv2d(Tensor input, Tensor weight, Tensor bias, int stride, int padding, int dilation, int groups)
 {
-    CHECK(!input.requires_grad() || !GradMode::is_enabled());
-    CHECK(!bias.defined());
-    CHECK_EQ(input.dim(), 4);
-    CHECK_EQ(weight.dim(), 4);
-    CHECK_EQ(stride, 1);
-    CHECK_EQ(dilation, 1);
-    CHECK_EQ(groups, 1);
-
-    int64_t in_batch = input.size(0);
-    // int64_t in_channels = input.size(1);
-    int64_t in_height = input.size(2);
-    int64_t in_width  = input.size(3);
-
-    CHECK_EQ(weight.size(0), 1);
-    int64_t out_batch    = in_batch;
-    int64_t out_channels = weight.size(1);
-    int64_t out_height   = in_height - (weight.size(2) - 1) + padding * 2;
-    int64_t out_width    = in_width - (weight.size(3) - 1) + padding * 2;
-
-    auto result = zeros({out_batch, out_channels, out_height, out_width}, input.options());
-
-    SELECT_DEVICE(input.device(), conv2d, input, weight, bias, stride, padding, dilation, groups, result);
-
-    return result;
+    return autograd::Conv2dNode::apply(input, weight, bias, (int64_t)stride, (int64_t)padding, (int64_t)dilation,
+                                       (int64_t)groups)[0];
 }
 
 Tensor nn::functional::grid_sample(Tensor data, Tensor uv, nn::functional::GridSampleFuncOptions options)
@@ -773,34 +877,69 @@ Tensor nn::functional::grid_sample(Tensor data, Tensor uv, nn::functional::GridS
 
 namespace autograd
 {
+// Batched matmul of a [..., M, K] and b [..., K, N] with broadcast batch dimensions (both operands >= 2-D).
+static Tensor matmul_broadcast(Tensor a, Tensor b)
+{
+    int64_t a_dim = a.dim();
+    int64_t b_dim = b.dim();
+    CHECK_GE(a_dim, 2);
+    CHECK_GE(b_dim, 2);
+    CHECK_EQ(a.device(), b.device());
+    CHECK_EQ(a.scalar_type(), b.scalar_type());
+    CHECK_EQ(a.size(a_dim - 1), b.size(b_dim - 2)) << "matmul: inner dimensions do not match";
+
+    int64_t batch_dim = std::max(a_dim, b_dim) - 2;
+    std::vector<int64_t> out_sizes(batch_dim + 2);
+    for (int64_t d = 0; d < batch_dim; ++d)
+    {
+        int64_t da = d - (batch_dim - (a_dim - 2));
+        int64_t db = d - (batch_dim - (b_dim - 2));
+        int64_t sa = da >= 0 ? a.size(da) : 1;
+        int64_t sb = db >= 0 ? b.size(db) : 1;
+        CHECK(sa == sb || sa == 1 || sb == 1) << "matmul: batch dimensions are not broadcastable";
+        out_sizes[d] = sa == 1 ? sb : sa;
+    }
+    out_sizes[batch_dim]     = a.size(a_dim - 2);
+    out_sizes[batch_dim + 1] = b.size(b_dim - 1);
+
+    Tensor result = empty(out_sizes, a.options());
+    if (result.numel() > 0)
+    {
+        SELECT_DEVICE(a.device(), matmul_impl, a, b, result);
+    }
+    return result;
+}
+
+// Sums the gradient of a broadcast operand back to the operand's sizes.
+static Tensor reduce_to_sizes(Tensor g, const SizeType& sizes)
+{
+    int64_t extra = g.dim() - (int64_t)sizes.size();
+    CHECK_GE(extra, 0);
+    std::vector<int64_t> reduce_dims;
+    for (int64_t d = 0; d < g.dim(); ++d)
+    {
+        if (d < extra || (sizes[d - extra] == 1 && g.size(d) != 1))
+        {
+            reduce_dims.push_back(d);
+        }
+    }
+    if (!reduce_dims.empty())
+    {
+        g = g.sum(reduce_dims, true);
+    }
+    if (extra > 0)
+    {
+        g = g.reshape(sizes);
+    }
+    return g;
+}
+
 struct MatmulNode : public FunctionNode<MatmulNode>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b)
     {
         ctx->save_for_backward({a, b});
-
-        auto a_sizes = a.sizes().vec();
-        auto b_sizes = b.sizes().vec();
-
-        CHECK_GE(a_sizes.size(), 2);
-        CHECK_GE(b_sizes.size(), 2);
-
-        int a_dim = a_sizes.size();
-        int b_dim = b_sizes.size();
-
-        // Inner dimensions must match for matrix multiplication
-        CHECK_EQ(a_sizes[a_dim - 1], b_sizes[b_dim - 2]);
-
-        // Output size: [..., M, N]
-        std::vector<int64_t> out_sizes = a_sizes;
-        out_sizes[a_dim - 1] = b_sizes[b_dim - 1];
-
-        Tensor result = empty(out_sizes, a.options());
-
-        // Dispatch to device-specific kernel (to be implemented later)
-        SELECT_DEVICE(a.device(), matmul_impl, a, b, result);
-
-        return {result};
+        return {matmul_broadcast(a, b)};
     }
 
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
@@ -810,22 +949,17 @@ struct MatmulNode : public FunctionNode<MatmulNode>
         auto b = l[1];
         auto g = grad[0];
 
-        int a_dim = a.dim();
-        int b_dim = b.dim();
-
-        // Transpose the last two dimensions for the backward passes
-        Tensor b_T = transpose(b, b_dim - 2, b_dim - 1);
-        Tensor a_T = transpose(a, a_dim - 2, a_dim - 1);
-
-        auto grad_a = empty_like(a);
-        auto grad_b = empty_like(b);
-
-        // dL/dA = dL/dC * B^T
-        SELECT_DEVICE(a.device(), matmul_impl, g, b_T, grad_a);
-
-        // dL/dB = A^T * dL/dC
-        SELECT_DEVICE(b.device(), matmul_impl, a_T, g, grad_b);
-
+        Tensor grad_a, grad_b;
+        if (ctx->requires_grad_for_input(0))
+        {
+            // dL/dA = dL/dC * B^T
+            grad_a = reduce_to_sizes(matmul_broadcast(g, transpose(b, b.dim() - 2, b.dim() - 1)), a.sizes());
+        }
+        if (ctx->requires_grad_for_input(1))
+        {
+            // dL/dB = A^T * dL/dC
+            grad_b = reduce_to_sizes(matmul_broadcast(transpose(a, a.dim() - 2, a.dim() - 1), g), b.sizes());
+        }
         return {grad_a, grad_b};
     }
 };
@@ -833,6 +967,27 @@ struct MatmulNode : public FunctionNode<MatmulNode>
 
 Tensor matmul(Tensor a, Tensor b)
 {
+    CHECK(a.dim() >= 1 && b.dim() >= 1) << "matmul: both arguments need at least one dimension";
+    if (a.dim() == 1 && b.dim() == 1)
+    {
+        return autograd::MatmulNode::apply(a.reshape({1, a.size(0)}), b.reshape({b.size(0), 1}))[0].reshape({1});
+    }
+    if (a.dim() == 1)
+    {
+        // [K] @ [..., K, N] -> [..., N]
+        auto r                     = autograd::MatmulNode::apply(a.reshape({1, a.size(0)}), b)[0];
+        std::vector<int64_t> sizes = r.sizes().vec();
+        sizes.erase(sizes.end() - 2);
+        return r.reshape(sizes);
+    }
+    if (b.dim() == 1)
+    {
+        // [..., M, K] @ [K] -> [..., M]
+        auto r                     = autograd::MatmulNode::apply(a, b.reshape({b.size(0), 1}))[0];
+        std::vector<int64_t> sizes = r.sizes().vec();
+        sizes.pop_back();
+        return r.reshape(sizes);
+    }
     return autograd::MatmulNode::apply(a, b)[0];
 }
 }  // namespace tinytorch

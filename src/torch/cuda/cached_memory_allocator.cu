@@ -26,7 +26,8 @@ static int64_t max_pinned_memory = 0;
 
 static std::recursive_mutex mu;
 static bool allocator_initialized = false;
-static bool has_malloc_async      = false;
+// per device: -1 = not queried yet, 0 = no memory pool support, 1 = cudaMallocAsync supported
+static int malloc_async_supported[MAX_DEVICES];
 
 struct PerDeviceMemoryData
 {
@@ -120,6 +121,7 @@ void set_allocator_algorithm(AllocatorAlgorithm algo)
 
 AllocatorAlgorithm get_allocator_algorithm()
 {
+    std::unique_lock l(mu);
     return algorithm;
 }
 
@@ -138,20 +140,24 @@ int get_allocator_log_level()
 
 int64_t current_allocated_size(int device_id)
 {
+    std::unique_lock l(mu);
     return DeviceData(device_id).current_allocated_bytes;
 }
 
 int64_t max_allocated_size(int device_id)
 {
+    std::unique_lock l(mu);
     return DeviceData(device_id).max_allocated_bytes;
 }
 void set_max_pinned_memory(int64_t size)
 {
+    std::unique_lock l(mu);
     max_pinned_memory = size;
 }
 
 int64_t current_pinned_allocated_size()
 {
+    std::unique_lock l(mu);
     return PinnedMemoryData().current_allocated_bytes;
 }
 
@@ -159,18 +165,20 @@ static void initialize_allocator()
 {
     CHECK(!allocator_initialized);
     allocator_initialized = true;
+    std::fill(std::begin(malloc_async_supported), std::end(malloc_async_supported), -1);
+}
 
-    int value = 0;
-    TT_CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&value, cudaDevAttrMemoryPoolsSupported, 0));
-
-    if (value == 0)
+static bool has_malloc_async(int device_id)
+{
+    CHECK_GE(device_id, 0);
+    CHECK_LT(device_id, MAX_DEVICES);
+    if (malloc_async_supported[device_id] < 0)
     {
-        has_malloc_async = false;
+        int value = 0;
+        TT_CHECK_CUDA_ERROR(cudaDeviceGetAttribute(&value, cudaDevAttrMemoryPoolsSupported, device_id));
+        malloc_async_supported[device_id] = value != 0;
     }
-    else
-    {
-        has_malloc_async = true;
-    }
+    return malloc_async_supported[device_id] == 1;
 }
 
 static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size, int device_id)
@@ -391,11 +399,11 @@ static void free_async(void* ptr)
 
 static void* malloc_blocking(int64_t size, int device_id)
 {
-    void* ptr;
+    void* ptr              = nullptr;
     cudaError_t cuda_error = cudaMalloc(&ptr, size);
 
     handle_cuda_allocation_error(cuda_error, size, device_id);
-
+    TT_CHECK_CUDA_ERROR(cuda_error);
 
     return ptr;
 }
@@ -435,7 +443,7 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
     void* ptr = nullptr;
     uint64_t info;
 
-    if (has_malloc_async && algorithm == AllocatorAlgorithm::CUDA_MALLOC_ASYNC)
+    if (algorithm == AllocatorAlgorithm::CUDA_MALLOC_ASYNC && has_malloc_async(device_id))
     {
         ptr  = malloc_async(size, device_id);
         info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC_ASYNC;
@@ -445,7 +453,7 @@ std::pair<void*, uint64_t> cuda_cached_malloc(int64_t size, int device_id)
         ptr  = malloc_blocking_check_free(size, device_id);
         info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC;
     }
-    else if (algorithm == AllocatorAlgorithm::CUDA_MALLOC)
+    else if (algorithm == AllocatorAlgorithm::CUDA_MALLOC || algorithm == AllocatorAlgorithm::CUDA_MALLOC_ASYNC)
     {
         ptr  = malloc_blocking(size, device_id);
         info = (uint64_t)AllocatorAlgorithm::CUDA_MALLOC;
@@ -598,6 +606,9 @@ void* cuda_malloc_pinned(int64_t size)
             std::cout << " Pinned memory allocation of " << (size / 1024.0 / 1024.0)
                       << "MiB failed. Falling back to non-pinned memory...\n";
         }
+        // the caller falls back to non-pinned memory, so clear the (non-sticky) error
+        (void)cudaGetLastError();
+        free(ptr);
         ptr = nullptr;
     }
     return ptr;
@@ -656,7 +667,7 @@ int64_t pre_allocate_vram(int64_t requested)
                 break;
             }
         }
-        catch (TinyTorchException e)
+        catch (const TinyTorchException&)
         {
         }
 
@@ -664,6 +675,7 @@ int64_t pre_allocate_vram(int64_t requested)
 
         if (allocated <= 0)
         {
+            log_level = old_log;
             return 0;
         }
     }
@@ -694,6 +706,14 @@ void free_preallocate_vram()
         if (log_level > 3)
         {
             std::cout << "free_preallocate_vram\n";
+        }
+        // work on any stream may still use (already freed) blocks of the arena
+        for (auto& block : data.free_blocks)
+        {
+            for (auto& e : block.free_events)
+            {
+                TT_LOG_FREE_ERROR(cudaEventSynchronize(e.first.get()));
+            }
         }
         cuda_cached_free(data.full_ptr, data.full_alloc_info, device_id);
         data.full_ptr  = nullptr;
@@ -734,14 +754,17 @@ void prealloc_print_debug_line()
 }
 void prealloc_allow_fallback_cudamalloc(bool value)
 {
+    std::unique_lock l(mu);
     prealloc_use_fallback = value;
 }
 void pre_allocate_set_reserved_memory(int64_t reserve)
 {
+    std::unique_lock l(mu);
     PreallocDeviceData(getDevice()).reserved_bytes = reserve;
 }
 int64_t pre_allocate_get_reserved_memory()
 {
+    std::unique_lock l(mu);
     return PreallocDeviceData(getDevice()).reserved_bytes;
 }
 }  // namespace cuda

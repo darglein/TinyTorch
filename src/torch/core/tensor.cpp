@@ -11,6 +11,8 @@
 #include "torch/core/ops/all.h"
 #include "torch/core/tensor.h"
 
+#include <algorithm>
+#include <atomic>
 #include <thread>
 
 #include "../tiny_torch_cuda.h"
@@ -25,18 +27,28 @@ int& internal_num_threads()
     return num_threads;
 }
 
+static std::atomic<int> default_num_threads{-1};
+
 void set_num_threads(int n)
 {
     internal_num_threads() = n;
+}
+void set_default_num_threads(int n)
+{
+    default_num_threads.store(n, std::memory_order_relaxed);
 }
 int get_num_threads()
 {
     int n = internal_num_threads();
     if (n <= 0)
     {
-        n = std::thread::hardware_concurrency();
+        n = default_num_threads.load(std::memory_order_relaxed);
     }
-    return n;
+    if (n <= 0)
+    {
+        n = (int)std::thread::hardware_concurrency();
+    }
+    return std::max(n, 1);
 }
 
 int64_t Tensor::numel() const
@@ -151,9 +163,10 @@ static void fill_neg_one_dim(SizeType& new_sizes, int64_t old_numel)
     int64_t* neg_dim  = nullptr;
     for (int64_t& i : new_sizes.vec())
     {
+        CHECK_GE(i, -1) << "invalid shape " << new_sizes;
         if (i == -1)
         {
-            CHECK_EQ(neg_dim, nullptr);
+            CHECK_EQ(neg_dim, nullptr) << "only one dimension can be inferred";
             neg_dim = &i;
         }
         else
@@ -164,6 +177,8 @@ static void fill_neg_one_dim(SizeType& new_sizes, int64_t old_numel)
 
     if (neg_dim)
     {
+        CHECK_NE(new_numel, 0) << "cannot reshape a tensor of " << old_numel << " elements into shape " << new_sizes
+                               << " because the unspecified dimension size -1 can be any value and is ambiguous";
         CHECK_EQ(old_numel % new_numel, 0);
         *neg_dim = old_numel / new_numel;
         new_numel *= *neg_dim;
@@ -289,28 +304,36 @@ Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step,
 {
     CHECK(defined());
     CHECK(!this->requires_grad() || !GradMode::is_enabled());
-    int64_t dims = this->dim();
+    dim              = maybe_wrap_dim(dim, this->dim());
+    int64_t dim_size = this->size(dim);
+    int64_t new_size = 0;
 
-    if (dim < 0)
+    if (step > 0)
     {
-        dim += this->dim();
+        // PyTorch semantics: negative start/end count from the back, out-of-range values are clamped
+        if (start < 0) start += dim_size;
+        if (end < 0) end += dim_size;
+        start    = std::min(std::max(start, int64_t(0)), dim_size);
+        end      = std::min(std::max(end, start), dim_size);
+        new_size = (end - start + step - 1) / step;
+    }
+    else
+    {
+        // internal reverse slicing (e.g. flip): start is the first index, end is exclusive and may be -1
+        CHECK(!sanity_checks) << "slice step must be positive";
+        CHECK_LT(step, 0);
+        CHECK_GE(end, -1);
+        CHECK_LE(end, start);
+        CHECK_LT(start, dim_size);
+        CHECK_EQ((end - start) % step, 0);
+        new_size = (end - start) / step;
     }
 
-    CHECK_GE(dim, 0);
-    CHECK_LT(dim, dims);
-
-    if (sanity_checks)
-    {
-        CHECK_LE(start, end);
-    }
-    CHECK_LE(end, this->size(dim));
-    CHECK_EQ((end - start) % step, 0);
-
-    int64_t offset = start * this->stride(dim);
+    int64_t offset = new_size > 0 ? start * this->stride(dim) : 0;
     offset *= this->element_size();
 
     std::vector<int64_t> new_sizes = this->sizes();
-    new_sizes[dim]                 = (end - start) / step;
+    new_sizes[dim]                 = new_size;
 
     auto new_strides = this->strides();
     new_strides[dim] *= step;
@@ -321,16 +344,32 @@ Tensor Tensor::slice_view(int64_t dim, int64_t start, int64_t end, int64_t step,
     return Tensor(new_impl);
 }
 
+Tensor Tensor::operator[](int64_t index) const
+{
+    CHECK_GE(dim(), 1);
+    int64_t n = size(0);
+    CHECK(index >= -n && index < n) << "index " << index << " is out of bounds for dimension 0 with size " << n;
+    if (index < 0)
+    {
+        index += n;
+    }
+    return slice(0, index, index + 1).squeeze(0);
+}
+
 Tensor Tensor::permute_view(const SizeType& index) const
 {
     CHECK_EQ(dim(), index.size());
     auto new_sizes   = this->sizes();
     auto new_strides = this->strides();
 
+    std::vector<bool> used(dim(), false);
     for (int i = 0; i < dim(); ++i)
     {
-        new_sizes[i]   = size(index[i]);
-        new_strides[i] = stride(index[i]);
+        int64_t d = maybe_wrap_dim(index[i], dim());
+        CHECK(!used[d]) << "repeated dim " << d << " in permute " << index;
+        used[d]        = true;
+        new_sizes[i]   = size(d);
+        new_strides[i] = stride(d);
     }
 
     std::shared_ptr<TensorImpl> new_impl = TensorImpl::create(impl_->storage_, impl_->storage_offset_,
@@ -381,12 +420,7 @@ void Tensor::resize_(const SizeType& size)
 
 Tensor Tensor::unsqueeze(int64_t dim) const
 {
-    CHECK(dim >= -this->dim() - 1 && dim < this->dim() + 1);
-
-    if (dim < 0)
-    {
-        dim = dim + this->dim() + 1;
-    }
+    dim = maybe_wrap_dim(dim, this->dim() + 1);
 
     std::vector<int64_t> new_sizes = sizes();
     new_sizes.insert(std::next(new_sizes.begin(), dim), 1);
@@ -395,15 +429,8 @@ Tensor Tensor::unsqueeze(int64_t dim) const
 
 Tensor Tensor::squeeze(int64_t dim) const
 {
-    if (dim < 0)
-    {
-        dim += this->dim();
-    }
-
-    CHECK_LT(dim, this->dim());
-    CHECK_GE(dim, 0);
-    CHECK_EQ(size(dim), 1);
-    if (this->dim() == 1)
+    dim = maybe_wrap_dim(dim, this->dim());
+    if (size(dim) != 1 || this->dim() == 1)
     {
         return *this;
     }
@@ -424,7 +451,7 @@ Tensor Tensor::squeeze() const
     std::vector<int64_t> new_sizes = sizes();
     new_sizes.erase(std::remove(new_sizes.begin(), new_sizes.end(), 1), new_sizes.end());
 
-    return view(new_sizes);
+    return reshape(new_sizes);
 }
 Tensor Tensor::squeeze_view() const
 {
@@ -596,9 +623,16 @@ Tensor Tensor::index_add(int64_t dim, Tensor index, Tensor data) const
 }
 bool Tensor::allclose(Tensor other, double rtol, double atol) const
 {
-    Tensor diff = (*this - other).abs().max().to(kDouble);
-    double v    = diff.toDouble();
-    return v <= atol;
+    NoGradGuard ngg;
+    CHECK_EQ(sizes(), other.sizes());
+    if (numel() == 0)
+    {
+        return true;
+    }
+    Tensor a        = this->to(kDouble);
+    Tensor b        = other.to(kDouble);
+    Tensor violates = (a - b).abs() - (atol + rtol * b.abs());
+    return violates.max().toDouble() <= 0;
 }
 void Tensor::backward() const
 {
@@ -729,19 +763,22 @@ Tensor& Tensor::index_copy_(int64_t dim, Tensor ids, Tensor value)
 }
 void Tensor::retain_grad()
 {
-    CHECK(requires_grad());
-    CHECK(!is_leaf());
-    CHECK(impl_->autograd_meta->edge);
+    CHECK(requires_grad()) << "retain_grad() called on a tensor that does not require grad";
+    if (is_leaf())
+    {
+        return;
+    }
     impl_->autograd_meta->_retain_grad = true;
 
-    auto old_edge = impl_->autograd_meta->edge;
-
-    auto accu_node = std::make_shared<autograd::AccumulateGrad>(impl_);
-    accu_node->next.push_back(old_edge);
-    accu_node->num_inputs_of_forward = 1;
-
-    auto intermedieate_edge    = std::make_shared<Edge>(accu_node, 0);
-    impl_->autograd_meta->edge = intermedieate_edge;
+    auto edge = impl_->autograd_meta->edge;
+    for (auto& retained : edge->function->retained_outputs)
+    {
+        if (retained.first == edge->input_nr && retained.second.lock() == impl_)
+        {
+            return;
+        }
+    }
+    edge->function->retained_outputs.emplace_back(edge->input_nr, impl_);
 }
 
 Tensor Tensor::gather(int64_t dim, Tensor index) const

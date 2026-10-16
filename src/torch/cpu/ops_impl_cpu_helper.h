@@ -9,9 +9,19 @@
 
 #include "torch/core/tensor.h"
 
+#include <type_traits>
+
 
 namespace tinytorch
 {
+
+// accumulation type of sums/products on the CPU: int64 for integers, float for half
+template <typename T>
+struct CpuAccType
+{
+    using Type =
+        typename std::conditional<std::is_integral<T>::value, int64_t, typename CpuComputeFloatType<T>::Type>::type;
+};
 
 #define CASE_MACRO(func, scalar_type, ...) \
     case scalar_type:                      \
@@ -21,6 +31,8 @@ namespace tinytorch
 #define SWITCH_MACRO_INT(real_scalar_type, func, ...)                  \
     switch (real_scalar_type)                                          \
     {                                                                  \
+        CASE_MACRO(func<uint8_t>, kUInt8, __VA_ARGS__)                 \
+        CASE_MACRO(func<int16_t>, kInt16, __VA_ARGS__)                 \
         CASE_MACRO(func<uint16_t>, kUInt16, __VA_ARGS__)               \
         CASE_MACRO(func<int32_t>, kInt32, __VA_ARGS__)                 \
         CASE_MACRO(func<int64_t>, kInt64, __VA_ARGS__)                 \

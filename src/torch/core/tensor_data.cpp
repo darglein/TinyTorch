@@ -255,17 +255,20 @@ StorageImpl::StorageImpl(int64_t size, TensorOptions __options) : size_(size), o
         data_ptr_ = malloc_impl_host(size);
 #endif
 
-#if TT_DEBUG
-        memset(data_ptr_, 0xabababab, size);
-#endif
         has_ownership = true;
 
-        if (!data_ptr_)
+        if (!data_ptr_ && size > 0)
         {
             print_memory_info(std::cout);
             throw TinyTorchException(std::string("CPU memory allocation failed. Out of memory."),
                                      TinyTorchExceptionStatus::OutOfMemoryCPU);
         }
+#if TT_DEBUG
+        if (data_ptr_)
+        {
+            memset(data_ptr_, 0xab, size);
+        }
+#endif
     }
     else if (options_.device_ == kCUDA)
     {

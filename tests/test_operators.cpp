@@ -4,6 +4,9 @@
  * See LICENSE file for more information.
  */
 
+#include <cmath>
+#include <limits>
+
 #include "test_utils.h"
 
 using tttest::DeviceTest;
@@ -170,6 +173,40 @@ TEST_P(TinyTorchComparisonOps, Values)
     TT_EXPECT_CLOSE((a - b).abs(), tttest::make_tensor({1, 0, 1, 0}, {2, 2}, device()), 0, 0);
 }
 
+// the scalar is not truncated to the integer type before the op
+TEST_P(TinyTorchComparisonOps, IntegerTensorWithFractionalScalar)
+{
+    Tensor a = tttest::make_tensor(std::vector<int64_t>{1, 2, 3, 4}, {4}, device());
+    EXPECT_EQ(tttest::to_double_vec(a < 2.5), (std::vector<double>{1, 1, 0, 0}));
+    EXPECT_EQ(tttest::to_double_vec(a > 2.5), (std::vector<double>{0, 0, 1, 1}));
+    EXPECT_EQ(tttest::to_double_vec(a == 2.5), (std::vector<double>{0, 0, 0, 0}));
+    EXPECT_EQ(tttest::to_double_vec(a * 1.5), (std::vector<double>{1, 3, 4, 6}));
+    Tensor b = tttest::make_tensor(std::vector<int64_t>{4, 9, 16}, {3}, device());
+    EXPECT_EQ(tttest::to_double_vec(tinytorch::pow(b, 2.0)), (std::vector<double>{16, 81, 256}));
+    // pow(x, 0.5) was pow(x, 0) = 1; the result is truncated to the integer type, so allow one below
+    auto r = tttest::to_double_vec(tinytorch::pow(b, 0.5));
+    for (size_t i = 0; i < r.size(); ++i) EXPECT_NEAR(r[i], 1.5 + double(i), 0.5);
+    // integer results wrap like integer arithmetic
+    Tensor c = tttest::make_tensor({0, 1}, {2}, device(), tinytorch::kUInt8);
+    EXPECT_EQ(tttest::to_double_vec(c - 1.0), (std::vector<double>{255, 0}));
+}
+
+// min/max propagate NaN from either operand (torch.minimum / torch.maximum)
+TEST_P(TinyTorchComparisonOps, MinMaxNaNSymmetric)
+{
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    Tensor a         = tttest::make_tensor({nan, 1, 2}, {3}, device());
+    Tensor b         = tttest::make_tensor({1, nan, 3}, {3}, device());
+    for (auto r : {tinytorch::min(a, b), tinytorch::min(b, a), tinytorch::max(a, b), tinytorch::max(b, a)})
+    {
+        auto v = tttest::to_double_vec(r);
+        EXPECT_TRUE(std::isnan(v[0]));
+        EXPECT_TRUE(std::isnan(v[1]));
+    }
+    EXPECT_EQ(tttest::to_double_vec(tinytorch::min(a, b))[2], 2);
+    EXPECT_EQ(tttest::to_double_vec(tinytorch::max(a, b))[2], 3);
+}
+
 // ------------------------------------------------------------------ compound ops
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchCompoundAssignOps);
@@ -216,6 +253,25 @@ TEST_P(TinyTorchBroadcasting, ValuesAndReducedGradient)
     TT_EXPECT_CLOSE(b.grad(), tttest::make_tensor({2, 2, 2, 3, 3, 3}, {2, 3}, device()), 0, 0);
 }
 
+// a size-1 dim broadcasts to 0 (like PyTorch); the gradient of the size-1 operand is 0 with its own shape
+TEST_P(TinyTorchBroadcasting, ZeroSizeDim)
+{
+    Tensor a = tttest::leaf({1, 2, 3}, {1, 3}, device());
+    Tensor b = tinytorch::zeros({0, 3}, TensorOptions().device(device()));
+    b.set_requires_grad(true, true);
+
+    Tensor s = a + b;
+    EXPECT_EQ(s.sizes(), (SizeType{0, 3}));
+    tinytorch::backward(tinytorch::sum(s));
+    EXPECT_EQ(a.grad().sizes(), (SizeType{1, 3}));
+    EXPECT_EQ(tttest::to_double_vec(a.grad()), (std::vector<double>{0, 0, 0}));
+
+    Tensor c = tttest::make_tensor({1, 2, 3}, {3, 1}, device());
+    Tensor d = tinytorch::zeros({3, 0}, TensorOptions().device(device()));
+    EXPECT_EQ((c * d).sizes(), (SizeType{3, 0}));
+    EXPECT_EQ((d * c).sizes(), (SizeType{3, 0}));
+}
+
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchBroadcastingAdd);
 TEST_P(TinyTorchBroadcastingAdd, Values)
 {
@@ -234,4 +290,16 @@ TEST_P(TinyTorchBroadcastingMismatch, SameDimMustMatch)
     Tensor b = tttest::make_tensor({1, 2, 1, 2}, {2, 2}, device());
     Tensor s = a + b;
     TT_EXPECT_CLOSE(s, tttest::make_tensor({2, 3, 3, 4}, {2, 2}, device()), 0, 0);
+}
+
+// Both operands have the same number of elements but are broadcast against each other
+TEST_P(TinyTorchBroadcastingAdd, EqualNumelDifferentShapes)
+{
+    Tensor a = tttest::make_tensor({1, 2, 3, 4}, {1, 4}, device());
+    Tensor b = tttest::make_tensor({10, 20, 30, 40}, {4, 1}, device());
+    Tensor c = a + b;
+    ASSERT_EQ(c.sizes(), (SizeType{4, 4}));
+    TT_EXPECT_CLOSE(
+        c, tttest::make_tensor({11, 12, 13, 14, 21, 22, 23, 24, 31, 32, 33, 34, 41, 42, 43, 44}, {4, 4}, device()), 0,
+        0);
 }

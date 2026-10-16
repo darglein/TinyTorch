@@ -132,4 +132,34 @@ TEST(TinyTorchCudaStreams, BlockingPeerToPeerWaitsForSourceStream)
     EXPECT_FLOAT_EQ(t0.min().item<float>(), 5.0f) << "the peer copy didn't wait for fill_ on the source device";
 }
 
+// A pinned host buffer must not be freed while an asynchronous copy still reads it (cudaHostUnregister waits for it)
+TEST(TinyTorchCudaStreams, PinnedSourceOutlivesAsyncCopy)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    Device device(kCUDA, 0);
+    cuda::DeviceGuard dg(device);
+    WarmUp(device);
+    NonBlockingStream s(device);
+
+    auto dst = zeros({1024}, TensorOptions(device).dtype(kFloat));
+    auto src = full({1024}, 3.0f, TensorOptions(kCPU).dtype(kFloat).pinned_memory(true));
+    if (!src.options().pinned_memory_)
+    {
+        GTEST_SKIP() << "pinned memory not available";
+    }
+
+    tttest::ReleaseLater(tttest::StallStream(s.stream), 200);
+    auto start = std::chrono::steady_clock::now();
+    dst.copy_(src, true);
+    src       = {};
+    auto wait = std::chrono::steady_clock::now() - start;
+    EXPECT_GE(wait, std::chrono::milliseconds(100)) << "the pinned buffer was freed before the async copy finished";
+
+    EXPECT_FLOAT_EQ(dst.min().item<float>(), 3.0f);
+    EXPECT_FLOAT_EQ(dst.max().item<float>(), 3.0f);
+}
+
 #endif

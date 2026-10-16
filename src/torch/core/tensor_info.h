@@ -121,8 +121,8 @@ struct DimIndexStruct
 
     explicit DimIndexStruct(const std::vector<int64_t>& data)
     {
-        CHECK_LT(data.size(), DIM);
-        for (int i = 0; i < data.size(); ++i)
+        CHECK_LE(data.size(), DIM);
+        for (size_t i = 0; i < data.size(); ++i)
         {
             indices[i] = (IndexType)data[i];
         }
@@ -353,11 +353,7 @@ struct TensorInfoBase
         return data[offset];
     }
 
-    template <typename... Ts>
-    TT_INLINE constexpr TT_HD T& operator()(DimIndex index)
-    {
-        return operator[](IndexToOffset(index));
-    }
+    TT_INLINE constexpr TT_HD T& operator()(DimIndex index) { return data[IndexToOffset(index)]; }
 
     TT_INLINE constexpr TT_HD IndexType IndexToOffset(DimIndex index)
     {
@@ -442,7 +438,7 @@ struct TensorInfoBase
 #pragma unroll
         for (int i = 0; i < max_dims; ++i)
         {
-            if (i < dim() && (index[i] < 0 || index[i] > sizes[i]))
+            if (i < dim() && (index[i] < 0 || index[i] >= sizes[i]))
             {
                 result = false;
             }

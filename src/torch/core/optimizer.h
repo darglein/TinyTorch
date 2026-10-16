@@ -30,6 +30,8 @@ struct AdamOptions
     void betas(betas_t b) { betas_ = b; }
     double& weight_decay() { return weight_decay_; }
     void weight_decay(double b) { weight_decay_ = b; }
+    bool& amsgrad() { return amsgrad_; }
+    void amsgrad(bool b) { amsgrad_ = b; }
 
     double lr_           = 1e-3;
     betas_t betas_       = std::make_tuple(0.9, 0.999);
@@ -82,7 +84,8 @@ struct TINYTORCH_API Adam : public OptimizerBase
     void step();
 
     std::vector<AdamOptions> options;
-    std::vector<Tensor> m1, m2;
+    // m2_max is only allocated for parameters whose group uses amsgrad
+    std::vector<Tensor> m1, m2, m2_max;
 };
 
 

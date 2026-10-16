@@ -57,6 +57,8 @@ src/
         ops_impl.h          SELECT_DEVICE(device, func, ...) dispatch macro -> cpu_impl::/cuda_impl::
         ops_impl_shared.h   Shared elementwise forward/backward functors (UnaryOperators/BinaryOperators),
                             broadcasting helpers (CheckOperatorSizeMatchOneDim, max_size, BackwardExpand)
+        grid_sample_shared.h  TT_HD grid_sample forward/backward per sample (PyTorch semantics: zeros/border/
+                            reflection padding, nearest = round half to even), used by the cpu and cuda kernels
     cpu/                    CPU kernels, namespace cpu_impl
       ops_impl_cpu.h/.cpp   reductions, indexing, matmul, padding, ...
       binary_operators.*    elementwise binary kernels (OpenMP, SIMD)
@@ -144,6 +146,9 @@ Tensor (value-type handle, shared_ptr<TensorImpl>)
   **the graph is one-shot**; you must re-run forward each iteration to build it again.
 - Gradient flow control: `GradMode::is_enabled()` is **thread-local**; `NoGradGuard`/
   `AutoGradMode` are RAII guards. Forward passes run under `NoGradGuard` internally.
+- A node's `backward` may return the same tensor (or views of the incoming grad) for several inputs
+  (e.g. `AddNode`), so the engine accumulates out of place and `AccumulateGrad` clones the first grad
+  of a leaf: never modify a gradient tensor in place inside the engine.
 - If an input does not require grad, `backward` may return an undefined (`{}`) Tensor for it —
   callers must honor `ctx->requires_grad_for_input(i)`.
 - Broadcasting: elementwise binary ops use `CheckOperatorSizeMatchOneDim` (sizes must match or
@@ -167,8 +172,8 @@ Tensor (value-type handle, shared_ptr<TensorImpl>)
   - CPU: `CASE_MACRO(func<T>, kType, ...)` inside `SWITCH_MACRO_ALL/FLOAT/INT`
     (cpu/ops_impl_cpu_helper.h), operating on `TensorInfo<T>` (int64 indexing).
   - CUDA: `CUDA_CASE_MACRO(...)` (cuda/ops_impl_cuda_helper.h), operating on
-    `TensorInfoCuda<T>` (int32 indexing by default — `is_32bit_addressable()` is CHECKed;
-    `__half` is used for `kHalf` on device, `Half` on host).
+    `TensorInfoCuda<T>` (int64 indexing by default; with an explicit 32-bit `IndexType`,
+    `is_32bit_addressable()` is CHECKed; `__half` is used for `kHalf` on device, `Half` on host).
 - Kernels: CPU uses OpenMP (`#pragma omp parallel for num_threads(get_num_threads())`,
   optionally `#pragma omp simd`); CUDA kernels use `__launch_bounds__(128)`,
   `cuda::DeviceGuard` to pin the device, and `TT_CHECK_CUDA_ERROR` for runtime calls.
@@ -187,8 +192,16 @@ Tensor (value-type handle, shared_ptr<TensorImpl>)
 - `optim::Adam` (constructor takes `std::vector<Tensor>` + `AdamOptions`; methods `step()`,
   `zero_grad()` — lowercase) and `optim::SGDOptimizer` (methods `Step()`, `ZeroGrad()` —
   **uppercase**; pre-existing inconsistency, do not "fix" without asking).
+- Both optimizers skip parameters without a defined grad, work for any float dtype/device (tensor ops),
+  and move their state (m1/m2/velocity) to the parameter's device/dtype if the parameter was moved after
+  the optimizer was created. Adam implements `weight_decay` (L2, added to the grad) and `amsgrad`; its
+  update is `lr * sqrt(1-b2^t)/(1-b1^t) * m1 / (sqrt(m2 + 1e-10) + eps)` (bias correction folded into
+  the learning rate, not exactly PyTorch's eps placement).
 - `nn::Module` holds `parameters_`/`buffers_`/`modules_` maps; `register_parameter` also
-  allocates the grad. `ModuleHolder<T>` + `TORCH_MODULE(Name)` macro provide a
+  allocates the grad. `parameters()`/`named_parameters()`/`buffers()`/`named_buffers()` recurse into
+  submodules by default (`recurse = true`, names prefixed like `"sub.weight"`); `train(bool)`/`eval()`,
+  `to()` and `zero_grad()` propagate to submodules. `to()` (via `TensorImpl::set_data`) moves/converts
+  an existing grad instead of resetting it. `ModuleHolder<T>` + `TORCH_MODULE(Name)` macro provide a
   shared_ptr wrapper (PyTorch-style `Linear` pattern).
 - `save()`/`load()` (module.h, ops_functions.h) are **stubs that throw** — serialization is
   not implemented.
@@ -330,14 +343,25 @@ and the build-generated `build/src/include`.
 - Debug vs release: `TT_DEBUG` = 1 unless `NDEBUG`. Debug enables the (slow)
   `CUDA_KERNEL_ASSERT` bounds checks in device code; release compiles them out.
 - CPU kernels: parallelize with `#pragma omp parallel for num_threads(get_num_threads())`;
-  thread count is set via `tinytorch::set_num_threads(n)` (thread-local).
+  `get_num_threads()` is the thread-local `set_num_threads(n)` if > 0, else the process-wide
+  `set_default_num_threads(n)` if > 0, else `hardware_concurrency()` (always >= 1).
+- Numerics: unary math runs in double for double and in float otherwise (`MathComputeType`); a tensor op with a
+  double scalar computes in `ScalarComputeType` (double for integer tensors, so `int_t < 2.5` is exact) and converts
+  only the result; sums/scans accumulate half in float and integers in int64 (output keeps the input dtype); min/max
+  and their reductions propagate NaN like PyTorch, sort puts NaN last, `median(0.5)` is the lower median.
+- `Half(x)` converts by value (IEEE round-to-nearest-even, inf/NaN/subnormals); reinterpret raw binary16 bits only
+  with `Half::from_bits(bits)`.
+- CPU RNG: `generator()` is per thread and uniquely seeded. `manual_seed(s)` seeds the calling thread exactly as
+  before and sets a global seed: threads that never called `manual_seed` themselves re-seed from (s, thread index)
+  on their next draw; threads that called `manual_seed` keep their own stream. CUDA kernels draw a 64 bit seed from
+  `generator()` and hash it with the element index.
 - CUDA kernels: guard device work with `cuda::DeviceGuard guard(device);`, check runtime
   calls with `TT_CHECK_CUDA_ERROR`, and bounds-check with `CUDA_KERNEL_ASSERT` (debug only).
 - Scalar-type switches: always end with the `default: CHECK(false) << "invalid input type"` case.
 - Mixed host/device code goes through `TT_HD` / `TT_DEVICE_CODE` macros — do not write raw
   `__host__ __device__`.
-- 32-bit vs 64-bit indexing: host kernels use 64-bit indices (`TensorInfo`), device kernels
-  default to 32-bit (`TensorInfoCuda`) with a runtime `is_32bit_addressable()` check.
+- 32-bit vs 64-bit indexing: host and device kernels use 64-bit indices by default (`TensorInfo`,
+  `TensorInfoCuda`); a 32-bit `TensorInfoCuda<T, DIMS, int32_t>` CHECKs `is_32bit_addressable()`.
 
 ## Gotchas
 
@@ -345,8 +369,16 @@ and the build-generated `build/src/include`.
   calling `backward()` twice without a new forward will fail.
 - `backward()` requires the loss to `requires_grad()` and to have an edge
   (`CHECK(loss.getEdge())`); a numel-1 loss gets an implicit grad of 1.
+- `retain_grad()` keeps the tensor's edge (it stays a non-leaf) and registers the tensor in its node's
+  `retained_outputs`; `backward()` stores a clone of the incoming grad there. It is idempotent, a no-op on
+  leaves, and works regardless of whether consumers were created before or after the call.
+- Indices/dims follow PyTorch: negative dims/indices/starts/ends count from the back (`maybe_wrap_dim`
+  in tensor.h), `slice` clamps start/end to the dim size and needs `step > 0` (a negative step is only
+  used internally by `slice_view(..., sanity_checks=false)` for `flip`); `operator[]` CHECKs the range.
+- Tensor creation (`empty`/`zeros`/...) keeps `requires_grad` from the options also under a `NoGradGuard`.
+- `autograd::call_back` is a `std::atomic<NodeCallback*>`; the callback object must outlive all running ops.
 - `SGDOptimizer` uses capitalized `Step()`/`ZeroGrad()` while `Adam` uses `step()`/`zero_grad()`.
-- `ops_functions.cpp:261` emits a `-Wreturn-type` warning in CPU-only builds
+- `ops_functions.cpp` emits a `-Wreturn-type` warning in CPU-only builds
   (`ToDeviceNode::forward` has no return in the `#else` branch after `CHECK(false)`);
   it is harmless but expected — don't "fix" it by changing behavior.
 - `External/glog` (google/glog submodule) is dead weight for the build; `External/tiny-glog`

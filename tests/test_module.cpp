@@ -83,6 +83,53 @@ TEST(TinyTorchModule, SubModules)
     EXPECT_TRUE(inner->is_training());
 }
 
+TEST(TinyTorchModule, TrainEvalPropagate)
+{
+    ToyImpl outer(tttest::make_tensor({1}, {1}, kCPU));
+    auto inner = std::make_shared<ToyImpl>(tttest::make_tensor({2, 3}, {2}, kCPU));
+    outer.register_module("inner", inner);
+
+    outer.train(false);
+    EXPECT_FALSE(outer.is_training());
+    EXPECT_FALSE(inner->is_training());
+
+    outer.train();
+    EXPECT_TRUE(outer.is_training());
+    EXPECT_TRUE(inner->is_training());
+
+    outer.eval();
+    EXPECT_FALSE(outer.is_training());
+    EXPECT_FALSE(inner->is_training());
+}
+
+// parameters()/buffers() include submodules (recurse = true), with prefixed names
+TEST(TinyTorchModule, RecursiveParametersAndBuffers)
+{
+    ToyImpl outer(tttest::make_tensor({1}, {1}, kCPU));
+    auto inner = std::make_shared<ToyImpl>(tttest::make_tensor({2, 3}, {2}, kCPU));
+    auto leaf  = std::make_shared<ToyImpl>(tttest::make_tensor({4, 5, 6}, {3}, kCPU));
+    inner->register_module("leaf", leaf);
+    outer.register_module("inner", inner);
+    Tensor b = tttest::make_tensor({9}, {1}, kCPU);
+    inner->register_buffer("b", b);
+
+    EXPECT_EQ(outer.parameters().size(), 3u);
+    EXPECT_EQ(outer.parameters(false).size(), 1u);
+    EXPECT_EQ(outer.parameters()[0].numel(), 1);
+
+    auto named = outer.named_parameters();
+    ASSERT_EQ(named.size(), 3u);
+    EXPECT_EQ(named.at("w").numel(), 1);
+    EXPECT_EQ(named.at("inner.w").numel(), 2);
+    EXPECT_EQ(named.at("inner.leaf.w").numel(), 3);
+    EXPECT_EQ(outer.named_parameters(false).size(), 1u);
+
+    EXPECT_EQ(outer.buffers().size(), 1u);
+    EXPECT_EQ(outer.buffers(false).size(), 0u);
+    EXPECT_EQ(outer.named_buffers().count("inner.b"), 1u);
+    EXPECT_EQ(outer.named_buffers(false).size(), 0u);
+}
+
 TEST(TinyTorchModule, NameAndTraining)
 {
     ToyImpl m(tttest::make_tensor({1}, {1}, kCPU));
@@ -127,4 +174,35 @@ TEST(TinyTorchModule, ToDevice)
 
     EXPECT_EQ(m.parameters()[0].device(), kCUDA);
     TT_EXPECT_CLOSE(m.parameters()[0], tttest::make_tensor({1, 2, 3, 4}, {4}, kCUDA), 0, 0);
+}
+
+// to() moves the accumulated gradient (also of submodules) instead of resetting it to zero
+TEST(TinyTorchModule, ToDeviceKeepsGrad)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+
+    ToyImpl outer(tttest::make_tensor({1, 2}, {2}, kCPU));
+    auto inner = std::make_shared<ToyImpl>(tttest::make_tensor({3}, {1}, kCPU));
+    outer.register_module("inner", inner);
+    tinytorch::backward(tinytorch::sum(outer.w * 2.0) + tinytorch::sum(inner->w * 5.0));
+
+    outer.to(kCUDA);
+    EXPECT_EQ(outer.w.device(), kCUDA);
+    EXPECT_EQ(inner->w.device(), kCUDA);
+    ASSERT_TRUE(outer.w.grad().defined());
+    EXPECT_EQ(outer.w.grad().device(), kCUDA);
+    TT_EXPECT_CLOSE(outer.w.grad(), tttest::make_tensor({2, 2}, {2}, kCUDA), 0, 0);
+    TT_EXPECT_CLOSE(inner->w.grad(), tttest::make_tensor({5}, {1}, kCUDA), 0, 0);
+
+    // also for a dtype change
+    outer.w.to_(tinytorch::kDouble);
+    EXPECT_EQ(outer.w.grad().dtype(), tinytorch::kDouble);
+    TT_EXPECT_CLOSE(outer.w.grad(), tttest::make_tensor({2, 2}, {2}, kCUDA, tinytorch::kDouble), 0, 0);
+
+    // the moved parameters still work in the graph
+    tinytorch::backward(tinytorch::sum(inner->w * 1.0));
+    TT_EXPECT_CLOSE(inner->w.grad(), tttest::make_tensor({6}, {1}, kCUDA), 0, 0);
 }

@@ -137,6 +137,40 @@ TEST(TinyTorchDevice, AutogradWithDeviceMove)
     TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({2, 4, 6, 8}, {4}, kCUDA), 0, 0);
 }
 
+// The gradient flowing back through to(device) may be non-contiguous (views created by cat/permute backward)
+TEST(TinyTorchDevice, ToDeviceBackwardWithNonContiguousGrad)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+
+    {
+        Tensor x = tttest::leaf({1, 2, 3, 4, 5, 6}, {2, 3}, kCPU);
+        Tensor w = tttest::leaf({0, 0}, {2, 1}, kCUDA);
+        Tensor c = tttest::make_tensor({1, 2, 3, 4, 5, 6, 7, 8}, {2, 4}, kCUDA);
+        Tensor y = x.to(kCUDA);
+        tinytorch::backward(tinytorch::sum(tinytorch::cat({y, w}, 1) * c));
+        EXPECT_EQ(x.grad().device(), kCPU);
+        TT_EXPECT_CLOSE(x.grad(), tttest::make_tensor({1, 2, 3, 5, 6, 7}, {2, 3}, kCPU), 0, 0);
+    }
+    {
+        Tensor x = tttest::leaf({1, 2, 3, 4, 5, 6}, {2, 3}, kCPU);
+        Tensor c = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {3, 2}, kCUDA);
+        Tensor y = x.to(kCUDA);
+        tinytorch::backward(tinytorch::sum(y.permute({1, 0}) * c));
+        TT_EXPECT_CLOSE(x.grad(), tttest::make_tensor({1, 3, 5, 2, 4, 6}, {2, 3}, kCPU), 0, 0);
+    }
+    {
+        // and the other direction
+        Tensor x = tttest::leaf({1, 2, 3, 4, 5, 6}, {2, 3}, kCUDA);
+        Tensor c = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {3, 2}, kCPU);
+        Tensor y = x.to(kCPU);
+        tinytorch::backward(tinytorch::sum(y.permute({1, 0}) * c));
+        TT_EXPECT_CLOSE(x.grad(), tttest::make_tensor({1, 3, 5, 2, 4, 6}, {2, 3}, kCUDA), 0, 0);
+    }
+}
+
 // ------------------------------------------------------------------ CPU/CUDA agreement
 
 // Runs the same computation on both devices and compares the results.

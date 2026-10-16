@@ -71,19 +71,32 @@ bool TensorImpl::requires_grad() const
 }
 void TensorImpl::set_data(TensorImpl& other)
 {
+    Tensor old_grad = requires_grad() ? autograd_meta->grad() : Tensor();
+
     storage_        = other.storage_;
     storage_offset_ = other.storage_offset_;
     sizes_          = other.sizes_;
     strides_        = other.strides_;
     options_        = other.options_;
 
-    bool has_grad = requires_grad() && autograd_meta->grad().defined();
     set_requires_grad(false, false);
 
-    // recreate edges and grad tensor
+    // recreate edges and move the existing grad to the new device/dtype
     if (other.requires_grad())
     {
-        set_requires_grad(true, has_grad);
+        set_requires_grad(true, false);
+        if (old_grad.defined())
+        {
+            NoGradGuard ngg;
+            if (old_grad.sizes() == sizes_)
+            {
+                autograd_meta->_grad = old_grad.to(options_.device_).to(options_.dtype_);
+            }
+            else
+            {
+                set_requires_grad(true, true);
+            }
+        }
     }
 }
 

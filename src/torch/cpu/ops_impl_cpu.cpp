@@ -138,22 +138,24 @@ void to_impl_cpu_cuda(Tensor src, Tensor dest, bool async)
 template <typename T>
 static void sort_impl(TensorInfo<T> a, int64_t dim, TensorInfo<T> out_t, TensorInfo<int64_t> out_index)
 {
-    using G = typename CpuComputeFloatType<T>::Type;
-#if 0
-    std::vector<std::pair<G, int64_t>> data;
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        data.push_back({a[i], i});
-    }
-    std::sort(data.begin(), data.end());
-
-    for (int64_t i = 0; i < a.numel(); ++i)
-    {
-        out_t[i]     = data[i].first;
-        out_index[i] = data[i].second;
-    }
-#else
+    using G                = typename CpuComputeFloatType<T>::Type;
     int64_t size_along_dim = out_t.size(dim);
+    if (size_along_dim == 0 || out_t.numel() == 0) return;
+
+    // NaN sorts last (like PyTorch), equal values keep their input order
+    auto less = [](const std::pair<G, int64_t>& x, const std::pair<G, int64_t>& y)
+    {
+        bool xn = tt_isnan(x.first);
+        bool yn = tt_isnan(y.first);
+        if (xn || yn)
+        {
+            if (xn && yn) return x.second < y.second;
+            return yn;
+        }
+        if (x.first < y.first) return true;
+        if (y.first < x.first) return false;
+        return x.second < y.second;
+    };
 
     std::vector<std::pair<G, int64_t>> data;
     data.resize(size_along_dim);
@@ -164,17 +166,16 @@ static void sort_impl(TensorInfo<T> a, int64_t dim, TensorInfo<T> out_t, TensorI
         for (int64_t o = 0; o < size_along_dim; ++o)
         {
             index[dim] = o;
-            data[o]    = {a[index], o};
+            data[o]    = {G(a[index]), o};
         }
-        std::sort(data.begin(), data.end());
+        std::sort(data.begin(), data.end(), less);
         for (int64_t o = 0; o < size_along_dim; ++o)
         {
             index[dim]       = o;
-            out_t[index]     = data[o].first;
+            out_t[index]     = T(data[o].first);
             out_index[index] = data[o].second;
         }
     }
-#endif
 }
 void sort_impl(Tensor a, int64_t dim, Tensor& out_t, Tensor& out_index)
 {
@@ -267,36 +268,45 @@ void range_impl(Tensor a, double start, double end, double step)
 
 
 template <typename T>
-static void rand_float_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, float low, float high)
+static void rand_float_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, double low, double high)
 {
-    float scale = (1.f / float(std::numeric_limits<uint32_t>::max())) * (high - low);
-    std::uniform_real_distribution<float> dist{low, high};
-
-    auto N = t.numel();
-    if (t.contiguous)
+    using G = typename CpuComputeFloatType<T>::Type;
+    auto N  = t.numel();
+    for (int64_t i = 0; i < N; ++i)
     {
-        T* pt = t.data;
-        for (int64_t i = 0; i < N; ++i)
+        T v = T(low);
+        if (low < high)
         {
-            uint32_t value = (uint32_t)mersenne_engine.operator()();
-            float xf       = float(value) * scale;
-            pt[i]          = T(xf + low);
+            // redraw in the rare case that rounding produces high, so that the result is in [low, high)
+            do
+            {
+                double x;
+                if constexpr (std::is_same<T, double>::value)
+                {
+                    uint64_t r = (uint64_t(mersenne_engine()) << 21) ^ uint64_t(mersenne_engine() >> 11);
+                    x          = double(r & ((uint64_t(1) << 53) - 1)) * (1.0 / 9007199254740992.0);
+                }
+                else
+                {
+                    x = double(mersenne_engine() >> 8) * (1.0 / 16777216.0);
+                }
+                v = T(G(low + x * (high - low)));
+            } while (!(double(G(v)) < high));
         }
-    }
-    else
-    {
-        for (int64_t i = 0; i < N; ++i)
+        if (t.contiguous)
         {
-            uint32_t value = (uint32_t)mersenne_engine.operator()();
-            float xf       = float(value) * scale;
-            t[i]           = T(xf + low);
+            t.data[i] = v;
+        }
+        else
+        {
+            t[i] = v;
         }
     }
 }
 
 void uniform_impl(Tensor& t, double mi, double ma)
 {
-    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl, t, generator(), (float)mi, (float)ma);
+    SWITCH_MACRO_ALL(t.scalar_type(), rand_float_impl, t, generator(), mi, ma);
 }
 
 template <typename T>
@@ -312,6 +322,7 @@ static void rand_int_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, int64_
 
 void uniform_int_impl(Tensor& t, int64_t low, int64_t high)
 {
+    CHECK_LT(low, high);
     SWITCH_MACRO_INT(t.scalar_type(), rand_int_impl, t, generator(), low, high);
 }
 
@@ -348,20 +359,21 @@ void normal_random_impl(Tensor& t)
 }
 
 
-template <typename T>
-static void add_poisson_noise_impl(TensorInfo<T> t, std::mt19937& gen)
+template <typename TT>
+static void add_poisson_noise_impl(TensorInfo<TT> t, std::mt19937& gen)
 {
+    using T = typename MathComputeType<TT>::Type;
     std::uniform_real_distribution<T> uniform_dist(0.0, 1.0);
     std::normal_distribution<T> normal_dist(0.0, 1.0);
 
     for (int64_t i = 0; i < t.numel(); ++i)
     {
-        T lambda = t[i];
+        T lambda = T(t[i]);
 
         // Safety check: Photon counts cannot be negative
         if (lambda <= 0.0)
         {
-            t[i] = 0.0;
+            t[i] = TT(0);
             continue;
         }
 
@@ -374,7 +386,7 @@ static void add_poisson_noise_impl(TensorInfo<T> t, std::mt19937& gen)
             T sample = lambda + std::sqrt(lambda) * n;
 
             // Round to nearest integer and prevent negative photon clipping
-            t[i] = std::max(static_cast<T>(0.0), std::round(sample));
+            t[i] = TT(std::max(static_cast<T>(0.0), std::round(sample)));
         }
 
         // 3. The Low-Photon Accurate Path (Knuth's Method)
@@ -391,45 +403,51 @@ static void add_poisson_noise_impl(TensorInfo<T> t, std::mt19937& gen)
                 p *= uniform_dist(gen);
             } while (p > L);
 
-            t[i] = static_cast<T>(k - 1);
+            t[i] = TT(k - 1);
         }
     }
 }
 
 void add_poisson_noise_impl(Tensor& t)
 {
-    add_poisson_noise_impl<float>(t, generator());
+    SWITCH_MACRO_ALL(t.scalar_type(), add_poisson_noise_impl, t, generator());
 }
 
 
 
-template <typename T>
-static void sum_impl(TensorInfo<T> a, TensorInfo<T> result)
+template <typename T, typename LoadOp>
+static void global_sum_impl(TensorInfo<T> a, TensorInfo<T> result, LoadOp load_op)
 {
-    int n = get_num_threads();
-    if (n < 1) n = 1;
-    std::vector<T> partial(n, T(0.));
+    using A = typename CpuAccType<T>::Type;
+    int n   = get_num_threads();
+    std::vector<A> partial(n, A(0));
 
-#pragma omp parallel num_threads(get_num_threads())
+#pragma omp parallel num_threads(n)
     {
-        T local_sum = T(0.);
+        A local_sum = A(0);
 
 #pragma omp for schedule(static)
         for (int64_t i = 0; i < a.numel(); ++i)
         {
-            T v       = a.contiguous ? a.data[i] : a[i];
-            local_sum = local_sum + v;
+            A v       = A(a.contiguous ? a.data[i] : a[i]);
+            local_sum = local_sum + load_op(v);
         }
 
         partial[omp_get_thread_num()] = local_sum;
     }
 
-    T acc = result[0];
+    A acc = A(result[0]);
     for (int i = 0; i < n; ++i)
     {
         acc = acc + partial[i];
     }
-    result[0] = acc;
+    result[0] = T(acc);
+}
+
+template <typename T>
+static void sum_impl(TensorInfo<T> a, TensorInfo<T> result)
+{
+    global_sum_impl(a, result, [](auto v) { return v; });
 }
 
 void sum_impl(Tensor a, Tensor result)
@@ -440,30 +458,7 @@ void sum_impl(Tensor a, Tensor result)
 template <typename T>
 static void abs_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    int n = get_num_threads();
-    if (n < 1) n = 1;
-    std::vector<T> partial(n, T(0.));
-
-#pragma omp parallel num_threads(get_num_threads())
-    {
-        T local_sum = T(0.);
-
-#pragma omp for schedule(static)
-        for (int64_t i = 0; i < a.numel(); ++i)
-        {
-            T v       = a.contiguous ? a.data[i] : a[i];
-            local_sum = local_sum + (v > T(0.) ? T(v) : T(-v));
-        }
-
-        partial[omp_get_thread_num()] = local_sum;
-    }
-
-    T acc = result[0];
-    for (int i = 0; i < n; ++i)
-    {
-        acc = acc + partial[i];
-    }
-    result[0] = acc;
+    global_sum_impl(a, result, [](auto v) { return v < decltype(v)(0) ? -v : v; });
 }
 
 void abs_sum_impl(Tensor a, Tensor result)
@@ -474,30 +469,7 @@ void abs_sum_impl(Tensor a, Tensor result)
 template <typename T>
 static void prod_sum_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    int n = get_num_threads();
-    if (n < 1) n = 1;
-    std::vector<T> partial(n, T(0.));
-
-#pragma omp parallel num_threads(get_num_threads())
-    {
-        T local_sum = T(0.);
-
-#pragma omp for schedule(static)
-        for (int64_t i = 0; i < a.numel(); ++i)
-        {
-            T v       = a.contiguous ? a.data[i] : a[i];
-            local_sum = local_sum + v * v;
-        }
-
-        partial[omp_get_thread_num()] = local_sum;
-    }
-
-    T acc = result[0];
-    for (int i = 0; i < n; ++i)
-    {
-        acc = acc + partial[i];
-    }
-    result[0] = acc;
+    global_sum_impl(a, result, [](auto v) { return v * v; });
 }
 
 void prod_sum_impl(Tensor a, Tensor result)
@@ -505,57 +477,77 @@ void prod_sum_impl(Tensor a, Tensor result)
     SWITCH_MACRO_ALL(a.scalar_type(), prod_sum_impl, a, result);
 }
 
+// reduces every slice along dim with op (accumulated in CpuAccType) and combines it with the value in result
+template <typename T, typename Op>
+static void dim_reduce_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result, Op op)
+{
+    using A           = typename CpuAccType<T>::Type;
+    int64_t size      = input.size(dim);
+    int64_t out_numel = result.numel();
+#pragma omp parallel for num_threads(get_num_threads())
+    for (int64_t o = 0; o < out_numel; ++o)
+    {
+        auto index_result = result.LinearIndexToDimIndex(o);
+        auto index_input  = index_result;
+        A acc             = A(result[index_result]);
+        for (int64_t k = 0; k < size; ++k)
+        {
+            index_input[dim] = k;
+            acc              = op(acc, A(input[index_input]));
+        }
+        result[index_result] = T(acc);
+    }
+}
 
 template <typename T>
 static void sum_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
-    for (int64_t linear_index_input = 0; linear_index_input < input.numel(); ++linear_index_input)
-    {
-        auto index_input     = input.LinearIndexToDimIndex(linear_index_input);
-        auto result_index    = index_input;
-        result_index[dim]    = 0;
-        result[result_index] = result[result_index] + input[index_input];
-    }
+    dim_reduce_impl(input, dim, result, [](auto a, auto b) { return a + b; });
 }
 
 void sum_impl(Tensor a, int64_t dim, Tensor result)
 {
-    SWITCH_MACRO_FLOAT(a.scalar_type(), sum_impl, a, dim, result);
+    SWITCH_MACRO_ALL(a.scalar_type(), sum_impl, a, dim, result);
 }
 
 
 template <typename T>
 static void prod_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
-    for (int64_t linear_index_input = 0; linear_index_input < input.numel(); ++linear_index_input)
-    {
-        auto index_input     = input.LinearIndexToDimIndex(linear_index_input);
-        auto index_result    = index_input;
-        index_result[dim]    = 0;
-        result[index_result] = result[index_result] * input[index_input];
-    }
+    dim_reduce_impl(input, dim, result, [](auto a, auto b) { return a * b; });
 }
 
 void prod_impl(Tensor input, int64_t dim, Tensor result)
 {
     SWITCH_MACRO_ALL(input.scalar_type(), prod_impl, input, dim, result);
 }
+
+template <typename T, typename Op>
+static void dim_scan_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result, typename CpuAccType<T>::Type init,
+                          Op op)
+{
+    using A      = typename CpuAccType<T>::Type;
+    int64_t size = result.size(dim);
+    if (size == 0 || result.numel() == 0) return;
+    int64_t slices = result.numel() / size;
+#pragma omp parallel for num_threads(get_num_threads())
+    for (int64_t s = 0; s < slices; ++s)
+    {
+        auto index = result.LinearIndexToDimIndexSkipDim(s, dim);
+        A acc      = init;
+        for (int64_t k = 0; k < size; ++k)
+        {
+            index[dim]    = k;
+            acc           = op(acc, A(input[index]));
+            result[index] = T(acc);
+        }
+    }
+}
+
 template <typename T>
 static void cumprod_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
-    for (int64_t i = 0; i < result.numel(); ++i)
-    {
-        auto index_result = result.LinearIndexToDimIndex(i);
-
-        T prod = T(1.f);
-        for (int64_t j = 0; j <= index_result[dim]; ++j)
-        {
-            auto index_input = index_result;
-            index_input[dim] = j;
-            prod             = prod * input[index_input];
-        }
-        result[index_result] = prod;
-    }
+    dim_scan_impl(input, dim, result, typename CpuAccType<T>::Type(1), [](auto a, auto b) { return a * b; });
 }
 void cumprod_impl(Tensor input, int64_t dim, Tensor result)
 {
@@ -564,53 +556,43 @@ void cumprod_impl(Tensor input, int64_t dim, Tensor result)
 template <typename T>
 static void cumsum_impl(TensorInfo<T> input, int64_t dim, TensorInfo<T> result)
 {
-    for (int64_t i = 0; i < result.numel(); ++i)
-    {
-        auto index_result = result.LinearIndexToDimIndex(i);
-
-        T prod = T(0.f);
-        for (int64_t j = 0; j <= index_result[dim]; ++j)
-        {
-            auto index_input = index_result;
-            index_input[dim] = j;
-            prod             = prod + input[index_input];
-        }
-        result[index_result] = prod;
-    }
+    dim_scan_impl(input, dim, result, typename CpuAccType<T>::Type(0), [](auto a, auto b) { return a + b; });
 }
 void cumsum_impl(Tensor input, int64_t dim, Tensor result)
 {
     SWITCH_MACRO_ALL(input.scalar_type(), cumsum_impl, input, dim, result);
 }
 
+// min/max that propagate NaN (the first NaN wins)
+template <typename G>
+static bool min_max_select(G v, G current, bool calc_min)
+{
+    if (tt_isnan(current)) return false;
+    if (tt_isnan(v)) return true;
+    return calc_min ? v < current : current < v;
+}
+
+template <typename T>
+static void global_min_max_impl(TensorInfo<T> a, TensorInfo<T> result, bool calc_min)
+{
+    using G = typename CpuComputeFloatType<T>::Type;
+    if (a.numel() == 0) return;
+    G value = G(a[0]);
+    for (int64_t i = 1; i < a.numel(); ++i)
+    {
+        G v = G(a[i]);
+        if (min_max_select(v, value, calc_min))
+        {
+            value = v;
+        }
+    }
+    result[0] = T(value);
+}
+
 template <typename T>
 static void min_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    using G = typename CpuComputeFloatType<T>::Type;
-
-    if (a.numel() < 128)
-    {
-        for (int64_t i = 0; i < a.numel(); ++i)
-        {
-            result[0] = std::min(G(a[i]), G(result[0]));
-        }
-    }
-    else
-    {
-        G min_val = std::numeric_limits<G>::max();
-
-        // #pragma omp parallel for reduction(min : min_val)
-        for (int64_t i = 0; i < a.numel(); ++i)
-        {
-            G v = G(a[i]);
-            if (v < min_val)
-            {
-                min_val = v;
-            }
-        }
-
-        result[0] = min_val;
-    }
+    global_min_max_impl(a, result, true);
 }
 
 void min_impl(Tensor a, Tensor result)
@@ -622,30 +604,7 @@ void min_impl(Tensor a, Tensor result)
 template <typename T>
 static void max_impl(TensorInfo<T> a, TensorInfo<T> result)
 {
-    using G = typename CpuComputeFloatType<T>::Type;
-    if (a.numel() < 128)
-    {
-        for (int64_t i = 0; i < a.numel(); ++i)
-        {
-            result[0] = std::max(G(a[i]), G(result[0]));
-        }
-    }
-    else
-    {
-        G max_val = std::numeric_limits<G>::lowest();
-
-        // #pragma omp parallel for reduction(max : max_val)
-        for (int64_t i = 0; i < a.numel(); ++i)
-        {
-            G v = G(a[i]);
-            if (v > max_val)
-            {
-                max_val = v;
-            }
-        }
-
-        result[0] = max_val;
-    }
+    global_min_max_impl(a, result, false);
 }
 
 void max_impl(Tensor a, Tensor result)
@@ -657,27 +616,31 @@ template <typename T>
 static void min_max_impl(TensorInfo<T> input, int64_t dim, TensorInfo<int64_t> indices, TensorInfo<T> result,
                          bool calc_min)
 {
-    using G = typename CpuComputeFloatType<T>::Type;
+    using G           = typename CpuComputeFloatType<T>::Type;
+    int64_t size      = input.size(dim);
+    int64_t out_numel = result.numel();
+    if (size == 0) return;
 
-    auto op_min = std::less<G>();
-    auto op_max = std::greater<G>();
-
-    for (int64_t i = 0; i < input.numel(); ++i)
+#pragma omp parallel for num_threads(get_num_threads())
+    for (int64_t o = 0; o < out_numel; ++o)
     {
-        G v               = input[i];
-        auto index_input  = input.LinearIndexToDimIndex(i);
-        auto index_result = index_input;
-        index_result[dim] = 0;
-
-        auto& result_value = result[index_result];
-        auto& result_index = indices[index_result];
-
-        bool comp = calc_min ? op_min(v, result_value) : op_max(v, result_value);
-        if (comp)
+        auto index_result = result.LinearIndexToDimIndex(o);
+        auto index_input  = index_result;
+        index_input[dim]  = 0;
+        G best            = G(input[index_input]);
+        int64_t best_k    = 0;
+        for (int64_t k = 1; k < size; ++k)
         {
-            result_value = v;
-            result_index = index_input[dim];
+            index_input[dim] = k;
+            G v              = G(input[index_input]);
+            if (min_max_select(v, best, calc_min))
+            {
+                best   = v;
+                best_k = k;
+            }
         }
+        result[index_result]  = T(best);
+        indices[index_result] = best_k;
     }
 }
 void min_impl(Tensor input, int64_t dim, Tensor result, Tensor& indices)
@@ -700,25 +663,22 @@ static void median_impl(TensorInfo<T> input, TensorInfo<T, 1> result, double per
 
     if (n == 0) return;
 
-    std::vector<T> buffer(n);
+    std::vector<G> buffer(n);
     for (int64_t i = 0; i < n; ++i)
     {
-        buffer[i] = input[i];
+        buffer[i] = G(input[i]);
+        if (tt_isnan(buffer[i]))
+        {
+            result[0] = T(buffer[i]);
+            return;
+        }
     }
 
-    int64_t mid = n * percentile;
-    std::nth_element(buffer.begin(), buffer.begin() + mid, buffer.end());
-
-    // 4. Handle exact mathematical median (Odd vs Even number of elements)
-    if (n % 2 != 0)
-    {
-        result[0] = buffer[mid];
-    }
-    else
-    {
-        auto max_left_it = std::max_element(buffer.begin(), buffer.begin() + mid);
-        result[0]        = T((G(*max_left_it) + G(buffer[mid])) / G(2.));
-    }
+    // nearest-rank percentile; for percentile 0.5 this is the lower median (like torch.median)
+    int64_t k = int64_t(std::ceil(percentile * double(n))) - 1;
+    k         = std::min(std::max(k, int64_t(0)), n - 1);
+    std::nth_element(buffer.begin(), buffer.begin() + k, buffer.end());
+    result[0] = T(buffer[k]);
 }
 
 void median_impl(Tensor a, Tensor result, double percentile)
@@ -992,13 +952,19 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
 template <typename T>
 static void clamp_impl_(TensorInfo<T> src, double low, double high)
 {
-    using G        = typename CpuComputeFloatType<T>::Type;
-    const G low_t  = G(std::isfinite(low) ? T(low) : std::numeric_limits<T>::lowest());
-    const G high_t = G(std::isfinite(high) ? T(high) : std::numeric_limits<T>::max());
+    // a non-finite bound means unbounded (std::numeric_limits is not specialized for Half)
+    using G             = typename CpuComputeFloatType<T>::Type;
+    const bool has_low  = std::isfinite(low);
+    const bool has_high = std::isfinite(high);
+    const G low_t       = has_low ? G(clamp_bound_to<T>(low, true)) : G(0);
+    const G high_t      = has_high ? G(clamp_bound_to<T>(high, false)) : G(0);
 #pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < src.numel(); ++i)
     {
-        src[i] = std::min(high_t, std::max(G(src[i]), low_t));
+        G v = G(src[i]);
+        if (has_low) v = std::max(v, low_t);
+        if (has_high) v = std::min(v, high_t);
+        src[i] = T(v);
     }
 }
 void clamp_impl_(Tensor& a, double low, double high)
@@ -1013,10 +979,10 @@ static void padding_2d_impl(TensorInfo<T, 4> src, TensorInfo<T, 4> dst, int pad_
 #pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < dst.numel(); ++i)
     {
-        int64_t b = 0;
-        int64_t c = i / dst.size(3) / dst.size(2);
-        int64_t y = i / dst.size(3) % dst.size(2);
         int64_t x = i % dst.size(3);
+        int64_t y = i / dst.size(3) % dst.size(2);
+        int64_t c = i / dst.size(3) / dst.size(2) % dst.size(1);
+        int64_t b = i / dst.size(3) / dst.size(2) / dst.size(1);
 
         auto x_src = x - pad_left;
         auto y_src = y - pad_top;
@@ -1074,13 +1040,11 @@ static void padding_3d_impl(TensorInfo<T, 5> src, TensorInfo<T, 5> dst, int pad_
 #pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < dst.numel(); ++i)
     {
-        int64_t b = 0;  // Keeping identical batch assumption as 2D
-
-        // 1D to 5D Index Unrolling
         int64_t x = i % dst.size(4);
         int64_t y = (i / dst.size(4)) % dst.size(3);
         int64_t z = (i / dst.size(4) / dst.size(3)) % dst.size(2);
-        int64_t c = (i / dst.size(4) / dst.size(3) / dst.size(2));
+        int64_t c = (i / dst.size(4) / dst.size(3) / dst.size(2)) % dst.size(1);
+        int64_t b = i / dst.size(4) / dst.size(3) / dst.size(2) / dst.size(1);
 
         // Offset to original source coordinates
         auto x_src = x - pad_left;
@@ -1137,7 +1101,8 @@ static void repeat_interleave_impl(TensorInfo<T> input, int64_t count, TensorInf
     for (int64_t i = 0; i < result.numel(); ++i)
     {
         auto index_result    = result.LinearIndexToDimIndex(i);
-        auto index_input     = input.LinearIndexToDimIndex(i / count);
+        auto index_input     = index_result;
+        index_input[0]       = index_result[0] / count;
         result[index_result] = input[index_input];
     }
 }
@@ -1183,30 +1148,23 @@ static void matmul_impl_kernel(TensorInfo<T> a, TensorInfo<T> b, TensorInfo<T> r
 #pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < result.numel(); ++i)
     {
-        // 1. Get the multi-dimensional index for the result tensor
         auto idx_res = result.LinearIndexToDimIndex(i);
 
-        // 2. Map the result index to the input A index
-        // Since result sizes are derived directly from A sizes (except the last dim),
-        // the batch and M dimensions perfectly align.
-        auto idx_a = idx_res;
-
-        // 3. Map the result index to the input B index
-        // We initialize with a zeroed index struct for B's dimensionality
-        auto idx_b = b.LinearIndexToDimIndex(0);
-
-        // Handle batch dimensions for B (if B is batched)
-        // This maps the trailing batch dimensions of result to B
-        int batch_offset_b = res_dim - b_dim;
+        // batch dims are right-aligned and broadcast where the operand has size 1
+        decltype(idx_res) idx_a, idx_b;
+        idx_a.zero_();
+        idx_b.zero_();
+        for (int d = 0; d < a_dim - 2; ++d)
+        {
+            idx_a[d] = a.size(d) == 1 ? 0 : idx_res[res_dim - a_dim + d];
+        }
         for (int d = 0; d < b_dim - 2; ++d)
         {
-            idx_b[d] = idx_res[batch_offset_b + d];
+            idx_b[d] = b.size(d) == 1 ? 0 : idx_res[res_dim - b_dim + d];
         }
-
-        // Set the N dimension for B
+        idx_a[a_dim - 2] = idx_res[res_dim - 2];
         idx_b[b_dim - 1] = idx_res[res_dim - 1];
 
-        // 4. Compute the dot product along the K dimension
         G sum = G(0);
         for (int64_t k = 0; k < K; ++k)
         {

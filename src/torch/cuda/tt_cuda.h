@@ -71,13 +71,26 @@ struct TINYTORCH_API DeviceGuard
         if (device.index() >= 0 && device.index() != original_device_index_)
         {
             setDevice(device._index);
+            changed_ = true;
         }
     }
     DeviceGuard(const DeviceGuard&) = delete;
     DeviceGuard(DeviceGuard&&)      = delete;
-    ~DeviceGuard() { setDevice(original_device_index_); }
+    // must not throw (std::terminate), also not after a CUDA error
+    ~DeviceGuard()
+    {
+        if (changed_)
+        {
+            auto error = cudaSetDevice(original_device_index_);
+            if (error != cudaSuccess)
+            {
+                std::cout << "[TinyTorch] CUDA Error " << cudaGetErrorString(error) << " in ~DeviceGuard" << std::endl;
+            }
+        }
+    }
 
     int original_device_index_;
+    bool changed_ = false;
 };
 
 

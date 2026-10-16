@@ -2,6 +2,8 @@
 
 #include "torch/core/graph.h"
 #include "torch/core/ops/all.h"
+
+#include "torch/core/tensor_impl.h"
 namespace tinytorch
 {
 
@@ -34,7 +36,7 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
     {
         CHECK_EQ(loss.numel(), 1);
         // The gradient of the final loss is 1
-        Tensor one          = full({1}, 1, loss.options());
+        Tensor one          = full(loss.sizes(), 1, loss.options());
         grad_map[root_node] = {one};
     }
 
@@ -63,6 +65,22 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
         // {
         //     continue;
         // }
+
+        // store the gradient of outputs on which retain_grad() was called
+        for (auto& retained : current_node->retained_outputs)
+        {
+            auto impl        = retained.second.lock();
+            auto& node_grads = grad_map[current_node];
+            if (!impl || !impl->autograd_meta || retained.first >= node_grads.size() ||
+                !node_grads[retained.first].defined())
+            {
+                continue;
+            }
+            NoGradGuard ngg;
+            Tensor g   = node_grads[retained.first].clone();
+            auto& grad = impl->autograd_meta->mutable_grad();
+            grad       = grad.defined() ? grad + g : g;
+        }
 
         // backpropagate gradients
         auto next_gradients = current_node->node_backward(grad_map[current_node]);
@@ -94,7 +112,8 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
                 }
                 else
                 {
-                    grad_map[next_node][next->input_nr] += g;
+                    // out-of-place: backward functions may return the same tensor for several inputs (e.g. AddNode)
+                    grad_map[next_node][next->input_nr] = grad_map[next_node][next->input_nr] + g;
                 }
 
                 // Add next node to the stack

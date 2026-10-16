@@ -2,10 +2,74 @@
 
 #include "torch/core/half.h"
 
+#include <cmath>
+#include <limits>
+
 #include "torch/tiny_torch_config.h"
+#include <type_traits>
 
 namespace tinytorch
 {
+// floating point type the math functions are evaluated in: double for double, float for everything else
+template <typename T>
+struct MathComputeType
+{
+    using Type = float;
+};
+template <>
+struct MathComputeType<double>
+{
+    using Type = double;
+};
+
+// type in which an operation between a tensor element of type T and a double scalar is computed
+template <typename T>
+struct ScalarComputeType
+{
+    using Type =
+        typename std::conditional<std::is_integral<T>::value, double, typename CpuComputeFloatType<T>::Type>::type;
+};
+
+// converts a result computed in ScalarComputeType<T> back to T (integers wrap like integer arithmetic)
+template <typename T, typename S>
+TT_HD inline T scalar_result_to(S v)
+{
+    if constexpr (std::is_integral<T>::value && !std::is_integral<S>::value)
+    {
+        return T(static_cast<long long>(v));
+    }
+    else
+    {
+        return T(v);
+    }
+}
+
+// converts a finite clamp bound to T; integer bounds are rounded inwards and saturated to the range of T
+template <typename T>
+TT_HD inline T clamp_bound_to(double bound, bool is_low)
+{
+    if constexpr (std::is_integral<T>::value)
+    {
+        bound = is_low ? std::ceil(bound) : std::floor(bound);
+        if (bound <= (double)std::numeric_limits<T>::lowest()) return std::numeric_limits<T>::lowest();
+        if (bound >= (double)std::numeric_limits<T>::max()) return std::numeric_limits<T>::max();
+    }
+    return T(bound);
+}
+
+template <typename T>
+TT_HD inline bool tt_isnan(T v)
+{
+    if constexpr (std::is_integral<T>::value)
+    {
+        return false;
+    }
+    else
+    {
+        return !(v == v);
+    }
+}
+
 namespace UnaryOperators
 {
 struct Abs
@@ -27,7 +91,8 @@ struct Round
     template <typename T>
     TT_HD T forward(T v)
     {
-        return T(roundf((float)v));
+        using M = typename MathComputeType<T>::Type;
+        return T(std::round(M(v)));
     }
 };
 struct Sqrt
@@ -35,17 +100,19 @@ struct Sqrt
     template <typename T>
     TT_HD T forward(T v)
     {
-        return T(sqrtf((float)v));
+        using M = typename MathComputeType<T>::Type;
+        return T(std::sqrt(M(v)));
     }
     template <typename T>
     TT_HD T backward(T input_x, T grad_output)
     {
-        float J = 0;
+        using M = typename MathComputeType<T>::Type;
+        M J     = 0;
         if (input_x > T(0))
         {
-            J = 1.f / (2.f * ::sqrt(float(input_x)));
+            J = M(1) / (M(2) * std::sqrt(M(input_x)));
         }
-        return T(J) * grad_output;
+        return T(J * M(grad_output));
     }
 };
 struct Log
@@ -53,7 +120,8 @@ struct Log
     template <typename T>
     TT_HD T forward(T v)
     {
-        return T(logf((float)v));
+        using M = typename MathComputeType<T>::Type;
+        return T(std::log(M(v)));
     }
 };
 struct Exp
@@ -61,7 +129,8 @@ struct Exp
     template <typename T>
     TT_HD T forward(T v)
     {
-        return T(expf((float)v));
+        using M = typename MathComputeType<T>::Type;
+        return T(std::exp(M(v)));
     }
 };
 struct Sign
@@ -77,7 +146,8 @@ struct Sin
     template <typename T>
     TT_HD T forward(T v)
     {
-        return T(sinf((float)v));
+        using M = typename MathComputeType<T>::Type;
+        return T(std::sin(M(v)));
     }
 };
 struct Cos
@@ -85,7 +155,8 @@ struct Cos
     template <typename T>
     TT_HD T forward(T v)
     {
-        return T(cosf((float)v));
+        using M = typename MathComputeType<T>::Type;
+        return T(std::cos(M(v)));
     }
 };
 struct Relu
@@ -101,35 +172,38 @@ struct Sigmoid
     template <typename T>
     TT_HD T forward(T x)
     {
-        return T(1.f) / T(1.f + expf(-(float)x));
+        using M = typename MathComputeType<T>::Type;
+        return T(M(1) / (M(1) + std::exp(-M(x))));
     }
     template <typename T>
     TT_HD T backward(T input_x, T grad_output)
     {
-        float x = 1.0f / (1.0f + expf(-(float)input_x));
-        T J     = (T)(x * (1.0f - x));
-        return J * grad_output;
+        using M = typename MathComputeType<T>::Type;
+        M x     = M(1) / (M(1) + std::exp(-M(input_x)));
+        return T(x * (M(1) - x) * M(grad_output));
     }
 };
 struct Softplus
 {
-    Softplus(float beta) : beta(beta) { threshold = 20.f / beta; }
+    Softplus(double beta) : beta(beta) { threshold = 20.0 / beta; }
     template <typename T>
     TT_HD T forward(T x)
     {
-        if (x > T(threshold)) return x;
-        return T(logf(::expf(float(x) * beta) + 1.f) / beta);
+        using M = typename MathComputeType<T>::Type;
+        if (M(x) > M(threshold)) return x;
+        return T(std::log(std::exp(M(x) * M(beta)) + M(1)) / M(beta));
     }
     template <typename T>
     TT_HD T backward(T input_x, T grad_output)
     {
-        if (input_x > T(threshold)) return T(1.f) * grad_output;
-        T tmp = T(expf((float)input_x * beta));
-        T J   = (tmp / (tmp + T(1.f)));
-        return grad_output * J;
+        using M = typename MathComputeType<T>::Type;
+        if (M(input_x) > M(threshold)) return grad_output;
+        M tmp = std::exp(M(input_x) * M(beta));
+        M J   = tmp / (tmp + M(1));
+        return T(M(grad_output) * J);
     }
-    float beta;
-    float threshold;
+    double beta;
+    double threshold;
 };
 }  // namespace UnaryOperators
 
@@ -204,7 +278,9 @@ struct Min
     template <typename T>
     TT_HD T forward(T a, T b)
     {
-        return a < b ? a : b;
+        if (tt_isnan(a)) return a;
+        if (tt_isnan(b)) return b;
+        return b < a ? b : a;
     }
 };
 struct Max
@@ -212,7 +288,9 @@ struct Max
     template <typename T>
     TT_HD T forward(T a, T b)
     {
-        return a > b ? a : b;
+        if (tt_isnan(a)) return a;
+        if (tt_isnan(b)) return b;
+        return a < b ? b : a;
     }
 };
 }  // namespace BinaryOperators
@@ -231,12 +309,12 @@ inline std::pair<SizeType, SizeType> CheckOperatorSizeMatchOneDim(const Tensor& 
         {
             CHECK(a.size(i) == 1 || b.size(i) == 1) << "Size Missmatch " << a.sizes() << " " << b.sizes();
 
-            // make sure we don't expand a 0 to a 1
-            if (a.size(i) == 1 && b.size(i) > 1)
+            // a size-1 dim is broadcast to the other size (also to 0, like PyTorch)
+            if (a.size(i) == 1)
             {
                 expand_a.push_back(i);
             }
-            else if (b.size(i) == 1 && a.size(i) > 1)
+            else
             {
                 expand_b.push_back(i);
             }
@@ -269,15 +347,7 @@ inline SizeType max_size(Tensor a, Tensor b)
         int64_t as = a.size(i);
         int64_t bs = b.size(i);
         CHECK(as == bs || as == 1 || bs == 1);
-        if (as == 0 || bs == 0)
-        {
-            // 0-sized dims are not expanded
-            new_sizes[i] = 0;
-        }
-        else
-        {
-            new_sizes[i] = std::max(as, bs);
-        }
+        new_sizes[i] = (as == 1) ? bs : as;
     }
     return new_sizes;
 }

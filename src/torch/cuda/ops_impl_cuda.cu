@@ -113,7 +113,7 @@ __launch_bounds__(128) static __global__
     {
         b[i] = TTarget((long long)a[i]);
     }
-    else if constexpr (std::is_same_v<TTarget, uint8_t>)
+    else if constexpr (std::is_same_v<TTarget, uint8_t> || std::is_same_v<TTarget, int16_t>)
     {
         b[i] = TTarget((int)a[i]);
     }
@@ -148,6 +148,12 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
         case kUInt16:
         {
             CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), uint16_t, src.numel(), copy_and_convert_impl,
+                                       src, target);
+            break;
+        }
+        case kInt16:
+        {
+            CUDA_SWITCH_MACRO_ALL_DUAL(src.device(), src.scalar_type(), int16_t, src.numel(), copy_and_convert_impl,
                                        src, target);
             break;
         }
@@ -186,151 +192,150 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
     }
 }
 
-__device__ inline uint32_t xorshift32(uint32_t& state)
+__device__ inline uint64_t splitmix64(uint64_t x)
 {
-    uint32_t x = state;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    state = x;
-    return x;
+    x += 0x9E3779B97F4A7C15ULL;
+    x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    x = (x ^ (x >> 27)) * 0x94D049BB133111EBULL;
+    return x ^ (x >> 31);
+}
+
+// xorshift64* generator, one per thread. The state is a hash of all 64 seed bits and the thread index and never 0.
+struct DeviceRng
+{
+    uint64_t state;
+
+    __device__ DeviceRng(uint64_t seed, int64_t i)
+    {
+        state = splitmix64(seed ^ splitmix64((uint64_t)i));
+        if (state == 0) state = 0x9E3779B97F4A7C15ULL;
+    }
+
+    __device__ uint32_t next()
+    {
+        state ^= state >> 12;
+        state ^= state << 25;
+        state ^= state >> 27;
+        return (uint32_t)((state * 0x2545F4914F6CDD1DULL) >> 32);
+    }
+
+    __device__ uint64_t next64() { return ((uint64_t)next() << 32) | (uint64_t)next(); }
+
+    // uniform in [0, 1)
+    __device__ float uniform_float() { return float(next() >> 8) * (1.0f / 16777216.0f); }
+    __device__ double uniform_double() { return double(next64() >> 11) * (1.0 / 9007199254740992.0); }
+};
+
+static uint64_t next_cuda_seed()
+{
+    std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+    return dist(generator());
 }
 
 template <typename T>
 __launch_bounds__(128) static __global__
-    void rand_float_impl(TensorInfoCuda<T, -1> a, float low, float high, uint32_t seed)
+    void rand_float_impl(TensorInfoCuda<T, -1> a, double low, double high, uint64_t seed)
 {
+    using G           = typename CpuComputeFloatType<T>::Type;
+    using M           = typename MathComputeType<G>::Type;
     int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     int64_t grid_size = (int64_t)blockDim.x * gridDim.x;
 
-    uint32_t state = seed ^ (uint32_t)i;
-    state *= 0x85ebca6b;
-    state ^= state >> 13;
-
-    // Optional: Warm up xorshift (discard one value) to enter randomness
-    xorshift32(state);
+    DeviceRng rng(seed, i);
+    const M low_m  = M(low);
+    const M high_m = M(high);
 
     for (; i < a.numel(); i += grid_size)
     {
-        auto rnd = xorshift32(state);
-
-        const float uint_to_float = 2.3283064365386963e-10f;
-        float rnd_float           = float(rnd) * uint_to_float;
-
-        a[i] = T(rnd_float * (high - low) + low);
+        T v = T(low_m);
+        if (low_m < high_m)
+        {
+            // redraw in the rare case that rounding produces high, so that the result is in [low, high)
+            do
+            {
+                M x = std::is_same<M, double>::value ? M(rng.uniform_double()) : M(rng.uniform_float());
+                v   = T(G(low_m + x * (high_m - low_m)));
+            } while (!(M(G(v)) < high_m));
+        }
+        a[i] = v;
     }
 }
 
 void uniform_impl(Tensor& a, double mi, double ma)
 {
-    std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
-    uint64_t seed       = dist(generator());
+    uint64_t seed       = next_cuda_seed();
     int64_t max_threads = std::min<int64_t>(a.numel(), int64_t(1024) * 1024 * 1024);
-    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_float_impl, a, (float)mi, (float)ma,
-                          uint32_t(seed));
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_float_impl, a, mi, ma, seed);
 }
 
 template <typename T>
 __launch_bounds__(128) static __global__
-    void rand_int_impl(TensorInfoCuda<T> a, int64_t low, int64_t high, uint32_t seed)
+    void rand_int_impl(TensorInfoCuda<T> a, int64_t low, int64_t high, uint64_t seed)
 {
     int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     int64_t grid_size = (int64_t)blockDim.x * gridDim.x;
 
-    uint32_t state = seed ^ (uint32_t)i;
-    state *= 0x85ebca6b;
-    state ^= state >> 13;
+    DeviceRng rng(seed, i);
+    uint64_t range = (uint64_t)(high - low);
 
     for (; i < a.numel(); i += grid_size)
     {
-        auto rnd = xorshift32(state);
-
-        // Fast Range Mapping (no modulo bias)
-        // Cast to uint64 to multiply, then shift down.
-        uint32_t range = (uint32_t)(high - low);
-        uint32_t val   = ((uint64_t)rnd * (uint64_t)range) >> 32;
-
-        a[i] = T(val + low);
+        // multiply-shift range mapping
+        uint64_t val = __umul64hi(rng.next64(), range);
+        a[i]         = T((int64_t)((uint64_t)low + val));
     }
 }
 
 void uniform_int_impl(Tensor& a, int64_t low, int64_t high)
 {
-    std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
-    uint64_t seed       = dist(generator());
+    CHECK_LT(low, high);
+    uint64_t seed       = next_cuda_seed();
     int64_t max_threads = std::min<int64_t>(a.numel(), int64_t(1024) * 1024 * 1024);
-    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_int_impl, a, low, high, uint32_t(seed));
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, rand_int_impl, a, low, high, seed);
 }
 
 
 template <typename T>
-__launch_bounds__(128) static __global__
-    void normal_random_float_impl(TensorInfoCuda<T, -1> a, uint32_t seed)
+__launch_bounds__(128) static __global__ void normal_random_float_impl(TensorInfoCuda<T, -1> a, uint64_t seed)
 {
     int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     int64_t grid_size = (int64_t)blockDim.x * gridDim.x;
 
-    uint32_t state = seed ^ (uint32_t)i;
-    state *= 0x85ebca6b;
-    state ^= state >> 13;
-
-    // Optional: Warm up xorshift (discard one value) to enter randomness
-    xorshift32(state);
-
-    // Constants for uniform-to-float conversion and Box-Muller
-    const float uint_to_float = 2.3283064365386963e-10f;
-    const float two_pi        = 6.28318530717958647692f;
+    DeviceRng rng(seed, i);
+    const float two_pi = 6.28318530717958647692f;
 
     for (; i < a.numel(); i += grid_size)
     {
-        // 1. Generate two independent uniform uint32_t values
-        uint32_t rnd1 = xorshift32(state);
-        uint32_t rnd2 = xorshift32(state);
-
-        // 2. Map them to floating point ranges.
-        // We use (1.0f - ...) for u1 so the range strictly becomes (0, 1].
-        // This is critical because logf(0) yields -infinity, which causes NaNs.
-        float u1 = 1.0f - float(rnd1) * uint_to_float;
-        float u2 = float(rnd2) * uint_to_float;
-
-        // 3. Apply the Box-Muller transform to get a standard normal variable (mean=0, std=1)
+        // Box-Muller, u1 in (0, 1] so that log(u1) is finite
+        float u1 = 1.0f - rng.uniform_float();
+        float u2 = rng.uniform_float();
         float z0 = sqrtf(-2.0f * logf(u1)) * cosf(two_pi * u2);
-
-        // 4. Cast and store
-        a[i] = T(z0);
+        a[i]     = T(z0);
     }
 }
 
 void normal_random_impl(Tensor& a)
 {
-    std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
-    uint64_t seed       = dist(generator());
+    uint64_t seed       = next_cuda_seed();
     int64_t max_threads = std::min<int64_t>(a.numel(), int64_t(1024) * 1024 * 1024);
-    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, normal_random_float_impl, a,
-                          uint32_t(seed));
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, normal_random_float_impl, a, seed);
 }
 
 // mirrors cpu_impl::add_poisson_noise_impl (gaussian approximation for lambda > 15,
 // Knuth's method below that)
 template <typename T>
-__launch_bounds__(128) static __global__
-    void poisson_noise_impl(TensorInfoCuda<T> a, uint32_t seed)
+__launch_bounds__(128) static __global__ void poisson_noise_impl(TensorInfoCuda<T> a, uint64_t seed)
 {
     int64_t i         = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     int64_t grid_size = (int64_t)blockDim.x * gridDim.x;
 
-    uint32_t state = seed ^ (uint32_t)i;
-    state *= 0x85ebca6b;
-    state ^= state >> 13;
-    xorshift32(state);
-
-    const float uint_to_float = 2.3283064365386963e-10f;
+    DeviceRng rng(seed, i);
 
     for (; i < a.numel(); i += grid_size)
     {
         float lambda = float(a[i]);
 
-        if (lambda <= 0.0f)
+        if (!(lambda > 0.0f))
         {
             a[i] = T(0.0);
             continue;
@@ -339,9 +344,9 @@ __launch_bounds__(128) static __global__
         if (lambda > 15.0f)
         {
             // Box-Muller standard normal from two uniforms
-            float u1 = float(xorshift32(state)) * uint_to_float;
-            float u2 = float(xorshift32(state)) * uint_to_float;
-            float n  = std::sqrt(-2.0f * std::log(u1 + 1e-10f)) * std::cos(2.0f * 3.14159265358979323846f * u2);
+            float u1 = 1.0f - rng.uniform_float();
+            float u2 = rng.uniform_float();
+            float n  = std::sqrt(-2.0f * std::log(u1)) * std::cos(2.0f * 3.14159265358979323846f * u2);
 
             float sample = lambda + std::sqrt(lambda) * n;
             a[i]         = T(std::max(0.0f, std::round(sample)));
@@ -356,7 +361,7 @@ __launch_bounds__(128) static __global__
             do
             {
                 k++;
-                p *= float(xorshift32(state)) * uint_to_float;
+                p *= rng.uniform_float();
             } while (p > L);
 
             a[i] = T(k - 1);
@@ -365,10 +370,9 @@ __launch_bounds__(128) static __global__
 }
 void add_poisson_noise_impl(Tensor& a)
 {
-    std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
-    uint64_t seed       = dist(generator());
+    uint64_t seed       = next_cuda_seed();
     int64_t max_threads = std::min<int64_t>(a.numel(), int64_t(1024) * 1024 * 1024);
-    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, poisson_noise_impl, a, uint32_t(seed));
+    CUDA_SWITCH_MACRO_ALL(a.device(), a.scalar_type(), max_threads, poisson_noise_impl, a, seed);
 }
 
 template <typename T>
@@ -377,13 +381,12 @@ __launch_bounds__(128) static __global__ void clamp_impl_(TensorInfoCuda<T> src,
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= src.numel()) return;
 
-    using G  = typename CpuComputeFloatType<T>::Type;
-    T low_t  = ::isfinite(low) ? T(low) : std::numeric_limits<T>::lowest();
-    T high_t = ::isfinite(high) ? T(high) : std::numeric_limits<T>::max();
-
-    {
-        src[i] = std::min(G(high_t), std::max(G(src[i]), G(low_t)));
-    }
+    // a non-finite bound means unbounded (std::numeric_limits is not specialized for __half)
+    using G = typename CpuComputeFloatType<T>::Type;
+    G v     = G(src[i]);
+    if (::isfinite(low)) v = std::max(v, G(clamp_bound_to<T>(low, true)));
+    if (::isfinite(high)) v = std::min(v, G(clamp_bound_to<T>(high, false)));
+    src[i] = T(v);
 }
 void clamp_impl_(Tensor& a, double low, double high)
 {
@@ -397,10 +400,10 @@ __launch_bounds__(128) static __global__
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= dst.numel()) return;
 
-    int64_t b = 0;
-    int64_t c = i / dst.size(3) / dst.size(2);
-    int64_t y = (i / dst.size(3)) % dst.size(2);
     int64_t x = i % dst.size(3);
+    int64_t y = (i / dst.size(3)) % dst.size(2);
+    int64_t c = i / dst.size(3) / dst.size(2) % dst.size(1);
+    int64_t b = i / dst.size(3) / dst.size(2) / dst.size(1);
 
     auto x_src = x - pad_left;
     auto y_src = y - pad_top;
@@ -446,9 +449,8 @@ __launch_bounds__(128) static __global__
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= dst.numel()) return;
 
-    // 1D to 5D Index Unrolling (Assuming Batch = 0 to match your 2D code)
-    int64_t b = 0;
-    int64_t c = i / dst.size(4) / dst.size(3) / dst.size(2);
+    int64_t b = i / dst.size(4) / dst.size(3) / dst.size(2) / dst.size(1);
+    int64_t c = i / dst.size(4) / dst.size(3) / dst.size(2) % dst.size(1);
     int64_t z = (i / dst.size(4) / dst.size(3)) % dst.size(2);
     int64_t y = (i / dst.size(4)) % dst.size(3);
     int64_t x = i % dst.size(4);
@@ -509,7 +511,8 @@ __launch_bounds__(128) static __global__
     if (i >= result.numel()) return;
 
     auto index_result    = result.LinearIndexToDimIndex(i);
-    auto index_input     = input.LinearIndexToDimIndex(i / count);
+    auto index_input     = index_result;
+    index_input[0]       = index_result[0] / count;
     result[index_result] = input[index_input];
 }
 void repeat_interleave_impl(Tensor input, int64_t count, Tensor result)
@@ -547,34 +550,31 @@ __launch_bounds__(128) static __global__
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= result.numel()) return;
 
-    using G = typename CpuComputeFloatType<T>::Type;
+    using G = std::conditional_t<std::is_same_v<T, __half>, float, typename CpuComputeFloatType<T>::Type>;
 
-    int a_dim = a.dim();
-    int b_dim = b.dim();
+    int a_dim   = a.dim();
+    int b_dim   = b.dim();
     int res_dim = result.dim();
 
     int64_t K = a.size(a_dim - 1);
 
-    // 1. Get the multi-dimensional index for the result tensor
     auto idx_res = result.LinearIndexToDimIndex(i);
 
-    // 2. Map the result index to the input A index
-    auto idx_a = idx_res;
-
-    // 3. Map the result index to the input B index
-    auto idx_b = b.LinearIndexToDimIndex(0);
-
-    // Handle batch dimensions for B (if B is batched)
-    int batch_offset_b = res_dim - b_dim;
+    // batch dims are right-aligned and broadcast where the operand has size 1
+    decltype(idx_res) idx_a, idx_b;
+    idx_a.zero_();
+    idx_b.zero_();
+    for (int d = 0; d < a_dim - 2; ++d)
+    {
+        idx_a[d] = a.size(d) == 1 ? 0 : idx_res[res_dim - a_dim + d];
+    }
     for (int d = 0; d < b_dim - 2; ++d)
     {
-        idx_b[d] = idx_res[batch_offset_b + d];
+        idx_b[d] = b.size(d) == 1 ? 0 : idx_res[res_dim - b_dim + d];
     }
-
-    // Set the N dimension for B
+    idx_a[a_dim - 2] = idx_res[res_dim - 2];
     idx_b[b_dim - 1] = idx_res[res_dim - 1];
 
-    // 4. Compute the dot product along the K dimension
     G sum = G(0);
     for (int64_t k = 0; k < K; ++k)
     {

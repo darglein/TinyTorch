@@ -77,32 +77,34 @@ static void unary_operator_backward_kernel(Op op, TensorInfo<T> a, TensorInfo<T>
     }
 }
 
-#define SWITCH_MACRO_UNARY_OPERATOR(op, input, output)                          \
-    switch (input.scalar_type())                                                \
-    {                                                                           \
-        CASE_MACRO((unary_operator_kernel<uint8_t>), kUInt8, op, input, output) \
-        CASE_MACRO((unary_operator_kernel<int16_t>), kInt16, op, input, output) \
-        CASE_MACRO((unary_operator_kernel<int32_t>), kInt32, op, input, output) \
-        CASE_MACRO((unary_operator_kernel<int64_t>), kLong, op, input, output)  \
-        CASE_MACRO((unary_operator_kernel<Half>), kHalf, op, input, output)     \
-        CASE_MACRO((unary_operator_kernel<float>), kFloat, op, input, output)   \
-        CASE_MACRO((unary_operator_kernel<double>), kDouble, op, input, output) \
-        default:                                                                \
-            CHECK(false) << "invalid input type " << input.scalar_type();       \
+#define SWITCH_MACRO_UNARY_OPERATOR(op, input, output)                            \
+    switch (input.scalar_type())                                                  \
+    {                                                                             \
+        CASE_MACRO((unary_operator_kernel<uint8_t>), kUInt8, op, input, output)   \
+        CASE_MACRO((unary_operator_kernel<uint16_t>), kUInt16, op, input, output) \
+        CASE_MACRO((unary_operator_kernel<int16_t>), kInt16, op, input, output)   \
+        CASE_MACRO((unary_operator_kernel<int32_t>), kInt32, op, input, output)   \
+        CASE_MACRO((unary_operator_kernel<int64_t>), kLong, op, input, output)    \
+        CASE_MACRO((unary_operator_kernel<Half>), kHalf, op, input, output)       \
+        CASE_MACRO((unary_operator_kernel<float>), kFloat, op, input, output)     \
+        CASE_MACRO((unary_operator_kernel<double>), kDouble, op, input, output)   \
+        default:                                                                  \
+            CHECK(false) << "invalid input type " << input.scalar_type();         \
     }
 
-#define SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(op, input, grad_input, grad_result)                          \
-    switch (input.scalar_type())                                                                          \
-    {                                                                                                     \
-        CASE_MACRO((unary_operator_backward_kernel<uint8_t>), kUInt8, op, input, grad_input, grad_result) \
-        CASE_MACRO((unary_operator_backward_kernel<int16_t>), kInt16, op, input, grad_input, grad_result) \
-        CASE_MACRO((unary_operator_backward_kernel<int32_t>), kInt32, op, input, grad_input, grad_result) \
-        CASE_MACRO((unary_operator_backward_kernel<int64_t>), kLong, op, input, grad_input, grad_result)  \
-        CASE_MACRO((unary_operator_backward_kernel<Half>), kHalf, op, input, grad_input, grad_result)     \
-        CASE_MACRO((unary_operator_backward_kernel<float>), kFloat, op, input, grad_input, grad_result)   \
-        CASE_MACRO((unary_operator_backward_kernel<double>), kDouble, op, input, grad_input, grad_result) \
-        default:                                                                                          \
-            CHECK(false) << "invalid input type " << input.scalar_type();                                 \
+#define SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(op, input, grad_input, grad_result)                            \
+    switch (input.scalar_type())                                                                            \
+    {                                                                                                       \
+        CASE_MACRO((unary_operator_backward_kernel<uint8_t>), kUInt8, op, input, grad_input, grad_result)   \
+        CASE_MACRO((unary_operator_backward_kernel<uint16_t>), kUInt16, op, input, grad_input, grad_result) \
+        CASE_MACRO((unary_operator_backward_kernel<int16_t>), kInt16, op, input, grad_input, grad_result)   \
+        CASE_MACRO((unary_operator_backward_kernel<int32_t>), kInt32, op, input, grad_input, grad_result)   \
+        CASE_MACRO((unary_operator_backward_kernel<int64_t>), kLong, op, input, grad_input, grad_result)    \
+        CASE_MACRO((unary_operator_backward_kernel<Half>), kHalf, op, input, grad_input, grad_result)       \
+        CASE_MACRO((unary_operator_backward_kernel<float>), kFloat, op, input, grad_input, grad_result)     \
+        CASE_MACRO((unary_operator_backward_kernel<double>), kDouble, op, input, grad_input, grad_result)   \
+        default:                                                                                            \
+            CHECK(false) << "invalid input type " << input.scalar_type();                                   \
     }
 
 void abs_impl(Tensor a, Tensor result)
@@ -157,11 +159,11 @@ void sigmoid_backward_impl(Tensor a, Tensor grad_a, Tensor grad_result)
 
 void softplus_impl(Tensor a, double beta, Tensor result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Softplus((float)beta), a, result);
+    SWITCH_MACRO_UNARY_OPERATOR(UnaryOperators::Softplus(beta), a, result);
 }
 void softplus_backward_impl(Tensor a, double beta, Tensor grad_a, Tensor grad_result)
 {
-    SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(UnaryOperators::Softplus((float)beta), a, grad_a, grad_result);
+    SWITCH_MACRO_UNARY_OPERATOR_BACKWARD(UnaryOperators::Softplus(beta), a, grad_a, grad_result);
 }
 
 }  // namespace cpu_impl

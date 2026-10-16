@@ -114,7 +114,38 @@ class ModuleHolder : ModuleHolderIndicator
 struct Module
 {
     virtual ~Module() {}
-    std::map<std::string, Tensor> named_parameters() { return parameters_; }
+    // Like libtorch, these include the parameters/buffers of all submodules (recurse = true) with names prefixed by
+    // the submodule name ("sub.weight").
+    std::map<std::string, Tensor> named_parameters(bool recurse = true)
+    {
+        std::map<std::string, Tensor> result = parameters_;
+        if (recurse)
+        {
+            for (auto& m : modules_)
+            {
+                for (auto& p : m.second->named_parameters(true))
+                {
+                    result[m.first + "." + p.first] = p.second;
+                }
+            }
+        }
+        return result;
+    }
+    std::map<std::string, Tensor> named_buffers(bool recurse = true)
+    {
+        std::map<std::string, Tensor> result = buffers_;
+        if (recurse)
+        {
+            for (auto& m : modules_)
+            {
+                for (auto& p : m.second->named_buffers(true))
+                {
+                    result[m.first + "." + p.first] = p.second;
+                }
+            }
+        }
+        return result;
+    }
 
     void to(Device d)
     {
@@ -160,12 +191,14 @@ struct Module
     }
     void train(bool on = true)
     {
-        is_training_ = true;
+        is_training_ = on;
         for (auto& b : modules_)
         {
             b.second->train(on);
         }
     }
+
+    void eval() { train(false); }
 
     bool is_training() const { return is_training_; }
 
@@ -261,22 +294,38 @@ struct Module
         modules_[name] = module_holder.ptr();
         return module_holder.ptr();
     }
-    std::vector<Tensor> parameters()
+    std::vector<Tensor> parameters(bool recurse = true)
     {
         std::vector<Tensor> result;
-        for (auto b : parameters_)
+        for (auto& b : parameters_)
         {
             result.push_back(b.second);
+        }
+        if (recurse)
+        {
+            for (auto& m : modules_)
+            {
+                auto sub = m.second->parameters(true);
+                result.insert(result.end(), sub.begin(), sub.end());
+            }
         }
         return result;
     }
 
-    std::vector<Tensor> buffers()
+    std::vector<Tensor> buffers(bool recurse = true)
     {
         std::vector<Tensor> result;
-        for (auto b : buffers_)
+        for (auto& b : buffers_)
         {
             result.push_back(b.second);
+        }
+        if (recurse)
+        {
+            for (auto& m : modules_)
+            {
+                auto sub = m.second->buffers(true);
+                result.insert(result.end(), sub.begin(), sub.end());
+            }
         }
         return result;
     }

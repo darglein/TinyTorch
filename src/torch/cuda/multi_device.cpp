@@ -249,10 +249,28 @@ void MultiDeviceTensor::MainToOthers()
         return;
     }
 
+    // cpu_data[0] may still be read by the copies to the other devices of the previous call
+    for (int i = 1; i < devices.size(); ++i)
+    {
+        cudaEvent_t prev_copy_done;
+        {
+            cuda::DeviceGuard dg(devices[i]);
+            prev_copy_done = getNextEvent();
+            TT_CHECK_CUDA_ERROR(cudaEventRecord(prev_copy_done, getCurrentCUDAStream()));
+        }
+        cuda::DeviceGuard dg(devices[0]);
+        TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(getCurrentCUDAStream(), prev_copy_done));
+    }
+
     MainToCPU();
 
-    auto on_cpu_event = getNextEvent();
-    cudaEventRecord(on_cpu_event, getCurrentCUDAStream());
+    // the D2H copy of MainToCPU runs on the stream of the main device
+    cudaEvent_t on_cpu_event;
+    {
+        cuda::DeviceGuard dg(devices[0]);
+        on_cpu_event = getNextEvent();
+        TT_CHECK_CUDA_ERROR(cudaEventRecord(on_cpu_event, getCurrentCUDAStream()));
+    }
 
     MainCPUToOthers(on_cpu_event, false);
 }

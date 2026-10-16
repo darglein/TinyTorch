@@ -4,6 +4,9 @@
  * See LICENSE file for more information.
  */
 
+#include <cmath>
+#include <limits>
+
 #include "test_utils.h"
 
 using tttest::DeviceTest;
@@ -163,6 +166,35 @@ TEST_P(TinyTorchUnarySignRound, Values)
     TT_EXPECT_CLOSE(tinytorch::round(a), tttest::make_tensor({-2, 0, 3, 0}, {2, 2}, device()), 0, 0);
 }
 
+// double tensors are computed in double precision (not via float)
+TEST_P(TinyTorchUnarySignRound, DoublePrecision)
+{
+    Tensor a = tttest::make_tensor({0.1, 2.0, 3.7}, {3}, device(), tinytorch::kDouble);
+    auto x   = tttest::to_double_vec(a);
+    auto chk = [&](const Tensor& r, double (*f)(double), const char* name)
+    {
+        auto v = tttest::to_double_vec(r);
+        for (size_t i = 0; i < v.size(); ++i)
+        {
+            EXPECT_NEAR(v[i], f(x[i]), 1e-15 * std::max(1.0, std::abs(f(x[i])))) << name << " " << x[i];
+        }
+    };
+    chk(tinytorch::sqrt(a), [](double v) { return std::sqrt(v); }, "sqrt");
+    chk(tinytorch::exp(a), [](double v) { return std::exp(v); }, "exp");
+    chk(tinytorch::log(a), [](double v) { return std::log(v); }, "log");
+    chk(tinytorch::sin(a), [](double v) { return std::sin(v); }, "sin");
+    chk(tinytorch::cos(a), [](double v) { return std::cos(v); }, "cos");
+    chk(tinytorch::sigmoid(a), [](double v) { return 1.0 / (1.0 + std::exp(-v)); }, "sigmoid");
+    chk(tinytorch::softplus(a, 1.0), [](double v) { return std::log(std::exp(v) + 1.0); }, "softplus");
+}
+
+TEST_P(TinyTorchUnarySignRound, UInt16)
+{
+    Tensor a = tttest::make_tensor({4, 9, 0}, {3}, device(), tinytorch::kUInt16);
+    EXPECT_EQ(tttest::to_double_vec(tinytorch::sqrt(a)), (std::vector<double>{2, 3, 0}));
+    EXPECT_EQ(tttest::to_double_vec(tinytorch::abs(a)), (std::vector<double>{4, 9, 0}));
+}
+
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnaryRelu);
 TEST_P(TinyTorchUnaryRelu, ValuesAndGradient)
 {
@@ -229,4 +261,11 @@ TEST_P(TinyTorchUnarySoftmax, SumsToOneAndGradient)
                             return tinytorch::sum(tinytorch::softmax(p[0], 1));
                         },
                         2e-2, 2e-3);
+}
+
+TEST_P(TinyTorchUnarySoftmax, NegativeDim)
+{
+    Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
+    TT_EXPECT_CLOSE(tinytorch::softmax(a, -1), tinytorch::softmax(a, 1), 0, 0);
+    TT_EXPECT_CLOSE(tinytorch::softmax(a, -2), tinytorch::softmax(a, 0), 0, 0);
 }
