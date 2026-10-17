@@ -213,9 +213,12 @@ TEST_P(TinyTorchUniformFillOps, Ranges)
         EXPECT_DOUBLE_EQ(std::floor(x), x);
     }
 
-    Tensor c = tinytorch::empty({2048}, TensorOptions().device(device()));
+    // 6 sigma bounds of the sample mean (1 / sqrt(n)) and sample std (1 / sqrt(2n)) of N(0, 1)
+    const int64_t n = 1 << 16;
+    Tensor c        = tinytorch::empty({n}, TensorOptions().device(device()));
     tinytorch::normal_random(c);
-    EXPECT_NEAR(c.mean().toDouble(), 0.0, 0.05);
+    EXPECT_NEAR(c.mean().toDouble(), 0.0, 6.0 / std::sqrt(double(n)));
+    EXPECT_NEAR(c.std().toDouble(), 1.0, 6.0 / std::sqrt(2.0 * n));
 }
 
 // ------------------------------------------------------------------ sort
