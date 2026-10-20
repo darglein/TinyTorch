@@ -33,6 +33,18 @@ bool IsCudaPeerToPeerAvailable(Device device0, Device device1)
     return canAccessPeer01 && canAccessPeer10;
 }
 
+// 'allowed' (already enabled / not enabled) is not an error. CUDA still records it as the last error, which a later
+// cudaGetLastError() would report, so it is cleared here.
+static void CheckPeerAccessError(cudaError_t error, cudaError_t allowed)
+{
+    if (error == allowed)
+    {
+        (void)cudaGetLastError();
+        return;
+    }
+    TT_CHECK_CUDA_ERROR(error);
+}
+
 bool EnableCudaPeerToPeer(Device device0, Device device1)
 {
     if (!IsCudaPeerToPeerAvailable(device0, device1))
@@ -46,19 +58,11 @@ bool EnableCudaPeerToPeer(Device device0, Device device1)
 
     {
         cuda::DeviceGuard guard(device0);
-        auto error = cudaDeviceEnablePeerAccess(device1.index(), 0);
-        if (error != cudaErrorPeerAccessAlreadyEnabled)
-        {
-            TT_CHECK_CUDA_ERROR(error);
-        }
+        CheckPeerAccessError(cudaDeviceEnablePeerAccess(device1.index(), 0), cudaErrorPeerAccessAlreadyEnabled);
     }
     {
         cuda::DeviceGuard guard(device1);
-        auto error = cudaDeviceEnablePeerAccess(device0.index(), 0);
-        if (error != cudaErrorPeerAccessAlreadyEnabled)
-        {
-            TT_CHECK_CUDA_ERROR(error);
-        }
+        CheckPeerAccessError(cudaDeviceEnablePeerAccess(device0.index(), 0), cudaErrorPeerAccessAlreadyEnabled);
     }
     return true;
 }
@@ -76,11 +80,11 @@ void DisableCudaPeerToPeer(Device device0, Device device1)
 
     {
         cuda::DeviceGuard guard(device0);
-        TT_CHECK_CUDA_ERROR(cudaDeviceDisablePeerAccess(device1.index()));
+        CheckPeerAccessError(cudaDeviceDisablePeerAccess(device1.index()), cudaErrorPeerAccessNotEnabled);
     }
     {
         cuda::DeviceGuard guard(device1);
-        TT_CHECK_CUDA_ERROR(cudaDeviceDisablePeerAccess(device0.index()));
+        CheckPeerAccessError(cudaDeviceDisablePeerAccess(device0.index()), cudaErrorPeerAccessNotEnabled);
     }
 }
 bool EnableCudaPeerToPeer(const std::vector<Device>& devices)
@@ -98,11 +102,12 @@ bool EnableCudaPeerToPeer(const std::vector<Device>& devices)
 }
 void DisableCudaPeerToPeer(const std::vector<Device>& devices)
 {
-    if (devices.size() >= 2)
+    // EnableCudaPeerToPeer enables every pair
+    for (int i = 0; i < devices.size(); ++i)
     {
-        for (int i = 1; i < devices.size(); ++i)
+        for (int j = i + 1; j < devices.size(); ++j)
         {
-            DisableCudaPeerToPeer(devices[0], devices[i]);
+            DisableCudaPeerToPeer(devices[i], devices[j]);
         }
     }
     has_p2p_copy = false;
