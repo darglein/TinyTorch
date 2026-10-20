@@ -99,6 +99,37 @@ INSTANTIATE_TEST_SUITE_P(DeviceCounts, TinyTorchMultiDeviceReduceParam, ::testin
                              return "devices" + std::to_string(info.param);
                          });
 
+// Enabling twice and disabling twice must not throw or leave a pending error, and disabling must disable every pair
+// (with 3+ devices, the pairs without device 0 stayed enabled).
+TEST_P(TinyTorchMultiDeviceReduceParam, EnableDisablePeerToPeer)
+{
+    // enabled in SetUp
+    EXPECT_TRUE(tinytorch::cuda::EnableCudaPeerToPeer(devices_));
+    EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+
+    tinytorch::cuda::DisableCudaPeerToPeer(devices_);
+    EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+    EXPECT_FALSE(tinytorch::cuda::HasP2PCopy());
+    for (size_t i = 0; i < devices_.size(); ++i)
+    {
+        for (size_t j = 0; j < devices_.size(); ++j)
+        {
+            if (i == j) continue;
+            tinytorch::cuda::DeviceGuard guard(devices_[i]);
+            EXPECT_EQ(cudaDeviceDisablePeerAccess(devices_[j].index()), cudaErrorPeerAccessNotEnabled)
+                << "peer access " << i << " -> " << j << " is still enabled";
+            (void)cudaGetLastError();
+        }
+    }
+
+    tinytorch::cuda::DisableCudaPeerToPeer(devices_);
+    EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+
+    // TearDown disables again
+    EXPECT_TRUE(tinytorch::cuda::EnableCudaPeerToPeer(devices_));
+    EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+}
+
 // data[0][e] becomes the sum of data[i][e] over every device i, for every element e.
 TEST_P(TinyTorchMultiDeviceReduceParam, ReduceSumToMainUVA)
 {
