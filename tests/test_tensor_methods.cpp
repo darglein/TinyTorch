@@ -350,7 +350,7 @@ TEST_P(TinyTorchTensorIndexCopyMethod, Values)
 {
     Tensor target = tinytorch::zeros({2, 2}, TensorOptions().device(device()));
     Tensor source = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
-    Tensor idx = tttest::make_tensor(std::vector<int64_t>{1, 0}, {2}, device());
+    Tensor idx    = tttest::make_tensor(std::vector<int64_t>{1, 0}, {2}, device());
 
     target.index_copy_(0, idx, source);
     TT_EXPECT_CLOSE(target, tttest::make_tensor({3, 4, 1, 2}, {2, 2}, device()), 0, 0);
@@ -367,7 +367,6 @@ TEST_P(TinyTorchTensorItem, Values)
     EXPECT_FLOAT_EQ(a.toFloat(), 42.0f);
     EXPECT_EQ(a.toInt(), 42);
     EXPECT_EQ(a.toLong(), 42);
-
 }
 
 // ------------------------------------------------------------------ allclose
@@ -432,4 +431,32 @@ TEST_P(TinyTorchTensorSetData, Overwrites)
     a.set_data(b);
     EXPECT_EQ(a.sizes(), (SizeType{2}));
     TT_EXPECT_CLOSE(a, b, 0, 0);
+}
+
+// set_data with the tensor itself (p.set_data(p.to(device)) when p already is on that device) keeps requires_grad and
+// the gradient
+TEST_P(TinyTorchTensorSetData, WithItselfKeepsGrad)
+{
+    Tensor p = tttest::leaf({1, 2, 3}, {3}, device());
+    p.mutable_grad().fill_(7);
+    p.set_data(p.to(device()));
+    EXPECT_TRUE(p.requires_grad());
+    EXPECT_TRUE(p.is_leaf());
+    ASSERT_TRUE(p.grad().defined());
+    TT_EXPECT_CLOSE(p.grad(), tttest::make_tensor({7, 7, 7}, {3}, device()), 0, 0);
+}
+
+// ------------------------------------------------------------------ 32 bit addressing
+
+// Positive and negative strides are checked separately, their offsets must not cancel each other
+TEST(TinyTorchTensorIs32BitAddressable, NegativeStrides)
+{
+    float dummy = 0;
+    int64_t big = int64_t(1) << 30;
+    // largest offset 3 * 2^30 > INT_MAX, smallest offset -3 * 2^30 < INT_MIN
+    Tensor t = tinytorch::from_blob(&dummy, {4, 4}, {big, -big});
+    EXPECT_FALSE(t.is_32bit_addressable());
+
+    Tensor small = tinytorch::from_blob(&dummy, {4, 4}, {4, -1});
+    EXPECT_TRUE(small.is_32bit_addressable());
 }

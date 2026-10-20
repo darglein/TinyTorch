@@ -126,6 +126,51 @@ __launch_bounds__(128) __global__
 }
 
 
+// The device pow is not exact for integer operands (pow(3.0, 1.0) = 2.9999999999999996 in double), and the
+// conversion to an integer type truncates the result (3^1 = 2). The CPU computes them exactly, so integer powers with a
+// non-negative integer exponent are computed with integer arithmetic (wrapping like integer multiplication).
+TT_HD inline double pow_integer_base(double a, double b)
+{
+    if (b >= 0 && b == ::floor(b) && b < 9.2e18)
+    {
+        unsigned long long r = 1, base = (unsigned long long)(long long)a;
+        for (unsigned long long e = (unsigned long long)b; e != 0; e >>= 1)
+        {
+            if (e & 1) r *= base;
+            base *= base;
+        }
+        return double((long long)r);
+    }
+    return ::pow(a, b);
+}
+
+// tensor ^ tensor
+struct PowExact
+{
+    template <typename T>
+    TT_HD T forward(T a, T b)
+    {
+        if constexpr (std::is_integral<T>::value)
+        {
+            return scalar_result_to<T>(pow_integer_base(double(a), double(b)));
+        }
+        else
+        {
+            return BinaryOperators::Pow().forward(a, b);
+        }
+    }
+};
+
+// integer tensor ^ double scalar (computed in double, see ScalarComputeType)
+struct PowIntegerBaseScalar
+{
+    template <typename T>
+    TT_HD T forward(T a, T b)
+    {
+        return T(pow_integer_base(double(a), double(b)));
+    }
+};
+
 template <typename OP, typename Ta, typename Tb>
 void SWITCH_MACRO_BINARY_OPERATOR(OP op, Ta a, Tb b, Tensor result)
 {
@@ -212,11 +257,18 @@ void greater_impl(Tensor a, double b, Tensor result)
 }
 void pow_impl(Tensor a, double b, Tensor result)
 {
-    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Pow(), a, b, result);
+    if (a.scalar_type() == kHalf || a.scalar_type() == kFloat || a.scalar_type() == kDouble)
+    {
+        SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Pow(), a, b, result);
+    }
+    else
+    {
+        SWITCH_MACRO_BINARY_OPERATOR(PowIntegerBaseScalar(), a, b, result);
+    }
 }
 void pow_impl(Tensor a, Tensor b, Tensor result)
 {
-    SWITCH_MACRO_BINARY_OPERATOR(BinaryOperators::Pow(), a, b, result);
+    SWITCH_MACRO_BINARY_OPERATOR(PowExact(), a, b, result);
 }
 void min_impl(Tensor a, Tensor b, Tensor result)
 {

@@ -46,7 +46,7 @@
 #endif
 
 
-#if defined(__CUDACC_) && defined(__CUDA_ARCH__) && __CUDA_ARCH__ > 0
+#if defined(__CUDACC__) && defined(__CUDA_ARCH__) && __CUDA_ARCH__ > 0
 #    define TT_DEVICE_CODE
 #endif
 

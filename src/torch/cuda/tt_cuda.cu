@@ -18,6 +18,8 @@ static constexpr int MAX_DEVICES = 8;
 
 static cudaStream_t& thread_local_stream(int device_id)
 {
+    CHECK_GE(device_id, 0);
+    CHECK_LT(device_id, MAX_DEVICES);
     static thread_local cudaStream_t strms[MAX_DEVICES] = {};
     return strms[device_id];
 }
@@ -56,7 +58,7 @@ void setDevice(int device_index)
 
 int& getTotalNumEventsUsed(int device)
 {
-    static thread_local int n[MAX_DEVICES]                    = {};
+    static thread_local int n[MAX_DEVICES] = {};
     return n[device];
 }
 
@@ -142,7 +144,8 @@ void ReportCudaError(cudaError_t cudaErrorCode, std::string function)
 
     if (cudaErrorCode == cudaErrorMemoryAllocation)
     {
-        throw TinyTorchException(std::string("CUDA OutOfMemory ") + error_string, TinyTorchExceptionStatus::OutOfMemoryGPU);
+        throw TinyTorchException(std::string("CUDA OutOfMemory ") + error_string,
+                                 TinyTorchExceptionStatus::OutOfMemoryGPU);
     }
     throw TinyTorchException(std::string("CUDA Error ") + error_string, TinyTorchExceptionStatus::CUDAError);
 }

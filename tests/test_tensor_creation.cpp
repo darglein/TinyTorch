@@ -88,6 +88,19 @@ TEST_P(TinyTorchFull, Values)
                     tttest::make_tensor(expected, {2, 2}, device()), 0.0, 0.0);
 }
 
+// fill(-0.0) must not take the memset fast path, which produces +0.0
+TEST_P(TinyTorchFull, NegativeZeroKeepsSign)
+{
+    Tensor a = tinytorch::ones({5}, TensorOptions().device(device()));
+    tinytorch::fill(a, -0.0);
+    Tensor c = a.cpu();
+    for (int i = 0; i < 5; ++i)
+    {
+        EXPECT_EQ(c.data_ptr<float>()[i], 0.f);
+        EXPECT_TRUE(std::signbit(c.data_ptr<float>()[i])) << i;
+    }
+}
+
 TEST(TinyTorchCreate, FullLike)
 {
     Tensor t = tinytorch::zeros({2, 2});
@@ -290,6 +303,27 @@ TEST_P(TinyTorchRandint, IntRange)
     }
 }
 
+// floating point tensors get integer values from [low, high)
+TEST_P(TinyTorchRandint, FloatingPointTypes)
+{
+    for (auto dtype : {kFloat, kFloat64, tinytorch::kHalf})
+    {
+        Tensor t      = tinytorch::randint(-3, 5, {1000}, TensorOptions().device(device()).dtype(dtype));
+        auto v        = tttest::to_double_vec(t);
+        bool seen_low = false, seen_high = false;
+        for (double x : v)
+        {
+            EXPECT_EQ(x, std::round(x));
+            EXPECT_GE(x, -3);
+            EXPECT_LT(x, 5);
+            seen_low  = seen_low || x == -3;
+            seen_high = seen_high || x == 4;
+        }
+        EXPECT_TRUE(seen_low) << dtype;
+        EXPECT_TRUE(seen_high) << dtype;
+    }
+}
+
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchRandn);
 TEST_P(TinyTorchRandn, ApproximatelyStandardNormal)
 {
@@ -313,14 +347,14 @@ TEST(TinyTorchCreate, RandLikeRandnLike)
 TEST(TinyTorchCreate, Range)
 {
     // end is inclusive
-    Tensor t = tinytorch::range(1, 5, 1);
+    Tensor t                    = tinytorch::range(1, 5, 1);
     std::vector<float> expected = {1, 2, 3, 4, 5};
     TT_EXPECT_CLOSE(t, tttest::make_tensor(expected, {5}, kCPU), 0.0, 0.0);
 }
 
 TEST(TinyTorchCreate, RangeNegativeStep)
 {
-    Tensor t = tinytorch::range(3, -1, -2);
+    Tensor t                    = tinytorch::range(3, -1, -2);
     std::vector<float> expected = {3, 1, -1};
     TT_EXPECT_CLOSE(t, tttest::make_tensor(expected, {3}, kCPU), 0.0, 0.0);
 }
@@ -379,8 +413,8 @@ TEST(TinyTorchCreate, FromBlobCustomStrides)
 TEST(TinyTorchCreate, FromBlobDoesNotTakeOwnership)
 {
     // The tensor must still be valid after this scope: the buffer stays alive in `data`.
-    std::vector<float> data = {1, 2, 3, 4, 5, 6};
-    Tensor t                = tinytorch::from_blob(data.data(), {2, 3});
+    std::vector<float> data     = {1, 2, 3, 4, 5, 6};
+    Tensor t                    = tinytorch::from_blob(data.data(), {2, 3});
     std::vector<float> expected = {1, 2, 3, 4, 5, 6};
     TT_EXPECT_CLOSE(t, tttest::make_tensor(expected, {2, 3}, kCPU), 0.0, 0.0);
 }

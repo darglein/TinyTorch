@@ -206,6 +206,7 @@ void fill(Tensor& t, Tensor value)
 }
 void fill(Tensor& t, Tensor values, int dim)
 {
+    dim = (int)maybe_wrap_dim(dim, t.dim());
     CHECK_EQ(values.numel(), t.size(dim));
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
@@ -394,6 +395,11 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
         CHECK_EQ(input.dim(), data.dim());
         CHECK_EQ(index.dim(), 1);
         CHECK_EQ(index.numel(), data.size(dim.toInt())) << index.sizes() << " " << data.sizes();
+        for (int64_t d = 0; d < data.dim(); ++d)
+        {
+            CHECK(d == dim.toInt() || data.size(d) <= input.size(d))
+                << "index_add: data " << data.sizes() << " does not fit into input " << input.sizes();
+        }
 
         Tensor result = input.clone();
         SELECT_DEVICE(result.device(), index_add_impl, dim.toInt(), index, data, result);
@@ -427,6 +433,15 @@ void index_copy(Tensor& target, int64_t dim, Tensor index, Tensor source)
     CHECK(!target.requires_grad() || !GradMode::is_enabled());
     CHECK_EQ(target.dtype(), source.dtype());
     dim = maybe_wrap_dim(dim, target.dim());
+    CHECK_EQ(target.device(), source.device());
+    CHECK_EQ(target.dim(), source.dim());
+    CHECK_EQ(index.dim(), 1);
+    CHECK_EQ(index.numel(), source.size(dim)) << index.sizes() << " " << source.sizes();
+    for (int64_t d = 0; d < source.dim(); ++d)
+    {
+        CHECK(d == dim || source.size(d) <= target.size(d))
+            << "index_copy: source " << source.sizes() << " does not fit into target " << target.sizes();
+    }
     TINYTORCH_LOG_FUNCTION_CALL();
     SELECT_DEVICE(target.device(), index_copy_impl, target, dim, index, source);
 }
@@ -436,7 +451,14 @@ Tensor gather(Tensor data, int64_t dim, Tensor index)
     CHECK(!data.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
     CHECK_EQ(data.dim(), index.dim());
-    dim            = maybe_wrap_dim(dim, data.dim());
+    CHECK_EQ(index.dtype(), kLong) << "gather: index must be int64";
+    CHECK_EQ(data.device(), index.device());
+    dim = maybe_wrap_dim(dim, data.dim());
+    for (int64_t d = 0; d < data.dim(); ++d)
+    {
+        CHECK(d == dim || index.size(d) <= data.size(d))
+            << "gather: index " << index.sizes() << " is larger than data " << data.sizes() << " in dim " << d;
+    }
     auto out_sizes = index.sizes();
     auto result    = empty(out_sizes, data.options());
     SELECT_DEVICE(result.device(), gather_impl, data, dim, index, result);
@@ -640,6 +662,14 @@ struct Cat2Node : public FunctionNode<Cat2Node>
 {
     static std::vector<Tensor> forward(Context* ctx, Tensor a, Tensor b, IValue dim)
     {
+        CHECK_EQ(a.dim(), b.dim()) << "cat: tensors must have the same number of dims";
+        CHECK_EQ(a.device(), b.device()) << "cat: tensors must be on the same device";
+        CHECK_EQ(a.scalar_type(), b.scalar_type()) << "cat: tensors must have the same dtype";
+        for (int64_t d = 0; d < a.dim(); ++d)
+        {
+            CHECK(d == dim.toInt() || a.size(d) == b.size(d))
+                << "cat: sizes must match except in dim " << dim.toInt() << ": " << a.sizes() << " " << b.sizes();
+        }
         ctx->saved_data["dim"] = dim;
         auto output_size       = a.sizes();
         output_size[dim.toInt()] += b.size(dim.toInt());
@@ -759,6 +789,7 @@ Tensor cat(const std::vector<Tensor>& list, int64_t dim)
         return {};
     }
     auto result = list.front();
+    dim         = maybe_wrap_dim(dim, result.dim());
     for (int i = 1; i < list.size(); ++i)
     {
         result = autograd::Cat2Node::apply(result, list[i], dim)[0];
@@ -770,6 +801,7 @@ Tensor cat(const std::vector<Tensor>& list, int64_t dim)
 std::pair<Tensor, Tensor> sort(Tensor t, int64_t dim)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
+    dim = maybe_wrap_dim(dim, t.dim());
 
     auto initial_device = t.device();
     t                   = t.cpu();

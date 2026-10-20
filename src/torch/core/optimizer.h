@@ -70,7 +70,7 @@ struct OptimizerBase
     {
         for (auto& p : params)
         {
-            if(p.grad().defined()) p.mutable_grad().zero_();
+            if (p.grad().defined()) p.mutable_grad().zero_();
         }
     }
 };
@@ -86,6 +86,9 @@ struct TINYTORCH_API Adam : public OptimizerBase
     std::vector<AdamOptions> options;
     // m2_max is only allocated for parameters whose group uses amsgrad
     std::vector<Tensor> m1, m2, m2_max;
+    // Number of steps per parameter (for the bias correction). Like PyTorch, it only counts the steps in which the
+    // parameter had a gradient, so parameters added later or used only sometimes start with a correct first step.
+    std::vector<int> param_steps;
 };
 
 

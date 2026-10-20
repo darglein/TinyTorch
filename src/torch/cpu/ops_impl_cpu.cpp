@@ -6,14 +6,15 @@
 
 #include "ops_impl_cpu.h"
 
+#include <cmath>
+#include <omp.h>
+#include <vector>
+
 #include "ops_impl_cpu_helper.h"
 #include "torch/core/ops/ops_impl.h"
 #include "torch/core/tensor_info.h"
 #include "torch/cuda/cached_memory_allocator.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
-
-#include <omp.h>
-#include <vector>
 
 
 
@@ -179,7 +180,7 @@ static void sort_impl(TensorInfo<T> a, int64_t dim, TensorInfo<T> out_t, TensorI
 }
 void sort_impl(Tensor a, int64_t dim, Tensor& out_t, Tensor& out_index)
 {
-    // CHECK_EQ(a.dim(), 1);
+    dim = maybe_wrap_dim(dim, a.dim());
     SWITCH_MACRO_ALL(a.scalar_type(), sort_impl, a, dim, out_t, out_index);
 }
 
@@ -214,7 +215,8 @@ static void fill_impl(TensorInfo<T> a, TensorInfo<T> values, int64_t dim)
 
 void fill_impl(Tensor& a, double value)
 {
-    if (value == 0 && a.is_contiguous())
+    // memset would turn -0.0 into +0.0
+    if (value == 0 && !std::signbit(value) && a.is_contiguous())
     {
         memset(a.data_ptr(), 0, a.numel() * a.element_size());
         return;
@@ -323,7 +325,7 @@ static void rand_int_impl(TensorInfo<T> t, std::mt19937& mersenne_engine, int64_
 void uniform_int_impl(Tensor& t, int64_t low, int64_t high)
 {
     CHECK_LT(low, high);
-    SWITCH_MACRO_INT(t.scalar_type(), rand_int_impl, t, generator(), low, high);
+    SWITCH_MACRO_ALL(t.scalar_type(), rand_int_impl, t, generator(), low, high);
 }
 
 
@@ -691,9 +693,12 @@ static void index_select_impl(TensorInfo<T> input, int64_t dim, TensorInfo<Index
 {
     for (int64_t result_linear_index = 0; result_linear_index < result.numel(); ++result_linear_index)
     {
-        auto index_result    = result.LinearIndexToDimIndex(result_linear_index);
-        auto index_input     = index_result;
-        index_input[dim]     = index[index_result[dim]];
+        auto index_result = result.LinearIndexToDimIndex(result_linear_index);
+        auto index_input  = index_result;
+        index_input[dim]  = index[index_result[dim]];
+        CHECK(index_input[dim] >= 0 && index_input[dim] < input.size(dim))
+            << "index_select: index " << index_input[dim] << " is out of range for dim " << dim << " with size "
+            << input.size(dim);
         result[index_result] = input[index_input];
     }
 }
@@ -730,6 +735,9 @@ static void index_add_impl(int64_t dim, TensorInfo<TIndex> index, TensorInfo<T> 
 
         auto index_result = index_input;
         index_result[dim] = index[index_input[dim]];
+        CHECK(result.index_in_range(index_result)) << "index_add: index " << index_result[dim]
+                                                   << " is out of range for dim " << dim << " or data is larger than "
+                                                   << "the input in another dim";
 
         result[index_result] = result[index_result] + data[index_input];
     }
@@ -765,6 +773,8 @@ static void gather_impl(TensorInfo<T> data, int64_t dim, TensorInfo<int64_t> ind
         auto index_input  = index_result;
 
         index_input[dim] = index[index_result];
+        CHECK(data.index_in_range(index_input)) << "gather: index " << index_input[dim] << " is out of range for dim "
+                                                << dim << " or index is larger than the input in another dim";
 
         result[index_result] = data[index_input];
     }
@@ -784,6 +794,9 @@ static void index_copy_impl(TensorInfo<T> target, int64_t dim, TensorInfo<TIndex
 
         auto index_result = index_input;
         index_result[dim] = index[index_input[dim]];
+        CHECK(target.index_in_range(index_result)) << "index_copy: index " << index_result[dim]
+                                                   << " is out of range for dim " << dim << " or source is larger "
+                                                   << "than the target in another dim";
 
         target[index_result] = value[index_input];
     }
@@ -797,6 +810,8 @@ static void index_copy_helper(Tensor& target, int64_t dim, TensorInfo<TIndex> in
 
 void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value)
 {
+    CHECK_EQ(index.dim(), 1);
+    CHECK_EQ(index.numel(), value.size(dim)) << "index_copy: index and source don't match";
     switch (index.scalar_type())
     {
         case kInt32:

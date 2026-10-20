@@ -7,10 +7,27 @@
 #include "test_utils.h"
 #include "torch/core/tensor_info.h"
 
+#ifdef __linux__
+#    include <sys/prctl.h>
+#endif
+
 using tttest::DeviceTest;
 
 namespace
 {
+
+// Expected crashes of death test children should not write core dumps (slow with a piped core_pattern).
+void DisableCoreDumps()
+{
+#ifdef __linux__
+    prctl(PR_SET_DUMPABLE, 0);
+#endif
+}
+
+Tensor long_tensor(const std::vector<int64_t>& v, Device device)
+{
+    return tttest::make_tensor(v, {(int64_t)v.size()}, device);
+}
 
 // Folds in the cases from the former tests/test_backward.cpp.
 
@@ -52,12 +69,8 @@ TEST_P(TinyTorchReshapeOps, ValuesAndGradient)
     TT_EXPECT_CLOSE(r, tttest::make_tensor({1, 2, 3, 4, 5, 6}, {3, 2}, device()), 0, 0);
 
     // reshape is a view: the gradient is the identity
-    tttest::check_grads({a},
-                        [](const std::vector<Tensor>& p)
-                        {
-                            return tinytorch::sum(tinytorch::reshape(p[0], {3, 2}));
-                        },
-                        1e-4, 1e-6);
+    tttest::check_grads(
+        {a}, [](const std::vector<Tensor>& p) { return tinytorch::sum(tinytorch::reshape(p[0], {3, 2})); }, 1e-4, 1e-6);
 }
 
 // ------------------------------------------------------------------ repeat
@@ -72,7 +85,7 @@ TEST_P(TinyTorchRepeatOps, Values)
     Tensor r = tinytorch::repeat(a, {1, 2});
     TT_EXPECT_CLOSE(r, tttest::make_tensor({1, 2, 1, 2, 3, 4, 3, 4}, {2, 4}, device()), 0, 0);
 
-    Tensor b = tttest::make_tensor({1, 2}, {2}, device());
+    Tensor b  = tttest::make_tensor({1, 2}, {2}, device());
     Tensor ri = tinytorch::repeat_interleave(b, 2);
     TT_EXPECT_CLOSE(ri, tttest::make_tensor({1, 1, 2, 2}, {4}, device()), 0, 0);
 }
@@ -102,12 +115,19 @@ TEST_P(TinyTorchTransposeOps, ValuesAndGradient)
     TT_EXPECT_CLOSE(t, tttest::make_tensor({1, 4, 2, 5, 3, 6}, {3, 2}, device()), 0, 0);
 
     // d(sum(a^T))/da = 1
-    tttest::check_grads({a},
+    tttest::check_grads(
+        {a}, [](const std::vector<Tensor>& p) { return tinytorch::sum(tinytorch::transpose(p[0], 0, 1)); }, 1e-4, 1e-6);
+
+    // negative dims, weighted so that a wrong permutation of the gradient is detected
+    Tensor b =
+        tttest::leaf({0.3f, -1.2f, 0.7f, 1.5f, -0.4f, 0.9f, 0.1f, 0.2f, -0.6f, 1.1f, 0.8f, -0.9f}, {2, 3, 2}, device());
+    tttest::check_grads({b},
                         [](const std::vector<Tensor>& p)
                         {
-                            return tinytorch::sum(tinytorch::transpose(p[0], 0, 1));
-                        },
-                        1e-4, 1e-6);
+                            auto w =
+                                tttest::make_tensor({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, {2, 2, 3}, p[0].device());
+                            return tinytorch::sum(tinytorch::transpose(p[0], -1, 1) * w);
+                        });
 }
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchPermuteOps);
@@ -138,10 +158,18 @@ TEST_P(TinyTorchPermuteOps, ValuesAndGradient)
 
     // default (looser) tolerances: float32 finite differences of a 24-term sum
     // pick up ~1e-3 rounding noise
-    tttest::check_grads({a},
+    tttest::check_grads(
+        {a}, [](const std::vector<Tensor>& p) { return tinytorch::sum(tinytorch::permute(p[0], {2, 1, 0})); });
+
+    // negative dims, weighted so that a wrong permutation of the gradient is detected
+    Tensor b =
+        tttest::leaf({0.3f, -1.2f, 0.7f, 1.5f, -0.4f, 0.9f, 0.1f, 0.2f, -0.6f, 1.1f, 0.8f, -0.9f}, {2, 3, 2}, device());
+    tttest::check_grads({b},
                         [](const std::vector<Tensor>& p)
                         {
-                            return tinytorch::sum(tinytorch::permute(p[0], {2, 1, 0}));
+                            auto w =
+                                tttest::make_tensor({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, {2, 2, 3}, p[0].device());
+                            return tinytorch::sum(tinytorch::permute(p[0], {-1, 0, 1}) * w);
                         });
 }
 
@@ -190,6 +218,11 @@ TEST_P(TinyTorchFillOps, Values)
     Tensor c = tinytorch::zeros({2, 3}, TensorOptions().device(device()));
     tinytorch::fill(c, tttest::make_tensor({5, 6, 7}, {3}, device()), 1);
     TT_EXPECT_CLOSE(c, tttest::make_tensor({5, 5, 5, 6, 6, 6}, {2, 3}, device()), 0, 0);
+
+    // a negative dim is the same as the wrapped dim
+    Tensor d = tinytorch::zeros({2, 3}, TensorOptions().device(device()));
+    tinytorch::fill(d, tttest::make_tensor({5, 6, 7}, {3}, device()), -1);
+    TT_EXPECT_CLOSE(d, c, 0, 0);
 }
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUniformFillOps);
@@ -223,14 +256,27 @@ TEST_P(TinyTorchUniformFillOps, Ranges)
 
 // ------------------------------------------------------------------ sort
 
-TEST(TinyTorchSortOps, ValuesAndIndices)
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchSortOps);
+TEST_P(TinyTorchSortOps, ValuesAndIndices)
 {
-    Tensor a = tttest::make_tensor({3, 1, 4, 1, 5, 9}, {2, 3}, kCPU);
+    Tensor a = tttest::make_tensor({3, 1, 4, 1, 5, 9}, {2, 3}, device());
 
     auto [s, idx] = tinytorch::sort(a, 1);
-    TT_EXPECT_CLOSE(s, tttest::make_tensor({1, 3, 4, 1, 5, 9}, {2, 3}, kCPU), 0, 0);
+    TT_EXPECT_CLOSE(s, tttest::make_tensor({1, 3, 4, 1, 5, 9}, {2, 3}, device()), 0, 0);
     // indices are per-row (0-based within the reduced dim)
-    TT_EXPECT_CLOSE(idx, tttest::make_tensor(std::vector<int64_t>{1, 0, 2, 0, 1, 2}, {2, 3}, kCPU), 0, 0);
+    TT_EXPECT_CLOSE(idx, tttest::make_tensor(std::vector<int64_t>{1, 0, 2, 0, 1, 2}, {2, 3}, device()), 0, 0);
+}
+
+TEST_P(TinyTorchSortOps, NegativeDim)
+{
+    Tensor a = tttest::make_tensor({3, 1, 2, 6, 5, 4}, {2, 3}, device());
+
+    auto [s, idx]   = tinytorch::sort(a, -1);
+    auto [s1, idx1] = tinytorch::sort(a, 1);
+    TT_EXPECT_CLOSE(s, tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device()), 0, 0);
+    TT_EXPECT_CLOSE(idx, tttest::make_tensor(std::vector<int64_t>{1, 2, 0, 2, 1, 0}, {2, 3}, device()), 0, 0);
+    TT_EXPECT_CLOSE(s, s1, 0, 0);
+    TT_EXPECT_CLOSE(idx, idx1, 0, 0);
 }
 
 // ------------------------------------------------------------------ clone
@@ -305,6 +351,12 @@ TEST_P(TinyTorchSliceGradient, ZerosOutsideTheSlice)
     Tensor s = tinytorch::slice(a, 0, 1, 3, 1);
     tinytorch::backward(tinytorch::sum(s));
     TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({0, 1, 1, 0}, {4}, device()), 0, 0);
+
+    // slice with a step along the inner dim
+    Tensor b =
+        tttest::leaf({0.3f, -1.2f, 0.7f, 1.5f, -0.4f, 0.9f, 0.1f, 0.2f, -0.6f, 1.1f, 0.8f, -0.9f}, {3, 4}, device());
+    tttest::check_grads(
+        {b}, [](const std::vector<Tensor>& p) { return tinytorch::sum(tinytorch::square(p[0].slice(1, 1, 4, 2))); });
 }
 
 // ------------------------------------------------------------------ stack / cat
@@ -336,12 +388,47 @@ TEST_P(TinyTorchCatOps, ValuesAndGradient)
     Tensor c1 = tinytorch::cat({a2, b2}, 1);
     TT_EXPECT_CLOSE(c1, tttest::make_tensor({1, 2, 5, 6, 3, 4, 7, 8}, {2, 4}, device()), 0, 0);
 
-    tttest::check_grads({a, b},
-                        [](const std::vector<Tensor>& p)
-                        {
-                            return tinytorch::sum(tinytorch::cat({p[0], p[1]}, 0));
-                        },
-                        1e-4, 1e-6);
+    tttest::check_grads(
+        {a, b}, [](const std::vector<Tensor>& p) { return tinytorch::sum(tinytorch::cat({p[0], p[1]}, 0)); }, 1e-4,
+        1e-6);
+}
+
+TEST_P(TinyTorchCatOps, NegativeDimAndGradient)
+{
+    Tensor a = tttest::leaf({1, 2, 3, 4}, {2, 2}, device());
+    Tensor b = tttest::leaf({5, 6}, {2, 1}, device());
+    TT_EXPECT_CLOSE(tinytorch::cat({a, b}, -1), tttest::make_tensor({1, 2, 5, 3, 4, 6}, {2, 3}, device()), 0, 0);
+    tttest::check_grads({a, b}, [](const std::vector<Tensor>& p)
+                        { return tinytorch::sum(tinytorch::square(tinytorch::cat({p[0], p[1]}, -1))); });
+
+    // three inputs of different sizes along dim 0
+    tttest::check_grads(
+        {tttest::leaf({0.3f, -1.2f, 0.7f, 1.5f, -0.4f, 0.9f}, {2, 3}, device()),
+         tttest::leaf({0.3f, -1.2f, 0.7f, 1.5f, -0.4f, 0.9f, 0.1f, 0.2f, -0.6f, 1.1f, 0.8f, -0.9f}, {4, 3}, device()),
+         tttest::leaf({0.1f, 0.2f, -0.6f, 1.1f, 0.8f, -0.9f}, {2, 3}, device())},
+        [](const std::vector<Tensor>& p)
+        { return tinytorch::sum(tinytorch::square(tinytorch::cat({p[0], p[1], p[2]}, 0)) * 0.5); });
+}
+
+TEST_P(TinyTorchCatOps, MismatchDies)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    tinytorch::NoGradGuard ngg;
+    auto o = TensorOptions().device(device());
+    // sizes differ in a dim other than the cat dim
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::cat({tinytorch::zeros({2, 2}, o), tinytorch::zeros({2, 3}, o)}, 0);
+        },
+        "");
+    // dtypes differ
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::cat({tinytorch::zeros({2, 2}, o), tinytorch::zeros({2, 2}, o.dtype(kFloat64))}, 0);
+        },
+        "");
 }
 
 // ------------------------------------------------------------------ indexing
@@ -349,7 +436,7 @@ TEST_P(TinyTorchCatOps, ValuesAndGradient)
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchIndexSelectOps);
 TEST_P(TinyTorchIndexSelectOps, ValuesAndGradient)
 {
-    Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
+    Tensor a   = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
     Tensor idx = tttest::make_tensor(std::vector<int64_t>{1, 0}, {2}, device());
 
     Tensor s = tinytorch::index_select(a, 0, idx);
@@ -360,27 +447,54 @@ TEST_P(TinyTorchIndexSelectOps, ValuesAndGradient)
     TT_EXPECT_CLOSE(s1, tttest::make_tensor({2, 1, 5, 4}, {2, 2}, device()), 0, 0);
 
     // dL/da: one-hot-ish scatter of the upstream gradient
-    Tensor al = tttest::leaf({1, 2, 3, 4, 5, 6}, {2, 3}, device());
+    Tensor al   = tttest::leaf({1, 2, 3, 4, 5, 6}, {2, 3}, device());
     Tensor idxl = tttest::make_tensor(std::vector<int64_t>{1, 0}, {2}, device());
     tinytorch::backward(tinytorch::sum(tinytorch::index_select(al, 0, idxl)));
     TT_EXPECT_CLOSE(al.grad(), tttest::make_tensor({1, 1, 1, 1, 1, 1}, {2, 3}, device()), 0, 0);
+
+    // repeated indices along a negative dim accumulate their gradients
+    tttest::check_grads(
+        {tttest::leaf({0.3f, -1.2f, 0.7f, 1.5f, -0.4f, 0.9f, 0.1f, 0.2f, -0.6f, 1.1f, 0.8f, -0.9f}, {3, 4}, device())},
+        [](const std::vector<Tensor>& p)
+        {
+            auto idx = tttest::make_tensor(std::vector<int64_t>{2, 0, 2}, {3}, p[0].device());
+            return tinytorch::sum(tinytorch::square(tinytorch::index_select(p[0], -1, idx)));
+        });
 }
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchIndexAddOps);
 TEST_P(TinyTorchIndexAddOps, ValuesAndGradient)
 {
     // out[row] = a[row] + a[index[row]]  (index maps rows onto each other)
-    Tensor a = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
+    Tensor a   = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
     Tensor idx = tttest::make_tensor(std::vector<int64_t>{1, 0}, {2}, device());
 
     Tensor r = tinytorch::index_add(a, 0, idx, a);
     TT_EXPECT_CLOSE(r, tttest::make_tensor({4, 6, 4, 6}, {2, 2}, device()), 0, 0);
 
-    Tensor al = tttest::leaf({1, 2, 3, 4}, {2, 2}, device());
+    Tensor al   = tttest::leaf({1, 2, 3, 4}, {2, 2}, device());
     Tensor idxl = tttest::make_tensor(std::vector<int64_t>{1, 0}, {2}, device());
     tinytorch::backward(tinytorch::sum(tinytorch::index_add(al, 0, idxl, al)));
     // each row contributes once as source and once as target -> 2 everywhere
     TT_EXPECT_CLOSE(al.grad(), tttest::make_tensor({2, 2, 2, 2}, {2, 2}, device()), 0, 0);
+}
+
+TEST_P(TinyTorchIndexAddOps, DuplicateIndices)
+{
+    // all entries with the same index are added
+    Tensor r = tinytorch::index_add(tinytorch::zeros({3}, TensorOptions().device(device())), 0,
+                                    long_tensor({1, 1, 1, 0}, device()),
+                                    tinytorch::ones({4}, TensorOptions().device(device())));
+    TT_EXPECT_CLOSE(r, tttest::make_tensor({1, 3, 0}, {3}, device()), 0, 0);
+
+    tttest::check_grads(
+        {tttest::leaf({0.3f, -1.2f, 0.7f, 1.5f, -0.4f, 0.9f, 0.1f, 0.2f, -0.6f, 1.1f, 0.8f, -0.9f}, {3, 4}, device()),
+         tttest::leaf({0.3f, -1.2f, 0.7f, 1.5f, -0.4f, 0.9f}, {3, 2}, device())},
+        [](const std::vector<Tensor>& p)
+        {
+            auto idx = tttest::make_tensor(std::vector<int64_t>{3, 3}, {2}, p[0].device());
+            return tinytorch::sum(tinytorch::square(tinytorch::index_add(p[0], 1, idx, p[1])));
+        });
 }
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchIndexCopyOps);
@@ -388,7 +502,7 @@ TEST_P(TinyTorchIndexCopyOps, Values)
 {
     Tensor target = tinytorch::zeros({2, 2}, TensorOptions().device(device()));
     Tensor source = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, device());
-    Tensor idx = tttest::make_tensor(std::vector<int64_t>{1, 0}, {2}, device());
+    Tensor idx    = tttest::make_tensor(std::vector<int64_t>{1, 0}, {2}, device());
 
     tinytorch::index_copy(target, 0, idx, source);
     TT_EXPECT_CLOSE(target, tttest::make_tensor({3, 4, 1, 2}, {2, 2}, device()), 0, 0);
@@ -399,11 +513,93 @@ TEST_P(TinyTorchGatherOps, Values)
 {
     // out[i][j] = data[i][index[i][j]]  (dim == 1)
     Tensor data = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
-    Tensor idx = tttest::make_tensor(std::vector<int64_t>{2, 0, 1, 2}, {2, 2}, device());
+    Tensor idx  = tttest::make_tensor(std::vector<int64_t>{2, 0, 1, 2}, {2, 2}, device());
 
     // out[i][j] = data[i][idx[i][j]]: [[1,2,3],[4,5,6]] with [[2,0],[1,2]] -> [[3,1],[5,6]]
     Tensor g = tinytorch::gather(data, 1, idx);
     TT_EXPECT_CLOSE(g, tttest::make_tensor({3, 1, 5, 6}, {2, 2}, device()), 0, 0);
+
+    // the index may be smaller than the data in the non-gathered dim
+    Tensor g1 = tinytorch::gather(data, 1, tttest::make_tensor(std::vector<int64_t>{2, 0}, {1, 2}, device()));
+    TT_EXPECT_CLOSE(g1, tttest::make_tensor({3, 1}, {1, 2}, device()), 0, 0);
+}
+
+// shape mismatches of the index ops that would otherwise access memory out of bounds
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchIndexOpsShapes);
+TEST_P(TinyTorchIndexOpsShapes, MismatchDies)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    tinytorch::NoGradGuard ngg;
+    auto o   = TensorOptions().device(device());
+    auto idx = long_tensor({0, 1}, device());
+    // the data is larger than the input in a non-indexed dim
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::index_add(tinytorch::zeros({3, 2}, o), 0, idx, tinytorch::ones({2, 5}, o));
+        },
+        "");
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            Tensor target = tinytorch::zeros({3, 2}, o);
+            tinytorch::index_copy(target, 0, idx, tinytorch::ones({2, 5}, o));
+        },
+        "");
+    // the index is larger than the input in the non-gathered dim
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::gather(tinytorch::zeros({2, 2}, o), 1, tinytorch::zeros({5, 1}, o.dtype(kLong)));
+        },
+        "");
+    // the source has more entries than the index in the indexed dim
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            Tensor target = tinytorch::zeros({4, 3}, o);
+            tinytorch::index_copy(target, 0, long_tensor({0}, device()), tinytorch::ones({2, 3}, o));
+        },
+        "");
+}
+
+// The CPU kernels check every index, also in release builds (CUDA kernels only check them in debug builds)
+TEST(TinyTorchIndexOpsOutOfRange, DiesOnCpu)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    Tensor input = tinytorch::zeros({4, 3});
+
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            input.index_select(0, long_tensor({0, 4}, kCPU));
+        },
+        "");
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            input.index_select(1, long_tensor({-1}, kCPU));
+        },
+        "");
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::index_add(input, 0, long_tensor({1, 7}, kCPU), tinytorch::ones({2, 3}));
+        },
+        "");
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::gather(input, 1, tttest::make_tensor(std::vector<int64_t>{0, 3}, {1, 2}, kCPU));
+        },
+        "");
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            Tensor target = tinytorch::zeros({4, 3});
+            tinytorch::index_copy(target, 0, long_tensor({-2}, kCPU), tinytorch::ones({1, 3}));
+        },
+        "");
 }
 
 // ------------------------------------------------------------------ padding
@@ -416,8 +612,8 @@ TEST_P(TinyTorchPadding2dZero, Values)
 
     Tensor p = tinytorch::padding_2d(a, 1, 1, 1, 1, kZero);
     EXPECT_EQ(p.sizes(), (SizeType{1, 1, 4, 4}));
-    TT_EXPECT_CLOSE(p, tttest::make_tensor({0, 0, 0, 0, 0, 1, 2, 0, 0, 3, 4, 0, 0, 0, 0, 0}, {1, 1, 4, 4}, device()),
-                    0, 0);
+    TT_EXPECT_CLOSE(p, tttest::make_tensor({0, 0, 0, 0, 0, 1, 2, 0, 0, 3, 4, 0, 0, 0, 0, 0}, {1, 1, 4, 4}, device()), 0,
+                    0);
 }
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchPadding2dBorder);
@@ -427,8 +623,7 @@ TEST_P(TinyTorchPadding2dBorder, Values)
     Tensor a = tttest::make_tensor({1, 2, 3, 4}, {1, 1, 2, 2}, device());
 
     Tensor p = tinytorch::padding_2d(a, 1, 1, 1, 1, kBorder);
-    TT_EXPECT_CLOSE(p,
-                    tttest::make_tensor({1, 1, 2, 2, 1, 1, 2, 2, 3, 3, 4, 4, 3, 3, 4, 4}, {1, 1, 4, 4}, device()), 0,
+    TT_EXPECT_CLOSE(p, tttest::make_tensor({1, 1, 2, 2, 1, 1, 2, 2, 3, 3, 4, 4, 3, 3, 4, 4}, {1, 1, 4, 4}, device()), 0,
                     0);
 }
 
@@ -440,8 +635,7 @@ TEST_P(TinyTorchPadding2dReflect, Values)
     Tensor p = tinytorch::padding_2d(a, 1, 1, 1, 1, kReflect);
     // reflection maps -1 -> 1 and 2 -> 0, so each axis gives indices 1,0,1,0:
     // row0 = a[1] reflected = [4,3,4,3], row1 = a[0] reflected = [2,1,2,1], etc.
-    TT_EXPECT_CLOSE(p,
-                    tttest::make_tensor({4, 3, 4, 3, 2, 1, 2, 1, 4, 3, 4, 3, 2, 1, 2, 1}, {1, 1, 4, 4}, device()), 0,
+    TT_EXPECT_CLOSE(p, tttest::make_tensor({4, 3, 4, 3, 2, 1, 2, 1, 4, 3, 4, 3, 2, 1, 2, 1}, {1, 1, 4, 4}, device()), 0,
                     0);
 }
 
@@ -576,12 +770,8 @@ TEST_P(TinyTorchMatmulBatched, ValuesAndGradient)
     Tensor m = tinytorch::matmul(a, b);
     TT_EXPECT_CLOSE(m, tttest::make_tensor({1, 2, 3, 4, 50, 20, 150, 40}, {2, 2, 2}, device()), 1e-5, 1e-6);
 
-    tttest::check_grads({a, b},
-                        [](const std::vector<Tensor>& p)
-                        {
-                            return tinytorch::sum(tinytorch::matmul(p[0], p[1]));
-                        },
-                        2e-2, 2e-3);
+    tttest::check_grads(
+        {a, b}, [](const std::vector<Tensor>& p) { return tinytorch::sum(tinytorch::matmul(p[0], p[1])); }, 2e-2, 2e-3);
 }
 
 namespace
@@ -758,7 +948,7 @@ TEST(TinyTorchConv2d, BoxFilter)
     std::vector<float> data = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
     std::vector<float> w(9, 1.0f);
 
-    Tensor input = tinytorch::from_blob(data.data(), {1, 1, 4, 4});
+    Tensor input  = tinytorch::from_blob(data.data(), {1, 1, 4, 4});
     Tensor weight = tinytorch::from_blob(w.data(), {1, 1, 3, 3});
 
     Tensor out = tinytorch::conv2d(input, weight, Tensor(), 1, 1, 1, 1);
@@ -778,7 +968,7 @@ TEST_P(TinyTorchConv2dDevice, BoxFilter)
     std::vector<float> data = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
     std::vector<float> w(9, 1.0f);
 
-    Tensor input = tttest::make_tensor(data, {1, 1, 4, 4}, device());
+    Tensor input  = tttest::make_tensor(data, {1, 1, 4, 4}, device());
     Tensor weight = tttest::make_tensor(w, {1, 1, 3, 3}, device());
 
     Tensor out = tinytorch::conv2d(input, weight, Tensor(), 1, 1, 1, 1);
@@ -1004,7 +1194,8 @@ TEST_P(TinyTorchGridSample2d, BilinearAlignCorners)
     // note: the grid layout is (N,H,W,2); make_grid builds {1,1,4,2}, so the
     // sampled output has shape {1,1,1,4}
     Tensor out = tinytorch::nn::functional::grid_sample(
-        input, grid, tinytorch::nn::functional::GridSampleFuncOptions().mode(kBilinear).padding_mode(kBorder).align_corners(true));
+        input, grid,
+        tinytorch::nn::functional::GridSampleFuncOptions().mode(kBilinear).padding_mode(kBorder).align_corners(true));
 
     TT_EXPECT_CLOSE(out, tttest::make_tensor({1, 2, 3, 4}, {1, 1, 1, 4}, device()), 1e-5, 1e-6);
 }
@@ -1016,7 +1207,8 @@ TEST_P(TinyTorchGridSample2d, BilinearCenter)
     Tensor grid = make_grid({0, 0}, device());
 
     Tensor out = tinytorch::nn::functional::grid_sample(
-        input, grid, tinytorch::nn::functional::GridSampleFuncOptions().mode(kBilinear).padding_mode(kBorder).align_corners(true));
+        input, grid,
+        tinytorch::nn::functional::GridSampleFuncOptions().mode(kBilinear).padding_mode(kBorder).align_corners(true));
 
     TT_EXPECT_CLOSE(out, tttest::make_tensor({2.5f}, {1, 1, 1, 1}, device()), 1e-5, 1e-6);
 }
@@ -1028,7 +1220,8 @@ TEST_P(TinyTorchGridSample2d, Nearest)
     Tensor grid = make_grid({0.5f, 0.5f}, device());
 
     Tensor out = tinytorch::nn::functional::grid_sample(
-        input, grid, tinytorch::nn::functional::GridSampleFuncOptions().mode(kNearest).padding_mode(kBorder).align_corners(true));
+        input, grid,
+        tinytorch::nn::functional::GridSampleFuncOptions().mode(kNearest).padding_mode(kBorder).align_corners(true));
 
     TT_EXPECT_CLOSE(out, tttest::make_tensor({4.0f}, {1, 1, 1, 1}, device()), 0, 0);
 }
@@ -1051,11 +1244,8 @@ TEST_P(TinyTorchGridSample2d, Gradient)
         tinytorch::nn::functional::GridSampleFuncOptions().mode(kBilinear).padding_mode(kBorder).align_corners(true);
 
     // check both the input gradient and the grid gradient against finite differences
-    tttest::check_grads({input, grid},
-                        [&opts](const std::vector<Tensor>& p)
-                        {
-                            return tinytorch::sum(tinytorch::nn::functional::grid_sample(p[0], p[1], opts));
-                        });
+    tttest::check_grads({input, grid}, [&opts](const std::vector<Tensor>& p)
+                        { return tinytorch::sum(tinytorch::nn::functional::grid_sample(p[0], p[1], opts)); });
 }
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchGridSample3d);
@@ -1072,14 +1262,16 @@ TEST_P(TinyTorchGridSample3d, BilinearAndNearest)
     // 3 sample points: (-1,-1,-1) -> 1, (1,1,1) -> 8, (0,0,0) -> center 4.5
     Tensor grid = tttest::make_tensor({-1, -1, -1, 1, 1, 1, 0, 0, 0}, {1, 1, 3, 1, 3}, device());
 
-    auto opts = tinytorch::nn::functional::GridSampleFuncOptions().mode(kBilinear).padding_mode(kBorder).align_corners(true);
+    auto opts =
+        tinytorch::nn::functional::GridSampleFuncOptions().mode(kBilinear).padding_mode(kBorder).align_corners(true);
     Tensor out = tinytorch::nn::functional::grid_sample(input, grid, opts);
     TT_EXPECT_CLOSE(out, tttest::make_tensor({1, 8, 4.5}, {1, 1, 1, 3, 1}, device()), 1e-5, 1e-6);
 
     // nearest: (0.2,0.2,0.2) -> px(0.6,0.6,0.6) -> rounds to (1,1,1) -> 8 (bilinear would give 5.2)
     Tensor grid_n = tttest::make_tensor({0.2, 0.2, 0.2}, {1, 1, 1, 1, 3}, device());
-    auto opts_n   = tinytorch::nn::functional::GridSampleFuncOptions().mode(kNearest).padding_mode(kBorder).align_corners(true);
-    Tensor out_n  = tinytorch::nn::functional::grid_sample(input, grid_n, opts_n);
+    auto opts_n =
+        tinytorch::nn::functional::GridSampleFuncOptions().mode(kNearest).padding_mode(kBorder).align_corners(true);
+    Tensor out_n = tinytorch::nn::functional::grid_sample(input, grid_n, opts_n);
     TT_EXPECT_CLOSE(out_n, tttest::make_tensor({8.0f}, {1, 1, 1, 1, 1}, device()), 0, 0);
 }
 

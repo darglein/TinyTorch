@@ -181,7 +181,9 @@ void MultiDeviceTensor::ReduceSumOnCPUToMain()
 
 void MultiDeviceTensor::ReduceSumCPUSingle(int target, int src)
 {
-    if (cpu_data[target].scalar_type() == kFloat32 && cpu_data[target].is_contiguous())
+    if (cpu_data[target].scalar_type() == kFloat32 && cpu_data[src].scalar_type() == kFloat32 &&
+        cpu_data[target].is_contiguous() && cpu_data[src].is_contiguous() &&
+        cpu_data[target].sizes() == cpu_data[src].sizes())
     {
         float* target_ptr = cpu_data[target].data_ptr<float>();
         float* src_ptr    = cpu_data[src].data_ptr<float>();
@@ -246,7 +248,7 @@ void MultiDeviceTensor::MainToOthers()
         return;
     }
 
-    if (devices.size() == 2 && Main().is_uva() && data[1].defined() && data[1].is_uva())
+    if (devices.size() == 2 && Main().defined() && Main().is_uva() && data[1].defined() && data[1].is_uva())
     {
         // direct uva copy
         NoGradGuard ngg;

@@ -13,7 +13,7 @@ namespace tinytorch
 TensorImpl::TensorImpl(const SizeType& sizes, TensorOptions options) : sizes_(sizes), options_(options)
 {
     recompute_strides();
-    storage_ = std::make_shared<StorageImpl>(elementSize(options.dtype_) * numel(), options);
+    storage_                = std::make_shared<StorageImpl>(elementSize(options.dtype_) * numel(), options);
     options_.pinned_memory_ = storage_->options().pinned_memory_;
 }
 
@@ -40,7 +40,7 @@ void TensorImpl::set_requires_grad(bool requires_grad, bool allocate_grad)
 {
     if (requires_grad)
     {
-        if(!this->requires_grad())
+        if (!this->requires_grad())
         {
             options_.requires_grad_ = true;
             autograd_meta           = std::make_unique<AutogradMeta>();
@@ -71,6 +71,11 @@ bool TensorImpl::requires_grad() const
 }
 void TensorImpl::set_data(TensorImpl& other)
 {
+    if (&other == this)
+    {
+        // e.g. p.set_data(p.to(device)) when p already is on that device
+        return;
+    }
     Tensor old_grad = requires_grad() ? autograd_meta->grad() : Tensor();
 
     storage_        = other.storage_;

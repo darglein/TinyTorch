@@ -33,7 +33,7 @@ std::vector<int> reduce_device_counts()
     std::vector<int> counts;
     int avail = 0;
     cudaGetDeviceCount(&avail);
-    int maxc   = std::min(avail, 4);
+    int maxc = std::min(avail, 4);
     for (int n = 2; n <= maxc; ++n)
     {
         counts.push_back(n);
@@ -59,7 +59,7 @@ std::vector<int> reduce_device_counts()
 // that every element of the reduced result must equal the per-element sum.
 class TinyTorchMultiDeviceReduceParam : public ::testing::TestWithParam<int>
 {
-  protected:
+   protected:
     static constexpr int64_t kRows = 4;  // size(0)
     static constexpr int64_t kCols = 3;  // numel = kRows * kCols = 12 != size(0)
     std::vector<Device> devices_;
@@ -87,17 +87,12 @@ class TinyTorchMultiDeviceReduceParam : public ::testing::TestWithParam<int>
         }
     }
 
-    static Tensor filled(float v, Device d)
-    {
-        return tinytorch::full({kRows, kCols}, v, TensorOptions().device(d));
-    }
+    static Tensor filled(float v, Device d) { return tinytorch::full({kRows, kCols}, v, TensorOptions().device(d)); }
 };
 
 INSTANTIATE_TEST_SUITE_P(DeviceCounts, TinyTorchMultiDeviceReduceParam, ::testing::ValuesIn(reduce_device_counts()),
                          [](const ::testing::TestParamInfo<int>& info)
-                         {
-                             return "devices" + std::to_string(info.param);
-                         });
+                         { return "devices" + std::to_string(info.param); });
 
 // Enabling twice and disabling twice must not throw or leave a pending error, and disabling must disable every pair
 // (with 3+ devices, the pairs without device 0 stayed enabled).
@@ -175,6 +170,59 @@ TEST_P(TinyTorchMultiDeviceReduceParam, ReduceGradientSumToMainUVA)
         expected += float(i + 1);  // = N * (N + 1) / 2
     }
     TT_EXPECT_CLOSE(mdt.data[0].grad(), filled(float(expected), devices_[0]), 0, 0);
+}
+
+// The tests below run on a single GPU: both "devices" of the MultiDeviceTensor are cuda:0, so the UVA kernels only
+// read local memory.
+
+// A MultiDeviceTensor may hold an empty tensor. The UVA kernels must not be launched with an empty grid (invalid
+// configuration error, which release builds leave as the last error).
+TEST(TinyTorchMultiDeviceReduce, EmptyTensorUVA)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    Device device(kCUDA, 0);
+    tinytorch::cuda::DeviceGuard dg(device);
+    (void)cudaGetLastError();
+    tinytorch::cuda::AllocatorAlgorithmGuard uva(tinytorch::cuda::AllocatorAlgorithm::CUDA_MALLOC);
+
+    tinytorch::cuda::MultiDeviceTensor mdt(tinytorch::zeros({0}, TensorOptions(device).dtype(kFloat)),
+                                           {device, device});
+    mdt.ReduceSumToMainUVA();
+    mdt.copy_parameters_from_main_to_others_uva();
+    TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+    EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+}
+
+// SetMainAndCopyToOthers accepts an undefined tensor and then clears the others, also with exactly two devices
+TEST(TinyTorchMultiDevice, UndefinedMainTwoDevices)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    Device device(kCUDA, 0);
+    tinytorch::cuda::DeviceGuard dg(device);
+    tinytorch::cuda::MultiDeviceTensor mdt(tinytorch::full({4}, 1.0f, TensorOptions(device).dtype(kFloat)),
+                                           {device, device});
+    mdt.SetMainAndCopyToOthers(Tensor());
+    EXPECT_FALSE(mdt.Main().defined());
+    EXPECT_FALSE(mdt.data[1].defined());
+}
+
+// The float fast path of ReduceSumCPUSingle reads both tensors linearly, so it must not be used for a non-contiguous
+// source (runs on the CPU only)
+TEST(TinyTorchMultiDeviceReduce, ReduceSumCPUSingleNonContiguousSource)
+{
+    tinytorch::cuda::MultiDeviceTensor mdt;
+    mdt.cpu_data.resize(2);
+    mdt.cpu_data[0] = tinytorch::zeros({2, 2}, TensorOptions(kCPU).dtype(kFloat));
+    mdt.cpu_data[1] = tttest::make_tensor({1, 2, 3, 4}, {2, 2}, kCPU, kFloat).permute({1, 0});
+    ASSERT_FALSE(mdt.cpu_data[1].is_contiguous());
+    mdt.ReduceSumCPUSingle(0, 1);
+    TT_EXPECT_CLOSE(mdt.cpu_data[0], tttest::make_tensor({1, 3, 2, 4}, {2, 2}, kCPU, kFloat), 0, 0);
 }
 
 #endif  // TT_HAS_CUDA

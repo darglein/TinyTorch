@@ -57,7 +57,7 @@ TEST_P(TinyTorchSumDim, WithAndWithoutKeepDim)
     Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
 
     Tensor s0 = tinytorch::sum(a, 0, true);
-    TT_EXPECT_CLOSE(s0, tttest::make_tensor({5, 7, 9}, {1,  3}, device()), 1e-5, 1e-6);
+    TT_EXPECT_CLOSE(s0, tttest::make_tensor({5, 7, 9}, {1, 3}, device()), 1e-5, 1e-6);
 
     Tensor s0s = tinytorch::sum(a, 0, false);
     EXPECT_EQ(s0s.sizes(), (SizeType{3}));
@@ -112,6 +112,17 @@ TEST_P(TinyTorchMinMaxBinary, Values)
 
     TT_EXPECT_CLOSE(tinytorch::min(a, b), tttest::make_tensor({1, 4, 3, 4}, {2, 2}, device()), 0, 0);
     TT_EXPECT_CLOSE(tinytorch::max(a, b), tttest::make_tensor({2, 5, 3, 9}, {2, 2}, device()), 0, 0);
+}
+
+// both operands broadcast, also the first one
+TEST_P(TinyTorchMinMaxBinary, BroadcastBothOperands)
+{
+    Tensor a = tttest::make_tensor({2, 2, 2}, {1, 3}, device());
+    Tensor b = tttest::make_tensor({1, 2, 3, 4, 0, 6}, {2, 3}, device());
+    TT_EXPECT_CLOSE(tinytorch::min(a, b), tttest::make_tensor({1, 2, 2, 2, 0, 2}, {2, 3}, device()), 0, 0);
+    TT_EXPECT_CLOSE(tinytorch::max(a, b), tttest::make_tensor({2, 2, 3, 4, 2, 6}, {2, 3}, device()), 0, 0);
+    TT_EXPECT_CLOSE(tinytorch::max(b, tttest::make_tensor({2}, {1}, device())),
+                    tttest::make_tensor({2, 2, 3, 4, 2, 6}, {2, 3}, device()), 0, 0);
 }
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchMinMaxReduce);
@@ -318,6 +329,14 @@ TEST_P(TinyTorchPowScalar, ValuesAndGradient)
     TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({2, 4, 6, 8}, {2, 2}, device()), 1e-4, 1e-6);
 }
 
+// pow(x, 0) has the gradient 0 everywhere (PyTorch), also at x = 0 where pow(x, -1) is inf
+TEST_P(TinyTorchPowScalar, ZeroExponentAtZero)
+{
+    Tensor a = tttest::leaf({0, 2}, {2}, device());
+    tinytorch::backward(tinytorch::sum(tinytorch::pow(a, 0.0)));
+    TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({0, 0}, {2}, device()), 0, 0);
+}
+
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchPowTensor);
 TEST_P(TinyTorchPowTensor, ValuesAndGradient)
 {
@@ -327,12 +346,34 @@ TEST_P(TinyTorchPowTensor, ValuesAndGradient)
     Tensor r = tinytorch::pow(a, b);
     TT_EXPECT_CLOSE(r, tttest::make_tensor({4, 27}, {2}, device()), 1e-5, 1e-6);
 
-    tttest::check_grads({a, b},
-                        [](const std::vector<Tensor>& p)
-                        {
-                            return tinytorch::sum(tinytorch::pow(p[0], p[1]));
-                        },
-                        2e-2, 2e-3);
+    tttest::check_grads(
+        {a, b}, [](const std::vector<Tensor>& p) { return tinytorch::sum(tinytorch::pow(p[0], p[1])); }, 2e-2, 2e-3);
+}
+
+// d/da a^b at a = 0, b = 0 is 0 and d/db a^b at a = 0, b > 0 is 0 (PyTorch masks both)
+TEST_P(TinyTorchPowTensor, GradientAtZeroBase)
+{
+    Tensor a = tttest::leaf({0, 0, 2}, {3}, device());
+    Tensor b = tttest::leaf({0, 2, 3}, {3}, device());
+    tinytorch::backward(tinytorch::sum(tinytorch::pow(a, b)));
+    TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({0, 0, 12}, {3}, device()), 1e-5, 1e-5);
+    TT_EXPECT_CLOSE(b.grad(), tttest::make_tensor({0, 0, 8 * std::log(2.0)}, {3}, device()), 1e-5, 1e-5);
+}
+
+// integer pow is exact, also on the GPU (3^1 is 3, not 2 from a single precision pow)
+TEST_P(TinyTorchPowTensor, IntegerTypesExact)
+{
+    tinytorch::NoGradGuard ngg;
+    for (auto t : {tinytorch::kUInt8, tinytorch::kInt16, tinytorch::kInt32, tinytorch::kLong})
+    {
+        auto expected = [&](const std::vector<int64_t>& v) { return tttest::make_tensor(v, {6}, device()).to(t); };
+        Tensor a      = expected({3, 5, 6, 2, 3, 4});
+        Tensor b      = expected({1, 3, 2, 5, 3, 2});
+        TT_EXPECT_CLOSE(tinytorch::pow(a, b), expected({3, 125, 36, 32, 27, 16}), 0, 0);
+        TT_EXPECT_CLOSE(tinytorch::pow(a, 1.0), a, 0, 0);
+        TT_EXPECT_CLOSE(tinytorch::pow(a, 3.0), expected({27, 125, 216, 8, 27, 64}), 0, 0);
+        TT_EXPECT_CLOSE(tinytorch::pow(a, 0.5), expected({1, 2, 2, 1, 1, 2}), 0, 0);
+    }
 }
 
 // ------------------------------------------------------------------ clamp
@@ -391,6 +432,11 @@ TEST_P(TinyTorchStdOps, PerDim)
     // per-row (dim 1): mean 2 (resp. 5), deviations {+-1,0} -> var 2/3
     TT_EXPECT_CLOSE(tinytorch::std(a, 1), tttest::make_tensor({std::sqrt(2.0 / 3), std::sqrt(2.0 / 3)}, {2}, device()),
                     1e-4, 1e-6);
+
+    // gradient along a negative dim
+    Tensor b =
+        tttest::leaf({0.3f, -1.2f, 0.7f, 1.5f, -0.4f, 0.9f, 0.1f, 0.2f, -0.6f, 1.1f, 0.8f, -0.9f}, {3, 4}, device());
+    tttest::check_grads({b}, [](const std::vector<Tensor>& p) { return tinytorch::sum(tinytorch::std(p[0], -1)); });
 }
 
 // ------------------------------------------------------------------ abs_sum / prod_sum
@@ -406,12 +452,7 @@ TEST_P(TinyTorchAbsSum, Backward)
 {
     // d/dx sum(|x|) = sign(x); avoid the kinks at 0
     Tensor a = tttest::leaf({1.0f, -2.0f, 3.0f, -4.0f}, {4}, device());
-    tttest::check_grads({a},
-                        [](const std::vector<Tensor>& p)
-                        {
-                            return tinytorch::abs_sum(p[0]);
-                        },
-                        2e-2, 2e-3);
+    tttest::check_grads({a}, [](const std::vector<Tensor>& p) { return tinytorch::abs_sum(p[0]); }, 2e-2, 2e-3);
 }
 
 // "prod_sum" is the sum of squares: sum(v^2)
@@ -426,12 +467,7 @@ TEST_P(TinyTorchProdSum, Backward)
 {
     // d/dx sum(x^2) = 2x
     Tensor a = tttest::leaf({1.0f, -2.0f, 3.0f, -4.0f}, {4}, device());
-    tttest::check_grads({a},
-                        [](const std::vector<Tensor>& p)
-                        {
-                            return tinytorch::prod_sum(p[0]);
-                        },
-                        2e-2, 2e-3);
+    tttest::check_grads({a}, [](const std::vector<Tensor>& p) { return tinytorch::prod_sum(p[0]); }, 2e-2, 2e-3);
 }
 
 // ------------------------------------------------------------------ median
@@ -530,8 +566,8 @@ TT_INSTANTIATE_DEVICE_TESTS(TinyTorchDeterminism);
 
 TEST_P(TinyTorchDeterminism, GlobalSum)
 {
-    int n   = 10000;
-    Tensor a = tttest::make_tensor(det_input(n), SizeType{n}, device());
+    int n      = 10000;
+    Tensor a   = tttest::make_tensor(det_input(n), SizeType{n}, device());
     Tensor ref = tinytorch::sum(a);
     for (int k = 1; k < 16; ++k)
     {
@@ -541,8 +577,8 @@ TEST_P(TinyTorchDeterminism, GlobalSum)
 
 TEST_P(TinyTorchDeterminism, AbsSum)
 {
-    int n   = 10000;
-    Tensor a = tttest::make_tensor(det_input(n), SizeType{n}, device());
+    int n      = 10000;
+    Tensor a   = tttest::make_tensor(det_input(n), SizeType{n}, device());
     Tensor ref = tinytorch::abs_sum(a);
     for (int k = 1; k < 16; ++k)
     {
@@ -552,8 +588,8 @@ TEST_P(TinyTorchDeterminism, AbsSum)
 
 TEST_P(TinyTorchDeterminism, ProdSum)
 {
-    int n   = 10000;
-    Tensor a = tttest::make_tensor(det_input(n), SizeType{n}, device());
+    int n      = 10000;
+    Tensor a   = tttest::make_tensor(det_input(n), SizeType{n}, device());
     Tensor ref = tinytorch::prod_sum(a);
     for (int k = 1; k < 16; ++k)
     {
@@ -563,8 +599,8 @@ TEST_P(TinyTorchDeterminism, ProdSum)
 
 TEST_P(TinyTorchDeterminism, Mean)
 {
-    int n   = 10000;
-    Tensor a = tttest::make_tensor(det_input(n), SizeType{n}, device());
+    int n      = 10000;
+    Tensor a   = tttest::make_tensor(det_input(n), SizeType{n}, device());
     Tensor ref = tinytorch::mean(a);
     for (int k = 1; k < 16; ++k)
     {
@@ -574,8 +610,8 @@ TEST_P(TinyTorchDeterminism, Mean)
 
 TEST_P(TinyTorchDeterminism, Std)
 {
-    int n   = 10000;
-    Tensor a = tttest::make_tensor(det_input(n), SizeType{n}, device());
+    int n      = 10000;
+    Tensor a   = tttest::make_tensor(det_input(n), SizeType{n}, device());
     Tensor ref = tinytorch::std(a);
     for (int k = 1; k < 16; ++k)
     {
@@ -589,8 +625,8 @@ TEST_P(TinyTorchDeterminism, Backward)
     // forward+backward cycles (guards the sequence_nr / grad_map ordering).
     auto run = [&]() -> std::vector<std::vector<double>>
     {
-        Tensor x = tttest::leaf({1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f}, {2, 3}, device());
-        Tensor y = tttest::leaf({0.5f, 0.1f, 0.9f, 0.3f, 0.7f, 0.2f}, {2, 3}, device());
+        Tensor x    = tttest::leaf({1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f}, {2, 3}, device());
+        Tensor y    = tttest::leaf({0.5f, 0.1f, 0.9f, 0.3f, 0.7f, 0.2f}, {2, 3}, device());
         Tensor loss = tinytorch::sum(x * x + x * y + y);  // x used twice -> accumulation
         tinytorch::backward(loss);
 

@@ -103,7 +103,7 @@ TEST_P(TinyTorchUnaryLog, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({1, 2, 4, 8}, {2, 2}, device());
 
-    Tensor r = tinytorch::log(a);
+    Tensor r                    = tinytorch::log(a);
     std::vector<float> expected = {0.0f, std::log(2.0f), std::log(4.0f), std::log(8.0f)};
     TT_EXPECT_CLOSE(r, tttest::make_tensor(expected, {2, 2}, device()), 1e-5, 1e-6);
 
@@ -126,8 +126,8 @@ TEST_P(TinyTorchUnaryExp, ValuesAndGradient)
     Tensor a = tttest::leaf({0, 1, 2, 3}, {2, 2}, device());
 
     Tensor r = tinytorch::exp(a);
-    TT_EXPECT_CLOSE(r, tttest::make_tensor({1, std::exp(1.0), std::exp(2.0), std::exp(3.0)}, {2, 2}, device()),
-                    1e-5, 1e-6);
+    TT_EXPECT_CLOSE(r, tttest::make_tensor({1, std::exp(1.0), std::exp(2.0), std::exp(3.0)}, {2, 2}, device()), 1e-5,
+                    1e-6);
 
     tinytorch::backward(tinytorch::sum(r));
     // d(exp(a))/da = exp(a)
@@ -140,12 +140,12 @@ TEST_P(TinyTorchUnarySinCos, ValuesAndGradient)
     Tensor a = tttest::leaf({0, 1, 2, 3}, {2, 2}, device());
 
     Tensor s = tinytorch::sin(a);
-    TT_EXPECT_CLOSE(s, tttest::make_tensor({0, std::sin(1.0), std::sin(2.0), std::sin(3.0)}, {2, 2}, device()),
-                    1e-5, 1e-6);
+    TT_EXPECT_CLOSE(s, tttest::make_tensor({0, std::sin(1.0), std::sin(2.0), std::sin(3.0)}, {2, 2}, device()), 1e-5,
+                    1e-6);
 
     Tensor c = tinytorch::cos(a);
-    TT_EXPECT_CLOSE(c, tttest::make_tensor({1, std::cos(1.0), std::cos(2.0), std::cos(3.0)}, {2, 2}, device()),
-                    1e-5, 1e-6);
+    TT_EXPECT_CLOSE(c, tttest::make_tensor({1, std::cos(1.0), std::cos(2.0), std::cos(3.0)}, {2, 2}, device()), 1e-5,
+                    1e-6);
 
     // d(sin)/dx = cos,  d(cos)/dx = -sin
     a.mutable_grad().zero_();
@@ -212,7 +212,7 @@ TEST_P(TinyTorchUnarySigmoid, ValuesAndGradient)
 {
     Tensor a = tttest::leaf({-1, 0, 1, 2}, {2, 2}, device());
 
-    Tensor r = tinytorch::sigmoid(a);
+    Tensor r                    = tinytorch::sigmoid(a);
     std::vector<float> expected = {1.0f / (1.0f + std::exp(1.0f)), 0.5f, 1.0f - 1.0f / (1.0f + std::exp(1.0f)),
                                    1.0f - 1.0f / (1.0f + std::exp(2.0f))};
     TT_EXPECT_CLOSE(r, tttest::make_tensor(expected, {2, 2}, device()), 1e-5, 1e-6);
@@ -225,10 +225,10 @@ TEST_P(TinyTorchUnarySigmoid, ValuesAndGradient)
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchUnarySoftplus);
 TEST_P(TinyTorchUnarySoftplus, ValuesAndGradient)
 {
-    Tensor a = tttest::leaf({-1, 0, 1, 2}, {2, 2}, device());
+    Tensor a          = tttest::leaf({-1, 0, 1, 2}, {2, 2}, device());
     const double beta = 1.0;
 
-    Tensor r = tinytorch::softplus(a, beta);
+    Tensor r                    = tinytorch::softplus(a, beta);
     std::vector<float> expected = {std::log1p(std::exp(-1.0f)), std::log(2.0f), std::log1p(std::exp(1.0f)),
                                    std::log1p(std::exp(2.0f))};
     TT_EXPECT_CLOSE(r, tttest::make_tensor(expected, {2, 2}, device()), 1e-5, 1e-6);
@@ -254,13 +254,10 @@ TEST_P(TinyTorchUnarySoftmax, SumsToOneAndGradient)
     EXPECT_LT(v[0], v[1]);
     EXPECT_LT(v[2], v[3]);
 
-    // gradient matches finite differences
-    tttest::check_grads({a},
-                        [](const std::vector<Tensor>& p)
-                        {
-                            return tinytorch::sum(tinytorch::softmax(p[0], 1));
-                        },
-                        2e-2, 2e-3);
+    // gradient matches finite differences (the gradient of sum(softmax) alone is always 0)
+    tttest::check_grads(
+        {a}, [](const std::vector<Tensor>& p)
+        { return tinytorch::sum(tinytorch::square(tinytorch::softmax(p[0], 1) - 0.1)); }, 2e-2, 2e-3);
 }
 
 TEST_P(TinyTorchUnarySoftmax, NegativeDim)

@@ -135,7 +135,8 @@ void Adam::step()
             }
             state_follow_param(m2_max[p], param);
         }
-        adam_step(param, param.grad(), m1[p], m2[p], m2_max[p], options[p], current_step);
+        param_steps[p]++;
+        adam_step(param, param.grad(), m1[p], m2[p], m2_max[p], options[p], param_steps[p]);
     }
 }
 void Adam::add_param_group(std::pair<std::vector<Tensor>, std::unique_ptr<AdamOptions>> group)
@@ -147,6 +148,7 @@ void Adam::add_param_group(std::pair<std::vector<Tensor>, std::unique_ptr<AdamOp
         m2.push_back(zeros_like(t));
         m2_max.push_back(group.second->amsgrad_ ? zeros_like(t) : Tensor());
         options.push_back(*group.second);
+        param_steps.push_back(0);
     }
 }
 Adam::Adam(std::vector<Tensor> params, AdamOptions options)
