@@ -60,6 +60,11 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id);
 
 TINYTORCH_API int64_t current_allocated_size(int device_id);
 TINYTORCH_API int64_t max_allocated_size(int device_id);
+// Sets the peak returned by max_allocated_size to the current allocation, so a later peak covers only what follows.
+TINYTORCH_API void reset_max_allocated_size(int device_id);
+// Counts memory allocated outside of this allocator (e.g. CUDA arrays) in current_allocated_size and
+// max_allocated_size. Pass the size when allocating and the negative size when freeing.
+TINYTORCH_API void add_external_allocated_size(int device_id, int64_t size);
 
 
 TINYTORCH_API void set_max_pinned_memory(int64_t size);

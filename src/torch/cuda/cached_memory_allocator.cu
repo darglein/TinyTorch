@@ -149,6 +149,23 @@ int64_t max_allocated_size(int device_id)
     std::unique_lock l(mu);
     return DeviceData(device_id).max_allocated_bytes;
 }
+
+void reset_max_allocated_size(int device_id)
+{
+    std::unique_lock l(mu);
+    auto& d               = DeviceData(device_id);
+    d.max_allocated_bytes = d.current_allocated_bytes;
+}
+
+void add_external_allocated_size(int device_id, int64_t size)
+{
+    std::unique_lock l(mu);
+    auto& d = DeviceData(device_id);
+    d.current_allocated_bytes += size;
+    CHECK_GE(d.current_allocated_bytes, 0);
+    d.max_allocated_bytes = std::max(d.current_allocated_bytes, d.max_allocated_bytes);
+}
+
 void set_max_pinned_memory(int64_t size)
 {
     std::unique_lock l(mu);
