@@ -25,19 +25,21 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
     auto root_node = loss.getEdge()->function;
     node_stack.push_back(root_node);
 
-
+    // the loss may be any output of a multi-output node
+    auto& root_grads = grad_map[root_node];
+    root_grads.resize(root_node->num_input_gradients_of_backward);
+    CHECK_LT(loss.getEdge()->input_nr, root_grads.size());
     if (grad.defined())
     {
         CHECK_EQ(loss.device(), grad.device());
         CHECK_EQ(loss.sizes(), grad.sizes());
-        grad_map[root_node] = {grad};
+        root_grads[loss.getEdge()->input_nr] = grad;
     }
     else
     {
         CHECK_EQ(loss.numel(), 1);
         // The gradient of the final loss is 1
-        Tensor one          = full(loss.sizes(), 1, loss.options());
-        grad_map[root_node] = {one};
+        root_grads[loss.getEdge()->input_nr] = full(loss.sizes(), 1, loss.options());
     }
 
     while (!node_stack.empty())
@@ -51,8 +53,8 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
         auto end_it = std::unique(node_stack.begin(), node_stack.end());
         // for (auto it = end_it; it != node_stack.end(); ++it)
         // {
-            // autograd::Node* node = it->get();
-            // CHECK_EQ(dynamic_cast<autograd::AccumulateGrad*>(node), nullptr);
+        // autograd::Node* node = it->get();
+        // CHECK_EQ(dynamic_cast<autograd::AccumulateGrad*>(node), nullptr);
         // }
         node_stack.erase(end_it, node_stack.end());
 
@@ -130,8 +132,7 @@ void backward(Tensor loss, Tensor grad, bool retain_grad)
             acc_nodes.push_back(it.first);
         }
     }
-    std::sort(acc_nodes.begin(), acc_nodes.end(),
-              [](auto& n1, auto& n2) { return n1->sequence_nr < n2->sequence_nr; });
+    std::sort(acc_nodes.begin(), acc_nodes.end(), [](auto& n1, auto& n2) { return n1->sequence_nr < n2->sequence_nr; });
     for (auto& n : acc_nodes)
     {
         autograd::AccumulateGrad* acc_node = dynamic_cast<autograd::AccumulateGrad*>(n.get());

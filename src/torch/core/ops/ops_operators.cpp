@@ -292,8 +292,27 @@ Tensor operator+(double a, Tensor b)
 
 // ============================================================================
 
+// The result of an in-place operator is a: b must broadcast to a. Otherwise the kernels (which clamp b's index to its
+// sizes) would silently read the wrong elements of b.
+static void CheckInplaceOperand(Tensor& a, Tensor& b)
+{
+    CHECK_EQ(a.device(), b.device());
+    MatchTensorSize(a, b);
+    if (b.numel() == 1)
+    {
+        return;
+    }
+    CHECK_EQ(a.dim(), b.dim()) << "in-place operator: " << b.sizes() << " does not broadcast to " << a.sizes();
+    for (int64_t i = 0; i < a.dim(); ++i)
+    {
+        CHECK(b.size(i) == a.size(i) || b.size(i) == 1)
+            << "in-place operator: " << b.sizes() << " does not broadcast to " << a.sizes();
+    }
+}
+
 Tensor operator==(Tensor a, double b)
-{  CHECK(!a.requires_grad() || !GradMode::is_enabled());
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
     auto result = empty_like(a);
     SELECT_DEVICE(a.device(), equal_impl, a, b, result);
@@ -301,14 +320,16 @@ Tensor operator==(Tensor a, double b)
 }
 
 Tensor operator<(Tensor a, double b)
-{  CHECK(!a.requires_grad() || !GradMode::is_enabled());
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
     auto result = empty_like(a);
     SELECT_DEVICE(a.device(), less_impl, a, b, result);
     return result;
 }
 Tensor operator>(Tensor a, double b)
-{  CHECK(!a.requires_grad() || !GradMode::is_enabled());
+{
+    CHECK(!a.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
     auto result = empty_like(a);
     SELECT_DEVICE(a.device(), greater_impl, a, b, result);
@@ -319,6 +340,7 @@ Tensor operator+=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
+    CheckInplaceOperand(a, b);
     SELECT_DEVICE(a.device(), add_impl, a, b, a);
     return a;
 }
@@ -333,7 +355,7 @@ Tensor operator-=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
-    MatchTensorSize(a, b);
+    CheckInplaceOperand(a, b);
     SELECT_DEVICE(a.device(), sub_impl, a, b, a);
     return a;
 }
@@ -348,7 +370,7 @@ Tensor operator*=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
-    MatchTensorSize(a, b);
+    CheckInplaceOperand(a, b);
     SELECT_DEVICE(a.device(), mult_impl, a, b, a);
     return a;
 }
@@ -363,7 +385,7 @@ Tensor operator/=(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
-    MatchTensorSize(a, b);
+    CheckInplaceOperand(a, b);
     SELECT_DEVICE(a.device(), div_impl, a, b, a);
     return a;
 }

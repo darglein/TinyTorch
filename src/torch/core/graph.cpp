@@ -7,9 +7,9 @@
 
 #include "torch/core/ops/all.h"
 
-#include "torch/core/tensor_impl.h"
-
 #include <atomic>
+
+#include "torch/core/tensor_impl.h"
 namespace tinytorch
 {
 
@@ -62,9 +62,13 @@ std::vector<Tensor> AccumulateGrad::accumulate(const std::vector<Tensor>& input_
     CHECK_EQ(input_grad.size(), 1);
     auto g = input_grad[0];
 
-    CHECK(!impl_.expired());
+    // The leaf may have been destroyed (e.g. a temporary) or may not require grad anymore after the graph was built:
+    // nobody can observe its gradient then.
     auto ptr = impl_.lock();
-    CHECK(ptr);
+    if (!ptr || !ptr->requires_grad())
+    {
+        return {g};
+    }
 
     Tensor t(ptr);
 

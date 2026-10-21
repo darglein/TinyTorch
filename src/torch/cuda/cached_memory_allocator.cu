@@ -24,7 +24,8 @@ static bool prealloc_use_fallback           = true;
 // all pinned mallocs after this will return nullptr
 static int64_t max_pinned_memory = 0;
 
-static std::recursive_mutex mu;
+// never destroyed, see DeviceData()
+static std::recursive_mutex& mu   = *new std::recursive_mutex;
 static bool allocator_initialized = false;
 // per device: -1 = not queried yet, 0 = no memory pool support, 1 = cudaMallocAsync supported
 static int malloc_async_supported[MAX_DEVICES];
@@ -37,18 +38,20 @@ struct PerDeviceMemoryData
     int64_t max_allocated_bytes     = 0;
 };
 
+// The allocator state is never destroyed: tensors held by static objects of the application are freed at exit, possibly
+// after the static objects of this library were destroyed
 static PerDeviceMemoryData& DeviceData(int device_id)
 {
     CHECK_GE(device_id, 0);
     CHECK_LT(device_id, MAX_DEVICES);
-    static PerDeviceMemoryData data[MAX_DEVICES];
+    static PerDeviceMemoryData* data = new PerDeviceMemoryData[MAX_DEVICES];
     return data[device_id];
 }
 
 static PerDeviceMemoryData& PinnedMemoryData()
 {
-    static PerDeviceMemoryData data;
-    return data;
+    static PerDeviceMemoryData* data = new PerDeviceMemoryData;
+    return *data;
 }
 
 // The free events of a block are waited on by later allocations, possibly much later. They are owned by the block
@@ -103,7 +106,7 @@ static PreallocPerDeviceMemoryData& PreallocDeviceData(int device_id)
 {
     CHECK_GE(device_id, 0);
     CHECK_LT(device_id, MAX_DEVICES);
-    static PreallocPerDeviceMemoryData data[MAX_DEVICES];
+    static PreallocPerDeviceMemoryData* data = new PreallocPerDeviceMemoryData[MAX_DEVICES];
     return data[device_id];
 }
 
@@ -228,11 +231,22 @@ static void handle_cuda_allocation_error(cudaError_t cuda_error, int64_t size, i
     }
 }
 
+// An out of memory error is not sticky, the caller may catch the exception and continue. It must not stay the last
+// error, otherwise a later cudaGetLastError() (e.g. a launch check of the application) reports it again.
+static void ClearOutOfMemoryError(cudaError_t cuda_error)
+{
+    if (cuda_error == cudaErrorMemoryAllocation)
+    {
+        (void)cudaGetLastError();
+    }
+}
+
 static void* malloc_async(int64_t size, int device_id)
 {
     void* ptr;
     auto strm       = cuda::getCurrentCUDAStream();
     auto cuda_error = cudaMallocAsync(&ptr, size, strm);
+    ClearOutOfMemoryError(cuda_error);
 
     handle_cuda_allocation_error(cuda_error, size, device_id);
 
@@ -418,6 +432,7 @@ static void* malloc_blocking(int64_t size, int device_id)
 {
     void* ptr              = nullptr;
     cudaError_t cuda_error = cudaMalloc(&ptr, size);
+    ClearOutOfMemoryError(cuda_error);
 
     handle_cuda_allocation_error(cuda_error, size, device_id);
     TT_CHECK_CUDA_ERROR(cuda_error);
@@ -533,9 +548,9 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
     }
 
     auto algo = (AllocatorAlgorithm)alloc_info;
-    CHECK(allocator_initialized);
 
     std::unique_lock l(mu);
+    CHECK(allocator_initialized);
 
     int64_t size = 0;
     if (algo != AllocatorAlgorithm::CUDA_PRE_ALLOCATE)
@@ -649,7 +664,6 @@ void cuda_pinned_free(void* ptr, int64_t size)
 void CUDACachingAllocator::emptyCache()
 {
     std::unique_lock l(mu);
-    CHECK(allocator_initialized);
     // this frees unused values for the async allocator
     TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 }
@@ -700,7 +714,10 @@ int64_t pre_allocate_vram(int64_t requested)
     log_level = old_log;
 
 
-    data.free_blocks.push_back({data.full_ptr, data.full_size});
+    // an arena from cudaMallocAsync is stream ordered: it may reuse memory that pending work on the current stream
+    // still uses, so allocations of its blocks on other streams wait for this event
+    auto strm = getCurrentCUDAStream();
+    data.free_blocks.push_back({data.full_ptr, data.full_size, {{RecordOwnedEvent(strm), strm}}});
 
     if (log_level > 3)
     {

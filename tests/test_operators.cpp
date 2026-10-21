@@ -234,6 +234,37 @@ TEST_P(TinyTorchCompoundAssignOps, Values)
     TT_EXPECT_CLOSE(a, tttest::make_tensor({0, 1, 2, 3}, {2, 2}, device()), 0, 0);
 }
 
+// the right-hand side broadcasts to the shape of the left-hand side
+TEST_P(TinyTorchCompoundAssignOps, Broadcast)
+{
+    tinytorch::NoGradGuard ngg;
+    Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
+    a += tttest::make_tensor({10, 20, 30}, {1, 3}, device());
+    TT_EXPECT_CLOSE(a, tttest::make_tensor({11, 22, 33, 14, 25, 36}, {2, 3}, device()), 0, 0);
+    a -= tttest::make_tensor({1}, {1}, device());
+    TT_EXPECT_CLOSE(a, tttest::make_tensor({10, 21, 32, 13, 24, 35}, {2, 3}, device()), 0, 0);
+}
+
+TEST_P(TinyTorchCompoundAssignOps, InvalidShapesDie)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    tinytorch::NoGradGuard ngg;
+    // the result would need the shape of the right-hand side
+    EXPECT_DEATH(
+        {
+            Tensor a = tttest::make_tensor({1, 2, 3}, {1, 3}, device());
+            a += tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
+        },
+        "");
+    // a right-hand side with fewer dims would be indexed with the wrong dims
+    EXPECT_DEATH(
+        {
+            Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
+            a *= tttest::make_tensor({1, 2, 3}, {3}, device());
+        },
+        "");
+}
+
 // ------------------------------------------------------------------ broadcasting
 
 // a (2,1) * b (2,3): output (2,3)
@@ -251,6 +282,16 @@ TEST_P(TinyTorchBroadcasting, ValuesAndReducedGradient)
     tinytorch::backward(tinytorch::sum(prod));
     TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({3, 3}, {2, 1}, device()), 0, 0);
     TT_EXPECT_CLOSE(b.grad(), tttest::make_tensor({2, 2, 2, 3, 3, 3}, {2, 3}, device()), 0, 0);
+}
+
+// the reduced gradients of all broadcasting binary ops match finite differences
+TEST_P(TinyTorchBroadcasting, GradientMatchesFiniteDifferences)
+{
+    tttest::check_grads(
+        {tttest::leaf({0.3f, -1.2f, 0.7f, 1.5f, -0.4f, 0.9f}, {2, 3}, device()),
+         tttest::leaf({0.5f, 1.5f, 2.5f}, {1, 3}, device())},
+        [](const std::vector<Tensor>& p)
+        { return tinytorch::sum(p[0] / p[1] + p[1] * p[0] - p[1] + tinytorch::pow(p[1] + 1.0, p[0])); });
 }
 
 // a size-1 dim broadcasts to 0 (like PyTorch); the gradient of the size-1 operand is 0 with its own shape

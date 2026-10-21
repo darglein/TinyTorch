@@ -458,17 +458,17 @@ Tensor Tensor::squeeze_view() const
     CHECK(defined());
     CHECK(!this->requires_grad() || !GradMode::is_enabled());
 
-    std::vector<int64_t> new_sizes  ; // = this->sizes();
-    std::vector<int64_t> new_strides; // = this->strides();
+    std::vector<int64_t> new_sizes;    // = this->sizes();
+    std::vector<int64_t> new_strides;  // = this->strides();
 
     for (int d = 0; d < this->dim(); ++d)
     {
-        if (size(d) != 1 || (new_sizes.empty() && d+1 == this->dim()))
+        if (size(d) != 1 || (new_sizes.empty() && d + 1 == this->dim()))
         {
             new_sizes.push_back(size(d));
             new_strides.push_back(stride(d));
-
-        }else
+        }
+        else
         {
             // squeeze away
         }
@@ -497,12 +497,19 @@ bool Tensor::is_32bit_addressable() const
 {
     // the maximum element offset has to fit in a 32 bit index type. It is computed in 64 bit
     // to avoid overflowing the check itself.
-    int64_t max_voxel_index = 0;
+    // Positive and negative strides are summed separately, otherwise their contributions could cancel.
+    int64_t max_offset = 0;
+    int64_t min_offset = 0;
     for (int64_t i = 0; i < dim(); ++i)
     {
-        max_voxel_index += stride(i) * (size(i) - 1);
+        if (size(i) == 0)
+        {
+            return true;
+        }
+        int64_t extent = stride(i) * (size(i) - 1);
+        (extent > 0 ? max_offset : min_offset) += extent;
     }
-    return max_voxel_index <= std::numeric_limits<int>::max();
+    return max_offset <= std::numeric_limits<int>::max() && min_offset >= std::numeric_limits<int>::min();
 }
 
 Tensor Tensor::contiguous() const
@@ -662,7 +669,7 @@ Tensor Tensor::mean(const SizeType& sizes, bool keepdim) const
 {
     return tinytorch::mean(*this, sizes, keepdim);
 }
-Tensor Tensor::median(double percentile ) const
+Tensor Tensor::median(double percentile) const
 {
     return tinytorch::median(*this, percentile);
 }

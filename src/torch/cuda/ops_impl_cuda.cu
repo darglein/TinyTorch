@@ -54,7 +54,8 @@ __launch_bounds__(128) static __global__ void fill_impl(TensorInfoCuda<T> a, Ten
 }
 void fill_impl(Tensor& a, double value)
 {
-    if (value == 0 && a.is_contiguous())
+    // the memset writes +0.0, so -0.0 takes the kernel path to keep its sign
+    if (value == 0 && !std::signbit(value) && a.is_contiguous())
     {
         cuda::DeviceGuard guard(a.device());
         TT_CHECK_CUDA_ERROR(
@@ -113,8 +114,10 @@ __launch_bounds__(128) static __global__
     {
         b[i] = TTarget((long long)a[i]);
     }
-    else if constexpr (std::is_same_v<TTarget, uint8_t> || std::is_same_v<TTarget, int16_t>)
+    else if constexpr (std::is_same_v<TTarget, uint8_t> || std::is_same_v<TTarget, int16_t> ||
+                       std::is_same_v<TTarget, uint16_t>)
     {
+        // convert through int like the CPU, which wraps negative values (a direct conversion saturates on the GPU)
         b[i] = TTarget((int)a[i]);
     }
     else
@@ -127,6 +130,8 @@ __launch_bounds__(128) static __global__
 void copy_and_convert_impl(Tensor src, Tensor& target)
 {
     CHECK_EQ(src.device(), target.device());
+    // before the memcpy fast path, which would otherwise write past the end of a smaller target
+    CHECK_EQ(src.numel(), target.numel());
     if (src.dtype() == target.dtype() && src.is_contiguous() && target.is_contiguous())
     {
         // trivial copy without conversion
@@ -136,7 +141,6 @@ void copy_and_convert_impl(Tensor src, Tensor& target)
         return;
     }
 
-    CHECK_EQ(src.numel(), target.numel());
     switch (target.dtype())
     {
         case kUInt8:
@@ -394,8 +398,8 @@ void clamp_impl_(Tensor& a, double low, double high)
 }
 template <typename T>
 __launch_bounds__(128) static __global__
-    void padding_2d_impl(TensorInfoCuda<T, 4> src, TensorInfoCuda<T, 4> dst, int pad_left, int pad_right,
-                                 int pad_top, int pad_bottom, PaddingMode mode )
+    void padding_2d_impl(TensorInfoCuda<T, 4> src, TensorInfoCuda<T, 4> dst, int pad_left, int pad_right, int pad_top,
+                         int pad_bottom, PaddingMode mode)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= dst.numel()) return;
@@ -413,7 +417,7 @@ __launch_bounds__(128) static __global__
         if (x_src < 0 || x_src >= src.size(3) || y_src < 0 || y_src >= src.size(2))
         {
             dst(b, c, y, x) = T(0);
-            return; // Thread done for this padding element
+            return;  // Thread done for this padding element
         }
     }
     else if (mode == kReflect)
@@ -435,16 +439,17 @@ __launch_bounds__(128) static __global__
     dst(b, c, y, x) = src(b, c, y_src, x_src);
 }
 
-void padding_2d_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, PaddingMode mode )
+void padding_2d_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom,
+                     PaddingMode mode)
 {
-    CUDA_SWITCH_MACRO_ALL(src.device(), src.scalar_type(), result.numel(), padding_2d_impl, src, result,
-                          pad_left, pad_right, pad_top, pad_bottom, mode);
+    CUDA_SWITCH_MACRO_ALL(src.device(), src.scalar_type(), result.numel(), padding_2d_impl, src, result, pad_left,
+                          pad_right, pad_top, pad_bottom, mode);
 }
 
 template <typename T>
 __launch_bounds__(128) static __global__
-    void padding_3d_impl(TensorInfoCuda<T, 5> src, TensorInfoCuda<T, 5> dst, int pad_left, int pad_right,
-                                 int pad_top, int pad_bottom, int pad_front, int pad_back, PaddingMode mode )
+    void padding_3d_impl(TensorInfoCuda<T, 5> src, TensorInfoCuda<T, 5> dst, int pad_left, int pad_right, int pad_top,
+                         int pad_bottom, int pad_front, int pad_back, PaddingMode mode)
 {
     int64_t i = (int64_t)threadIdx.x + (int64_t)blockIdx.x * (int64_t)blockDim.x;
     if (i >= dst.numel()) return;
@@ -462,12 +467,10 @@ __launch_bounds__(128) static __global__
 
     if (mode == kZero)
     {
-        if (x_src < 0 || x_src >= src.size(4) ||
-            y_src < 0 || y_src >= src.size(3) ||
-            z_src < 0 || z_src >= src.size(2))
+        if (x_src < 0 || x_src >= src.size(4) || y_src < 0 || y_src >= src.size(3) || z_src < 0 || z_src >= src.size(2))
         {
             dst(b, c, z, y, x) = T(0);
-            return; // Thread done for this padding element
+            return;  // Thread done for this padding element
         }
     }
     else if (mode == kReflect)
@@ -497,10 +500,11 @@ __launch_bounds__(128) static __global__
     dst(b, c, z, y, x) = src(b, c, z_src, y_src, x_src);
 }
 
-void padding_3d_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front, int pad_back, PaddingMode mode )
+void padding_3d_impl(Tensor src, Tensor result, int pad_left, int pad_right, int pad_top, int pad_bottom, int pad_front,
+                     int pad_back, PaddingMode mode)
 {
-    CUDA_SWITCH_MACRO_ALL(src.device(), src.scalar_type(), result.numel(), padding_3d_impl, src, result,
-                          pad_left, pad_right, pad_top, pad_bottom, pad_front, pad_back, mode);
+    CUDA_SWITCH_MACRO_ALL(src.device(), src.scalar_type(), result.numel(), padding_3d_impl, src, result, pad_left,
+                          pad_right, pad_top, pad_bottom, pad_front, pad_back, mode);
 }
 
 template <typename T>

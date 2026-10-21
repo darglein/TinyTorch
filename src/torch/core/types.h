@@ -192,8 +192,8 @@ struct std::hash<tinytorch::Device>
 {
     inline std::size_t operator()(tinytorch::Device device) const
     {
-        static_assert(sizeof(tinytorch::Device) == sizeof(size_t));
-        size_t d = (size_t&)device;
-        return std::hash<size_t>()(d);
+        // combine the members instead of reinterpreting the struct (strict aliasing, padding)
+        uint64_t d = (uint64_t(uint32_t(device.type())) << 32) | uint64_t(uint32_t(device.index()));
+        return std::hash<uint64_t>()(d);
     }
 };

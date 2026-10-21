@@ -148,6 +148,65 @@ TEST(TinyTorchAdam, StateFollowsParamDeviceAndDtype)
     }
 }
 
+// The bias correction uses the step count of each parameter (like PyTorch): a parameter added with add_param_group
+// after some steps, or one that had no gradient in the previous steps, gets the bias correction of its first step
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchAdamStepCount);
+TEST_P(TinyTorchAdamStepCount, BiasCorrectionPerParameter)
+{
+    tinytorch::optim::AdamOptions options(0.1);
+    double first_step = AdamReference(1, {1.0}, 0.1, 0, false);
+
+    Tensor a = tttest::leaf({1.0f}, {1}, device());
+    tinytorch::optim::Adam adam({a}, options);
+    for (int i = 0; i < 20; ++i)
+    {
+        a.mutable_grad().fill_(1);
+        adam.step();
+    }
+    Tensor b = tttest::leaf({1.0f}, {1}, device());
+    adam.add_param_group(
+        std::make_pair(std::vector<Tensor>{b}, std::make_unique<tinytorch::optim::AdamOptions>(options)));
+    a.mutable_grad().fill_(1);
+    b.mutable_grad().fill_(1);
+    adam.step();
+    EXPECT_NEAR(b.toDouble(), first_step, 1e-5);
+
+    Tensor c = tttest::leaf({1.0f}, {1}, device());
+    Tensor d = tttest::leaf({1.0f}, {1}, device());
+    tinytorch::optim::Adam adam2({c, d}, options);
+    for (int i = 0; i < 20; ++i)
+    {
+        c.mutable_grad().fill_(1);
+        if (d.grad().defined()) d.mutable_grad() = Tensor();
+        adam2.step();
+    }
+    d.set_grad(tttest::make_tensor({1}, {1}, device()));
+    adam2.step();
+    EXPECT_NEAR(d.toDouble(), first_step, 1e-5);
+}
+
+// a parameter that changes its shape gets fresh moments, so the bias correction restarts at step 1
+TEST_P(TinyTorchAdamStepCount, ShapeChangeRestartsBiasCorrection)
+{
+    tinytorch::optim::AdamOptions options(0.1);
+    double first_step = AdamReference(1, {1.0}, 0.1, 0, false);
+
+    Tensor a = tttest::leaf({1.0f}, {1}, device());
+    tinytorch::optim::Adam adam({a}, options);
+    for (int i = 0; i < 20; ++i)
+    {
+        a.mutable_grad().fill_(1);
+        adam.step();
+    }
+    a.set_data(tttest::leaf({1.0f, 1.0f}, {2}, device()));
+    a.mutable_grad().fill_(1);
+    adam.step();
+    auto v = tttest::to_double_vec(a);
+    ASSERT_EQ(v.size(), 2);
+    EXPECT_NEAR(v[0], first_step, 1e-5);
+    EXPECT_NEAR(v[1], first_step, 1e-5);
+}
+
 // ------------------------------------------------------------------ SGD
 
 // Hand-verified single step:

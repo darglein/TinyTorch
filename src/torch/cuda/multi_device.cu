@@ -52,7 +52,7 @@ struct MultiGPUInputSimple
         }
     }
 
-    __device__ ComputeType CombinedRead(int tid)
+    __device__ ComputeType CombinedRead(int64_t tid)
     {
         CUDA_KERNEL_ASSERT(tid >= 0 && tid < N);
         ComputeType result = 0;
@@ -64,7 +64,7 @@ struct MultiGPUInputSimple
     }
 
 
-    __device__ void WriteToAll(ComputeType result, int tid)
+    __device__ void WriteToAll(ComputeType result, int64_t tid)
     {
         CUDA_KERNEL_ASSERT(tid >= 0 && tid < N);
         for (int i = 0; i < NUM_GPUS; ++i)
@@ -73,7 +73,7 @@ struct MultiGPUInputSimple
         }
     }
 
-    __device__ void WriteToD0(ComputeType result, int tid)
+    __device__ void WriteToD0(ComputeType result, int64_t tid)
     {
         CUDA_KERNEL_ASSERT(tid >= 0 && tid < N);
 
@@ -129,6 +129,11 @@ static void ReduceToDevice0Launcher(std::vector<Tensor> grads)
     CheckUVATensors(grads);
     int num_gpus  = grads.size();
     int64_t numel = grads[0].numel();
+    if (numel == 0)
+    {
+        // a launch with an empty grid fails
+        return;
+    }
 
     // the kernel on device 0 reads the tensors of all other devices
     for (int i = 1; i < num_gpus; ++i)
@@ -180,11 +185,11 @@ void MultiDeviceTensor::ReduceGradientSumToMainUVA()
     else if (data[0].scalar_type() == kFloat64)
     {
         ReduceToDevice0Launcher<double, double>(grads);
-    }else
+    }
+    else
     {
         CHECK(false);
     }
-
 }
 
 
@@ -214,7 +219,8 @@ void MultiDeviceTensor::ReduceSumToMainUVA()
     else if (data[0].scalar_type() == kFloat64)
     {
         ReduceToDevice0Launcher<double, double>(this->data);
-    }else
+    }
+    else
     {
         CHECK(false);
     }
@@ -224,6 +230,11 @@ void MultiDeviceTensor::ReduceSumToMainUVA()
 void MultiDeviceTensor::copy_parameters_from_main_to_others_uva()
 {
     CheckUVATensors(data);
+    if (data[0].numel() == 0)
+    {
+        // a launch with an empty grid fails
+        return;
+    }
     for (int i = 1; i < data.size(); ++i)
     {
         int64_t numel = data[0].numel();
@@ -242,7 +253,8 @@ void MultiDeviceTensor::copy_parameters_from_main_to_others_uva()
             auto src = data[0].data_ptr<double>();
             auto dst = data[i].data_ptr<double>();
             Simplecopy<<<iDivUp(numel, 128), 128, 0, getCurrentCUDAStream()>>>(src, dst, numel);
-        }else
+        }
+        else
         {
             CHECK(false);
         }

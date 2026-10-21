@@ -11,7 +11,22 @@
 
 #include "test_utils.h"
 
+#ifdef __linux__
+#    include <sys/prctl.h>
+#endif
+
 using tttest::DeviceTest;
+
+namespace
+{
+// Expected crashes of death test children should not write core dumps (slow with a piped core_pattern).
+void DisableCoreDumps()
+{
+#ifdef __linux__
+    prctl(PR_SET_DUMPABLE, 0);
+#endif
+}
+}  // namespace
 
 // ----------------------------------------------------------------- empty
 
@@ -86,6 +101,19 @@ TEST_P(TinyTorchFull, Values)
     std::vector<float> expected(4, 7.5f);
     TT_EXPECT_CLOSE(tinytorch::full({2, 2}, 7.5f, TensorOptions().device(device())),
                     tttest::make_tensor(expected, {2, 2}, device()), 0.0, 0.0);
+}
+
+// fill(-0.0) must not take the memset fast path, which produces +0.0
+TEST_P(TinyTorchFull, NegativeZeroKeepsSign)
+{
+    Tensor a = tinytorch::ones({5}, TensorOptions().device(device()));
+    tinytorch::fill(a, -0.0);
+    Tensor c = a.cpu();
+    for (int i = 0; i < 5; ++i)
+    {
+        EXPECT_EQ(c.data_ptr<float>()[i], 0.f);
+        EXPECT_TRUE(std::signbit(c.data_ptr<float>()[i])) << i;
+    }
 }
 
 TEST(TinyTorchCreate, FullLike)
@@ -275,6 +303,17 @@ TEST_P(TinyTorchHalfConversion, TensorRoundTrip)
     EXPECT_EQ(tttest::to_double_vec(b.to(tinytorch::kFloat).to(tinytorch::kInt16)), (std::vector<double>{1, -2, 300}));
 }
 
+// negative floating point values wrap when converted to the unsigned types (through int, not UB)
+TEST_P(TinyTorchHalfConversion, NegativeFloatToUnsignedWraps)
+{
+    for (auto dtype : {tinytorch::kHalf, tinytorch::kFloat, tinytorch::kDouble})
+    {
+        Tensor a = tttest::make_tensor({-1, -2, 3, 0}, {4}, device()).to(dtype);
+        EXPECT_EQ(tttest::to_double_vec(a.to(tinytorch::kUInt16)), (std::vector<double>{65535, 65534, 3, 0})) << dtype;
+        EXPECT_EQ(tttest::to_double_vec(a.to(tinytorch::kUInt8)), (std::vector<double>{255, 254, 3, 0})) << dtype;
+    }
+}
+
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchRandint);
 TEST_P(TinyTorchRandint, IntRange)
 {
@@ -288,6 +327,65 @@ TEST_P(TinyTorchRandint, IntRange)
         EXPECT_LE(x, 5);
         EXPECT_DOUBLE_EQ(std::floor(x), x);
     }
+}
+
+// floating point tensors get integer values from [low, high)
+TEST_P(TinyTorchRandint, FloatingPointTypes)
+{
+    for (auto dtype : {kFloat, kFloat64, tinytorch::kHalf})
+    {
+        Tensor t      = tinytorch::randint(-3, 5, {1000}, TensorOptions().device(device()).dtype(dtype));
+        auto v        = tttest::to_double_vec(t);
+        bool seen_low = false, seen_high = false;
+        for (double x : v)
+        {
+            EXPECT_EQ(x, std::round(x));
+            EXPECT_GE(x, -3);
+            EXPECT_LT(x, 5);
+            seen_low  = seen_low || x == -3;
+            seen_high = seen_high || x == 4;
+        }
+        EXPECT_TRUE(seen_low) << dtype;
+        EXPECT_TRUE(seen_high) << dtype;
+    }
+}
+
+// a floating dtype must represent the whole range exactly, otherwise rounding could return high
+TEST_P(TinyTorchRandint, FloatingPointRangeChecked)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    auto o = TensorOptions().device(device());
+    // the largest exactly representable ranges work
+    Tensor h = tinytorch::randint(-2048, 2049, {1000}, o.dtype(tinytorch::kHalf));
+    EXPECT_LE(tinytorch::max(h).toDouble(), 2048);
+    EXPECT_GE(tinytorch::min(h).toDouble(), -2048);
+    Tensor f = tinytorch::randint(0, (int64_t(1) << 24) + 1, {1000}, o.dtype(kFloat));
+    EXPECT_LE(tinytorch::max(f).toDouble(), double(int64_t(1) << 24));
+
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::randint(0, 4096, {10}, o.dtype(tinytorch::kHalf));
+        },
+        "");
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::randint(-2049, 0, {10}, o.dtype(tinytorch::kHalf));
+        },
+        "");
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::randint(0, (int64_t(1) << 24) + 2, {10}, o.dtype(kFloat));
+        },
+        "");
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::randint(0, (int64_t(1) << 53) + 2, {10}, o.dtype(kFloat64));
+        },
+        "");
 }
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchRandn);
@@ -313,14 +411,14 @@ TEST(TinyTorchCreate, RandLikeRandnLike)
 TEST(TinyTorchCreate, Range)
 {
     // end is inclusive
-    Tensor t = tinytorch::range(1, 5, 1);
+    Tensor t                    = tinytorch::range(1, 5, 1);
     std::vector<float> expected = {1, 2, 3, 4, 5};
     TT_EXPECT_CLOSE(t, tttest::make_tensor(expected, {5}, kCPU), 0.0, 0.0);
 }
 
 TEST(TinyTorchCreate, RangeNegativeStep)
 {
-    Tensor t = tinytorch::range(3, -1, -2);
+    Tensor t                    = tinytorch::range(3, -1, -2);
     std::vector<float> expected = {3, 1, -1};
     TT_EXPECT_CLOSE(t, tttest::make_tensor(expected, {3}, kCPU), 0.0, 0.0);
 }
@@ -379,8 +477,8 @@ TEST(TinyTorchCreate, FromBlobCustomStrides)
 TEST(TinyTorchCreate, FromBlobDoesNotTakeOwnership)
 {
     // The tensor must still be valid after this scope: the buffer stays alive in `data`.
-    std::vector<float> data = {1, 2, 3, 4, 5, 6};
-    Tensor t                = tinytorch::from_blob(data.data(), {2, 3});
+    std::vector<float> data     = {1, 2, 3, 4, 5, 6};
+    Tensor t                    = tinytorch::from_blob(data.data(), {2, 3});
     std::vector<float> expected = {1, 2, 3, 4, 5, 6};
     TT_EXPECT_CLOSE(t, tttest::make_tensor(expected, {2, 3}, kCPU), 0.0, 0.0);
 }

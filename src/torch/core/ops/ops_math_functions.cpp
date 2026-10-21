@@ -37,7 +37,7 @@ struct AbsSumNode : public FunctionNode<AbsSumNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         CHECK_EQ(grad.size(), 1);
-        auto a       = ctx->get_saved_variables()[0];
+        auto a        = ctx->get_saved_variables()[0];
         Tensor grad_a = sign(a) * grad[0];
         return {grad_a};
     }
@@ -56,7 +56,7 @@ struct ProdSumNode : public FunctionNode<ProdSumNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         CHECK_EQ(grad.size(), 1);
-        auto a       = ctx->get_saved_variables()[0];
+        auto a        = ctx->get_saved_variables()[0];
         Tensor grad_a = (a * 2.0) * grad[0];
         return {grad_a};
     }
@@ -150,15 +150,17 @@ struct PowNode : public FunctionNode<PowNode>
 
         if (ctx->requires_grad_for_input(0))
         {
+            // b * a^(b-1); where b == 0 the exponent is shifted to 0 so that a == 0 gives 0 instead of 0 * inf
             grad_a = empty(max_size(a, b), g.options());
-            SELECT_DEVICE(grad_a.device(), pow_impl, a, b - 1, grad_a);
+            SELECT_DEVICE(grad_a.device(), pow_impl, a, b - 1 + (b == 0), grad_a);
             grad_a = grad_a * b * g;
         }
 
         if (ctx->requires_grad_for_input(1))
         {
-            // ln(a)*a^b
-            grad_b = log(a) * pow(a, b) * g;
+            // ln(a)*a^b; like PyTorch 0 where a == 0 and b >= 0 (log(0) * 0^b would be NaN): log(1) = 0 there
+            Tensor a_zero = (a == 0) * (1 - (b < 0));
+            grad_b        = log(a + a_zero) * pow(a, b) * g;
         }
 
         BackwardExpand(grad_a, grad_b, ctx->saved_data["expand_a"].toSizes(), ctx->saved_data["expand_b"].toSizes());
@@ -183,9 +185,14 @@ struct PowScalarNode : public FunctionNode<PowScalarNode>
     static std::vector<Tensor> backward(Context* ctx, const std::vector<Tensor>& grad)
     {
         CHECK_EQ(grad.size(), 1);
-        auto a        = ctx->get_saved_variables()[0];
-        double b      = ctx->saved_data["b"].toDouble();
-        auto g        = grad[0];
+        auto a   = ctx->get_saved_variables()[0];
+        double b = ctx->saved_data["b"].toDouble();
+        auto g   = grad[0];
+        if (b == 0)
+        {
+            // a^0 is constant; b * a^(b-1) would be 0 * inf = NaN at a == 0
+            return {zeros(ctx->next_meta[0].size, g.options()), {}};
+        }
         Tensor grad_a = empty(ctx->next_meta[0].size, g.options());
 
         SELECT_DEVICE(grad_a.device(), pow_impl, a, b - 1, grad_a);
@@ -205,6 +212,25 @@ Tensor pow(Tensor a, double b)
 Tensor pow(Tensor a, Tensor b)
 {
     return autograd::PowNode::apply(a, b)[0];
+}
+
+// Elementwise binary op without autograd: a numel-1 operand broadcasts to any shape, otherwise the dims must match
+// and the sizes broadcast. Returns the result size.
+static SizeType broadcast_operands(Tensor& a, Tensor& b)
+{
+    if (a.dim() != b.dim())
+    {
+        if (b.numel() == 1)
+        {
+            b = b.reshape(std::vector<int64_t>(a.dim(), 1));
+        }
+        else if (a.numel() == 1)
+        {
+            a = a.reshape(std::vector<int64_t>(b.dim(), 1));
+        }
+    }
+    CheckOperatorSizeMatchOneDim(a, b);
+    return max_size(a, b);
 }
 
 template <typename T>
@@ -327,14 +353,14 @@ std::pair<Tensor, Tensor> max(Tensor a, int64_t dim, bool keepdim)
 Tensor min(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    Tensor result = empty_like(a);
+    Tensor result = empty(broadcast_operands(a, b), a.options());
     SELECT_DEVICE(a.device(), min_impl, a, b, result);
     return result;
 }
 Tensor max(Tensor a, Tensor b)
 {
     CHECK(!a.requires_grad() || !GradMode::is_enabled());
-    Tensor result = empty_like(a);
+    Tensor result = empty(broadcast_operands(a, b), a.options());
     SELECT_DEVICE(a.device(), max_impl, a, b, result);
     return result;
 }
@@ -411,7 +437,7 @@ Tensor mean(Tensor a, SizeType s, bool keepdim)
 
     return a;
 }
-Tensor median(Tensor a, double percentile )
+Tensor median(Tensor a, double percentile)
 {
     auto initial_device = a.device();
     auto result         = ones({1}, TensorOptions().dtype(a.scalar_type()).device(kCPU));
@@ -471,8 +497,8 @@ Tensor norm(Tensor a, int64_t norm, int64_t dim, bool keep)
     CHECK_EQ(norm, 2);
     dim = normalize_dim(a, dim);
     a   = a.square();
-    a = a.sum(dim, keep);
-    a = a.sqrt();
+    a   = a.sum(dim, keep);
+    a   = a.sqrt();
     return a;
 }
 

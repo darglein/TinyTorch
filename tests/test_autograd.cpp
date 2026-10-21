@@ -178,7 +178,7 @@ TEST(TinyTorchAutograd, BackwardRequiresEdge)
     EXPECT_FALSE(t.requires_grad());
     EXPECT_EQ(t.getEdge(), nullptr);
 
-    Tensor t2 = tttest::leaf({1.0f}, {1}, kCPU);
+    Tensor t2   = tttest::leaf({1.0f}, {1}, kCPU);
     Tensor loss = t2 * 2.0;
     EXPECT_TRUE(loss.requires_grad());
     EXPECT_TRUE(loss.getEdge());
@@ -242,9 +242,9 @@ TEST(TinyTorchAutograd, RetainGradDoesNotAlias)
 TEST(TinyTorchAutograd, BackwardWithExplicitGradOnVectorLoss)
 {
     // backward(loss, grad) with a non-scalar loss requires matching shapes
-    Tensor a = tttest::leaf({1, 2}, {2}, kCPU);
+    Tensor a    = tttest::leaf({1, 2}, {2}, kCPU);
     Tensor loss = a * a;  // elementwise, shape {2}
-    Tensor g = tinytorch::full({2}, 1.0f);
+    Tensor g    = tinytorch::full({2}, 1.0f);
 
     tinytorch::backward(loss, g);
     // d(a^2)/da = 2a
@@ -281,4 +281,64 @@ TEST(TinyTorchAutograd, ImplicitGradientOfMultiDimLoss)
     ASSERT_EQ(loss.sizes(), (SizeType{1, 1}));
     tinytorch::backward(loss);
     TT_EXPECT_CLOSE(a.grad(), tttest::make_tensor({1. / 3, 1. / 3, 1. / 3}, {3, 1}, kCPU), 1e-6, 1e-6);
+}
+
+// ------------------------------------------------------------------ leaves outside the graph
+
+// A leaf that is destroyed before backward() can not receive a gradient anymore: it is skipped, the other leaves still
+// get theirs
+TEST(TinyTorchAutograd, BackwardWithDestroyedLeaf)
+{
+    Tensor x = tttest::leaf({1, 2, 3}, {3}, kCPU);
+    Tensor loss;
+    {
+        Tensor tmp = tttest::leaf({4, 5, 6}, {3}, kCPU);
+        loss       = tinytorch::sum(x * tmp);
+    }
+    tinytorch::backward(loss);
+    TT_EXPECT_CLOSE(x.grad(), tttest::make_tensor({4, 5, 6}, {3}, kCPU), 0, 0);
+}
+
+// A leaf whose requires_grad was switched off after it was used in the graph receives no gradient
+TEST(TinyTorchAutograd, BackwardAfterLeafRequiresGradDisabled)
+{
+    Tensor x    = tttest::leaf({1, 2, 3}, {3}, kCPU);
+    Tensor y    = tttest::leaf({4, 5, 6}, {3}, kCPU);
+    Tensor loss = tinytorch::sum(x * y);
+    y.set_requires_grad(false);
+    tinytorch::backward(loss);
+    TT_EXPECT_CLOSE(x.grad(), tttest::make_tensor({4, 5, 6}, {3}, kCPU), 0, 0);
+    EXPECT_FALSE(y.grad().defined());
+}
+
+// ------------------------------------------------------------------ multi-output nodes
+
+namespace
+{
+// (2 * a, 3 * a)
+struct TwoOutputNode : public tinytorch::autograd::FunctionNode<TwoOutputNode>
+{
+    static std::vector<Tensor> forward(tinytorch::autograd::Context* ctx, Tensor a) { return {a * 2.0, a * 3.0}; }
+    static std::vector<Tensor> backward(tinytorch::autograd::Context* ctx, const std::vector<Tensor>& grad)
+    {
+        Tensor g;
+        if (grad[0].defined()) g = grad[0] * 2.0;
+        if (grad[1].defined()) g = g.defined() ? g + grad[1] * 3.0 : grad[1] * 3.0;
+        return {g};
+    }
+};
+}  // namespace
+
+// backward() started from (a tensor computed from) the second output of a multi-output node
+TEST(TinyTorchAutograd, BackwardFromSecondOutputOfMultiOutputNode)
+{
+    Tensor x = tttest::leaf({1, 2}, {2}, kCPU);
+    tinytorch::backward(tinytorch::sum(TwoOutputNode::apply(x)[1]));
+    TT_EXPECT_CLOSE(x.grad(), tttest::make_tensor({3, 3}, {2}, kCPU), 0, 0);
+
+    // directly from the output, with an explicit gradient
+    Tensor x2 = tttest::leaf({1, 2}, {2}, kCPU);
+    auto outs = TwoOutputNode::apply(x2);
+    tinytorch::backward(outs[1], tttest::make_tensor({1, 10}, {2}, kCPU));
+    TT_EXPECT_CLOSE(x2.grad(), tttest::make_tensor({3, 30}, {2}, kCPU), 0, 0);
 }
