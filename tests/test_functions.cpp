@@ -431,6 +431,21 @@ TEST_P(TinyTorchCatOps, MismatchDies)
         "");
 }
 
+// legacy empty 1-D tensors ({0}) are skipped like in PyTorch
+TEST_P(TinyTorchCatOps, SkipsLegacyEmpty)
+{
+    auto o   = TensorOptions().device(device());
+    Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
+    Tensor e = tinytorch::empty({0}, o);
+    Tensor r = tinytorch::cat({a, e}, 0);
+    EXPECT_EQ(r.sizes(), (SizeType{2, 3}));
+    TT_EXPECT_CLOSE(r, a, 0, 0);
+    r = tinytorch::cat({e, a, e, a}, 1);
+    EXPECT_EQ(r.sizes(), (SizeType{2, 6}));
+    // only legacy empty tensors
+    EXPECT_EQ(tinytorch::cat({e, e}, 0).sizes(), (SizeType{0}));
+}
+
 // ------------------------------------------------------------------ indexing
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchIndexSelectOps);

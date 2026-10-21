@@ -224,6 +224,29 @@ void uniform_int(Tensor& t, int64_t low, int64_t high)
 {
     CHECK(!t.requires_grad() || !GradMode::is_enabled());
     TINYTORCH_LOG_FUNCTION_CALL();
+    CHECK_LT(low, high);
+    // a floating dtype must represent every value in [low, high) exactly, otherwise rounding can produce high
+    int64_t max_exact = -1;
+    switch (t.scalar_type())
+    {
+        case kHalf:
+            max_exact = int64_t(1) << 11;
+            break;
+        case kFloat:
+            max_exact = int64_t(1) << 24;
+            break;
+        case kDouble:
+            max_exact = int64_t(1) << 53;
+            break;
+        default:
+            break;
+    }
+    if (max_exact > 0)
+    {
+        CHECK_GE(low, -max_exact) << "randint: low is out of the exactly representable range of " << t.scalar_type();
+        CHECK_LE(high - 1, max_exact) << "randint: high is out of the exactly representable range of "
+                                      << t.scalar_type();
+    }
     SELECT_DEVICE(t.device(), uniform_int_impl, t, low, high);
 }
 
@@ -392,6 +415,8 @@ struct IndexAddNode : public FunctionNode<IndexAddNode>
 
         CHECK_LT(dim.toInt(), input.dim());
         CHECK(index.dtype() == kInt32 || index.dtype() == kInt64);
+        CHECK_EQ(data.device(), input.device());
+        CHECK_EQ(index.device(), input.device());
         CHECK_EQ(input.dim(), data.dim());
         CHECK_EQ(index.dim(), 1);
         CHECK_EQ(index.numel(), data.size(dim.toInt())) << index.sizes() << " " << data.sizes();
@@ -434,6 +459,7 @@ void index_copy(Tensor& target, int64_t dim, Tensor index, Tensor source)
     CHECK_EQ(target.dtype(), source.dtype());
     dim = maybe_wrap_dim(dim, target.dim());
     CHECK_EQ(target.device(), source.device());
+    CHECK_EQ(index.device(), target.device());
     CHECK_EQ(target.dim(), source.dim());
     CHECK_EQ(index.dim(), 1);
     CHECK_EQ(index.numel(), source.size(dim)) << index.sizes() << " " << source.sizes();
@@ -788,11 +814,25 @@ Tensor cat(const std::vector<Tensor>& list, int64_t dim)
     {
         return {};
     }
-    auto result = list.front();
-    dim         = maybe_wrap_dim(dim, result.dim());
-    for (int i = 1; i < list.size(); ++i)
+    // like PyTorch, skip legacy empty 1-D tensors ({0}) when they are mixed with other tensors
+    std::vector<Tensor> inputs;
+    for (auto& t : list)
     {
-        result = autograd::Cat2Node::apply(result, list[i], dim)[0];
+        if (!(t.dim() == 1 && t.numel() == 0))
+        {
+            inputs.push_back(t);
+        }
+    }
+    if (inputs.empty())
+    {
+        inputs = list;
+    }
+
+    auto result = inputs.front();
+    dim         = maybe_wrap_dim(dim, result.dim());
+    for (int i = 1; i < inputs.size(); ++i)
+    {
+        result = autograd::Cat2Node::apply(result, inputs[i], dim)[0];
     }
 
     return result;

@@ -11,7 +11,22 @@
 
 #include "test_utils.h"
 
+#ifdef __linux__
+#    include <sys/prctl.h>
+#endif
+
 using tttest::DeviceTest;
+
+namespace
+{
+// Expected crashes of death test children should not write core dumps (slow with a piped core_pattern).
+void DisableCoreDumps()
+{
+#ifdef __linux__
+    prctl(PR_SET_DUMPABLE, 0);
+#endif
+}
+}  // namespace
 
 // ----------------------------------------------------------------- empty
 
@@ -288,6 +303,17 @@ TEST_P(TinyTorchHalfConversion, TensorRoundTrip)
     EXPECT_EQ(tttest::to_double_vec(b.to(tinytorch::kFloat).to(tinytorch::kInt16)), (std::vector<double>{1, -2, 300}));
 }
 
+// negative floating point values wrap when converted to the unsigned types (through int, not UB)
+TEST_P(TinyTorchHalfConversion, NegativeFloatToUnsignedWraps)
+{
+    for (auto dtype : {tinytorch::kHalf, tinytorch::kFloat, tinytorch::kDouble})
+    {
+        Tensor a = tttest::make_tensor({-1, -2, 3, 0}, {4}, device()).to(dtype);
+        EXPECT_EQ(tttest::to_double_vec(a.to(tinytorch::kUInt16)), (std::vector<double>{65535, 65534, 3, 0})) << dtype;
+        EXPECT_EQ(tttest::to_double_vec(a.to(tinytorch::kUInt8)), (std::vector<double>{255, 254, 3, 0})) << dtype;
+    }
+}
+
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchRandint);
 TEST_P(TinyTorchRandint, IntRange)
 {
@@ -322,6 +348,44 @@ TEST_P(TinyTorchRandint, FloatingPointTypes)
         EXPECT_TRUE(seen_low) << dtype;
         EXPECT_TRUE(seen_high) << dtype;
     }
+}
+
+// a floating dtype must represent the whole range exactly, otherwise rounding could return high
+TEST_P(TinyTorchRandint, FloatingPointRangeChecked)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    auto o = TensorOptions().device(device());
+    // the largest exactly representable ranges work
+    Tensor h = tinytorch::randint(-2048, 2049, {1000}, o.dtype(tinytorch::kHalf));
+    EXPECT_LE(tinytorch::max(h).toDouble(), 2048);
+    EXPECT_GE(tinytorch::min(h).toDouble(), -2048);
+    Tensor f = tinytorch::randint(0, (int64_t(1) << 24) + 1, {1000}, o.dtype(kFloat));
+    EXPECT_LE(tinytorch::max(f).toDouble(), double(int64_t(1) << 24));
+
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::randint(0, 4096, {10}, o.dtype(tinytorch::kHalf));
+        },
+        "");
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::randint(-2049, 0, {10}, o.dtype(tinytorch::kHalf));
+        },
+        "");
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::randint(0, (int64_t(1) << 24) + 2, {10}, o.dtype(kFloat));
+        },
+        "");
+    EXPECT_DEATH(
+        {
+            DisableCoreDumps();
+            tinytorch::randint(0, (int64_t(1) << 53) + 2, {10}, o.dtype(kFloat64));
+        },
+        "");
 }
 
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchRandn);

@@ -243,6 +243,53 @@ TEST(TinyTorchDeviceDeathTest, CopyNumelMismatchOnCuda)
         "");
 }
 
+// index_add / index_copy check that all tensors are on the same device (also the same GPU)
+TEST(TinyTorchDeviceDeathTest, IndexOpsDeviceMismatch)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    std::vector<Device> others = {kCPU};
+#ifdef TT_HAS_CUDA
+    int count = 0;
+    if (cudaGetDeviceCount(&count) == cudaSuccess && count >= 2)
+    {
+        others.push_back(Device(kCUDA, 1));
+    }
+#endif
+    Device dev = Device(kCUDA, 0);
+    auto o     = TensorOptions().device(dev);
+    for (auto other : others)
+    {
+        SCOPED_TRACE(::testing::Message() << other);
+        auto oo = TensorOptions().device(other);
+        EXPECT_DEATH(
+            {
+                DisableCoreDumps();
+                NoGradGuard ngg;
+                tinytorch::index_add(zeros({3, 2}, o), 0, zeros({2}, oo.dtype(kLong)), ones({2, 2}, o));
+            },
+            "");
+        EXPECT_DEATH(
+            {
+                DisableCoreDumps();
+                NoGradGuard ngg;
+                tinytorch::index_add(zeros({3, 2}, o), 0, zeros({2}, o.dtype(kLong)), ones({2, 2}, oo));
+            },
+            "");
+        EXPECT_DEATH(
+            {
+                DisableCoreDumps();
+                NoGradGuard ngg;
+                Tensor target = zeros({3, 2}, o);
+                tinytorch::index_copy(target, 0, zeros({2}, oo.dtype(kLong)), ones({2, 2}, o));
+            },
+            "");
+    }
+}
+
 TEST(TinyTorchDevice, DtypeConversionCrossDevice)
 {
     if (!tttest::has_cuda())

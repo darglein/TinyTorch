@@ -125,6 +125,11 @@ void Adam::step()
         {
             continue;
         }
+        if (m1[p].sizes() != param.sizes())
+        {
+            // the moments are reset below, so the bias correction restarts as well
+            param_steps[p] = 0;
+        }
         state_follow_param(m1[p], param);
         state_follow_param(m2[p], param);
         if (options[p].amsgrad_)

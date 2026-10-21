@@ -901,6 +901,14 @@ static void copy_and_convert_impl_kernel(TensorInfo<TSource> src, TensorInfo<TTa
         {
             target[i] = TTarget(float(src[i]));
         }
+        else if constexpr ((std::is_same_v<TTarget, uint8_t> || std::is_same_v<TTarget, int16_t> ||
+                            std::is_same_v<TTarget, uint16_t>) &&
+                           !std::is_integral_v<TSource>)
+        {
+            // convert through int, which wraps negative values (a direct float -> unsigned conversion is UB)
+            using F   = std::conditional_t<std::is_same_v<TSource, Half>, float, TSource>;
+            target[i] = TTarget((int)F(src[i]));
+        }
         else
         {
             target[i] = TTarget(src[i]);
