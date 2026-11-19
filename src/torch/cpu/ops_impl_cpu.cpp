@@ -6,7 +6,10 @@
 
 #include "ops_impl_cpu.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <omp.h>
 #include <vector>
 
@@ -827,21 +830,17 @@ void index_copy_impl(Tensor& target, int64_t dim, Tensor index, Tensor value)
 
 
 
-template <typename T>
-static void transpose_impl(TensorInfo<T> input, int64_t dim0, int64_t dim1, TensorInfo<T> result)
-{
-    for (int64_t i = 0; i < result.numel(); ++i)
-    {
-        auto index_result = result.LinearIndexToDimIndex(i);
-        auto index_input  = index_result;
-        std::swap(index_input[dim0], index_input[dim1]);
-        result[index_result] = input[index_input];
-    }
-}
-
 void transpose_impl(Tensor input, int64_t dim0, int64_t dim1, Tensor result)
 {
-    SWITCH_MACRO_ALL(input.scalar_type(), transpose_impl, input, dim0, dim1, result);
+    // a copy of the transposed view
+    CHECK_EQ(input.dtype(), result.dtype());
+    std::vector<int64_t> perm(input.dim());
+    for (int64_t i = 0; i < input.dim(); ++i)
+    {
+        perm[i] = i;
+    }
+    std::swap(perm[dim0], perm[dim1]);
+    copy_and_convert_impl(input.permute_view(perm), result);
 }
 
 // ================================================================================================================
@@ -892,26 +891,275 @@ void max_backward_impl(Tensor grad_output, Tensor& grad_a, Tensor& grad_b)
 
 
 template <typename TSource, typename TTarget>
-static void copy_and_convert_impl_kernel(TensorInfo<TSource> src, TensorInfo<TTarget> target)
+static inline TTarget convert_element(TSource v)
+{
+    if constexpr (std::is_same_v<TTarget, Half>)
+    {
+        return TTarget(float(v));
+    }
+    else if constexpr ((std::is_same_v<TTarget, uint8_t> || std::is_same_v<TTarget, int16_t> ||
+                        std::is_same_v<TTarget, uint16_t>) &&
+                       !std::is_integral_v<TSource>)
+    {
+        // convert through int, which wraps negative values (a direct float -> unsigned conversion is UB)
+        using F = std::conditional_t<std::is_same_v<TSource, Half>, float, TSource>;
+        return TTarget((int)F(v));
+    }
+    else
+    {
+        return TTarget(v);
+    }
+}
+
+// Element i of src (in row-major order) goes to element i of target, for tensors of different shapes.
+template <typename TSource, typename TTarget>
+static void copy_and_convert_impl_kernel_generic(TensorInfo<TSource> src, TensorInfo<TTarget> target)
 {
 #pragma omp parallel for num_threads(get_num_threads())
     for (int64_t i = 0; i < src.numel(); ++i)
     {
-        if constexpr (std::is_same_v<TTarget, Half>)
+        target[i] = convert_element<TSource, TTarget>(src[i]);
+    }
+}
+
+// The copy as nested loops over the dimensions, outermost first. Dimensions of size 1 are dropped and a loop is
+// merged into its outer neighbor if both tensors step over it contiguously, so the copy of a flipped, sliced or
+// transposed matrix is two loops, without the per element index math of TensorInfo::operator[] (a division per
+// dimension for source and target).
+struct CopyLoops
+{
+    int dims = 0;
+    int64_t size[MAX_TENSORINFO_DIMS];
+    int64_t src_stride[MAX_TENSORINFO_DIMS];
+    int64_t dst_stride[MAX_TENSORINFO_DIMS];
+};
+
+// Moves loop `from` to position `to`, shifting the loops in between.
+static void MoveLoop(CopyLoops& l, int from, int to)
+{
+    int step = from < to ? 1 : -1;
+    for (int i = from; i != to; i += step)
+    {
+        std::swap(l.size[i], l.size[i + step]);
+        std::swap(l.src_stride[i], l.src_stride[i + step]);
+        std::swap(l.dst_stride[i], l.dst_stride[i + step]);
+    }
+}
+
+// Merges every loop into its outer neighbor where both tensors step over it contiguously.
+static void MergeLoops(CopyLoops& l)
+{
+    int merged = 0;
+    for (int i = 0; i < l.dims; ++i)
+    {
+        int64_t sz = l.size[i], ss = l.src_stride[i], ds = l.dst_stride[i];
+        if (merged > 0 && l.src_stride[merged - 1] == ss * sz && l.dst_stride[merged - 1] == ds * sz)
         {
-            target[i] = TTarget(float(src[i]));
+            l.size[merged - 1] *= sz;
+            l.src_stride[merged - 1] = ss;
+            l.dst_stride[merged - 1] = ds;
+            continue;
         }
-        else if constexpr ((std::is_same_v<TTarget, uint8_t> || std::is_same_v<TTarget, int16_t> ||
-                            std::is_same_v<TTarget, uint16_t>) &&
-                           !std::is_integral_v<TSource>)
+        l.size[merged]       = sz;
+        l.src_stride[merged] = ss;
+        l.dst_stride[merged] = ds;
+        merged++;
+    }
+    l.dims = merged;
+}
+
+template <typename TSource, typename TTarget>
+static CopyLoops MakeCopyLoops(TensorInfo<TSource>& src, TensorInfo<TTarget>& target)
+{
+    CopyLoops l;
+    for (int i = 0; i < src.dim(); ++i)
+    {
+        if (src.sizes[i] == 1) continue;
+        l.size[l.dims]       = src.sizes[i];
+        l.src_stride[l.dims] = src.strides[i];
+        l.dst_stride[l.dims] = target.strides[i];
+        l.dims++;
+    }
+    MergeLoops(l);
+    return l;
+}
+
+// For a transpose-like layout: the source has the smaller stride in the outer of the two innermost loops, the target
+// in the inner one. Tiles keep the source cache lines in the cache until all of their elements are read. Without
+// tiles, a power-of-two row length maps every element of a source column to the same cache sets: the transpose of a
+// 3072 x 4096 image was 6x slower without them.
+template <typename TSource, typename TTarget>
+static void copy_tiled(const CopyLoops& l, const TSource* src_data, TTarget* dst_data, int num_threads)
+{
+    // Each row of a tile reads one source cache line per column. With a power-of-two source stride these lines map to
+    // the same cache sets, so only a few columns fit (32 columns were 3x slower than 8 for a 3072 x 4096 image).
+    constexpr int64_t tile_rows = 128;
+    constexpr int64_t tile_cols = 8;
+    const int outer             = l.dims - 2;
+    const int inner             = l.dims - 1;
+    const int64_t rows          = l.size[outer];
+    const int64_t cols          = l.size[inner];
+    const int64_t row_tiles     = (rows + tile_rows - 1) / tile_rows;
+    const int64_t col_tiles     = (cols + tile_cols - 1) / tile_cols;
+    int64_t planes              = 1;
+    for (int d = 0; d < outer; ++d)
+    {
+        planes *= l.size[d];
+    }
+
+#pragma omp parallel for num_threads(num_threads)
+    for (int64_t tile = 0; tile < planes * row_tiles * col_tiles; ++tile)
+    {
+        int64_t col_tile = tile % col_tiles;
+        int64_t row_tile = (tile / col_tiles) % row_tiles;
+        int64_t plane    = tile / col_tiles / row_tiles;
+
+        int64_t soff = 0, doff = 0;
+        for (int d = outer - 1; d >= 0; --d)
         {
-            // convert through int, which wraps negative values (a direct float -> unsigned conversion is UB)
-            using F   = std::conditional_t<std::is_same_v<TSource, Half>, float, TSource>;
-            target[i] = TTarget((int)F(src[i]));
+            int64_t i = plane % l.size[d];
+            plane /= l.size[d];
+            soff += i * l.src_stride[d];
+            doff += i * l.dst_stride[d];
         }
-        else
+
+        int64_t r_end = std::min(rows, (row_tile + 1) * tile_rows);
+        int64_t c_end = std::min(cols, (col_tile + 1) * tile_cols);
+        for (int64_t r = row_tile * tile_rows; r < r_end; ++r)
         {
-            target[i] = TTarget(src[i]);
+            const TSource* s = src_data + soff + r * l.src_stride[outer];
+            TTarget* t       = dst_data + doff + r * l.dst_stride[outer];
+            for (int64_t c = col_tile * tile_cols; c < c_end; ++c)
+            {
+                t[c * l.dst_stride[inner]] = convert_element<TSource, TTarget>(s[c * l.src_stride[inner]]);
+            }
+        }
+    }
+}
+
+template <typename TSource, typename TTarget>
+static void copy_and_convert_impl_kernel(TensorInfo<TSource> src, TensorInfo<TTarget> target)
+{
+    int64_t n = src.numel();
+    if (n == 0) return;
+    bool same_shape = src.dim() == target.dim();
+    for (int i = 0; same_shape && i < src.dim(); ++i)
+    {
+        same_shape = src.sizes[i] == target.sizes[i];
+    }
+    if (!same_shape)
+    {
+        copy_and_convert_impl_kernel_generic(src, target);
+        return;
+    }
+
+    CopyLoops l = MakeCopyLoops(src, target);
+    if (l.dims == 0)
+    {
+        target.data[0] = convert_element<TSource, TTarget>(src.data[0]);
+        return;
+    }
+
+    // a thread team costs more than copying a small tensor
+    const int num_threads = n >= (1 << 16) ? get_num_threads() : 1;
+    auto abs_less         = [](int64_t x, int64_t y) { return std::abs(x) < std::abs(y); };
+
+    if (l.dims >= 2)
+    {
+        // The loop order does not change the result. The innermost loop steps the target with its smallest stride, the
+        // one around it the source with its smallest stride (a zero stride counts as the smallest), so that a
+        // permutation of more than two dimensions is tiled over the two dimensions that matter. Loops that become
+        // neighbors are merged again, e.g. for a permuted view copied into a view with the same permutation.
+        int dst_min = 0;
+        for (int i = 1; i < l.dims; ++i)
+        {
+            if (abs_less(l.dst_stride[i], l.dst_stride[dst_min])) dst_min = i;
+        }
+        MoveLoop(l, dst_min, l.dims - 1);
+        int src_min = 0;
+        for (int i = 1; i < l.dims - 1; ++i)
+        {
+            if (abs_less(l.src_stride[i], l.src_stride[src_min])) src_min = i;
+        }
+        MoveLoop(l, src_min, l.dims - 2);
+        MergeLoops(l);
+    }
+    if (l.dims >= 2 && abs_less(l.src_stride[l.dims - 2], l.src_stride[l.dims - 1]) &&
+        std::abs(l.src_stride[l.dims - 1]) > 1)
+    {
+        copy_tiled(l, src.data, target.data, num_threads);
+        return;
+    }
+
+    const int inner          = l.dims - 1;
+    const int64_t inner_size = l.size[inner];
+    const int64_t ss_in      = l.src_stride[inner];
+    const int64_t ds_in      = l.dst_stride[inner];
+    const TSource* src_data  = src.data;
+    TTarget* dst_data        = target.data;
+
+    // The threads split the elements, not the rows: a contiguous conversion or a 1D flip is a single row.
+#pragma omp parallel num_threads(num_threads)
+    {
+        int tid       = omp_get_thread_num();
+        int nt        = omp_get_num_threads();
+        int64_t begin = n * tid / nt;
+        int64_t end   = n * (tid + 1) / nt;
+
+        // position of the first element: its index in the outer dimensions and in the row
+        int64_t idx[MAX_TENSORINFO_DIMS] = {};
+        int64_t k                        = begin % inner_size;
+        int64_t soff = 0, doff = 0;
+        {
+            int64_t r = begin / inner_size;
+            for (int d = inner - 1; d >= 0; --d)
+            {
+                idx[d] = r % l.size[d];
+                r /= l.size[d];
+                soff += idx[d] * l.src_stride[d];
+                doff += idx[d] * l.dst_stride[d];
+            }
+        }
+
+        for (int64_t e = begin; e < end;)
+        {
+            int64_t count    = std::min(inner_size - k, end - e);
+            const TSource* s = src_data + soff + k * ss_in;
+            TTarget* t       = dst_data + doff + k * ds_in;
+            if (ss_in == 1 && ds_in == 1)
+            {
+                if constexpr (std::is_same_v<TSource, TTarget>)
+                {
+                    std::memmove(t, s, count * sizeof(TTarget));
+                }
+                else
+                {
+                    for (int64_t i = 0; i < count; ++i)
+                    {
+                        t[i] = convert_element<TSource, TTarget>(s[i]);
+                    }
+                }
+            }
+            else
+            {
+                for (int64_t i = 0; i < count; ++i)
+                {
+                    t[i * ds_in] = convert_element<TSource, TTarget>(s[i * ss_in]);
+                }
+            }
+            e += count;
+            k = 0;
+
+            // next row
+            for (int d = inner - 1; d >= 0; --d)
+            {
+                soff += l.src_stride[d];
+                doff += l.dst_stride[d];
+                if (++idx[d] < l.size[d]) break;
+                soff -= l.src_stride[d] * l.size[d];
+                doff -= l.dst_stride[d] * l.size[d];
+                idx[d] = 0;
+            }
         }
     }
 }
