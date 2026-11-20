@@ -12,6 +12,7 @@
 #    include <atomic>
 #    include <chrono>
 #    include <cstdlib>
+#    include <cstring>
 #    include <iostream>
 #    include <optional>
 #    include <string>
@@ -208,8 +209,9 @@ struct PreallocTest
         return ptr;
     }
 
-    // Allocates numel floats on the stream (expected at the address of a freed tensor) and fills them with 2. Then
-    // releases the pending writes to the freed tensor and checks that none of them overwrote y.
+    // Allocates numel floats on the stream (expected at the address of a freed tensor) and sets their bytes to 2. Then
+    // releases the pending writes (bytes 1) to the freed tensor and checks that none of them overwrote y. Memsets, not
+    // kernels: debug builds synchronize after every kernel launch, which would wait for the stalls before the release.
     void ExpectReuseWaits(cudaStream_t stream, void* freed_ptr, int64_t numel)
     {
         for (auto e : pending)
@@ -222,12 +224,15 @@ struct PreallocTest
         cuda::setCUDAStreamForThisThread(stream);
         auto y = empty({numel}, options);
         EXPECT_EQ(y.data_ptr(), freed_ptr) << "test setup: y should reuse the freed memory";
-        y.fill_(2.0);
+        TT_CHECK_CUDA_ERROR(cudaMemsetAsync(y.data_ptr(), 2, numel * sizeof(float), stream));
         Release();
         TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
         EXPECT_EQ(cudaGetLastError(), cudaSuccess) << "the allocator left an error for the application";
-        EXPECT_FLOAT_EQ(y.min().item<float>(), 2.0f) << "a pending write to the freed tensor overwrote y";
-        EXPECT_FLOAT_EQ(y.max().item<float>(), 2.0f) << "a pending write to the freed tensor overwrote y";
+        uint32_t bits = 0x02020202;
+        float expected;
+        std::memcpy(&expected, &bits, sizeof(float));
+        EXPECT_EQ(y.min().item<float>(), expected) << "a pending write to the freed tensor overwrote y";
+        EXPECT_EQ(y.max().item<float>(), expected) << "a pending write to the freed tensor overwrote y";
     }
 };
 }  // namespace
@@ -360,6 +365,42 @@ TEST(TinyTorchCudaAllocator, PreallocPerThreadDefaultStreamsDiffer)
     }
 
     t.ExpectReuseWaits(cudaStreamPerThread, x_ptr, t.n);
+}
+
+// A new thread may get the id of a thread that exited. A block freed on the per-thread default stream of the exited
+// thread (with its work still pending) and reused on the per-thread default stream of the new thread must wait.
+TEST(TinyTorchCudaAllocator, PreallocPerThreadStreamOfExitedThread)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    cuda::DeviceGuard dg(Device(kCUDA, 0));
+    PreallocTest t;
+    ASSERT_TRUE(t.Init());
+
+    void* x_ptr = nullptr;
+    std::thread::id first_id;
+    std::thread first(
+        [&]()
+        {
+            cuda::DeviceGuard dg2(Device(kCUDA, 0));
+            first_id = std::this_thread::get_id();
+            x_ptr    = t.FreeWithPendingWrite(cudaStreamPerThread);
+        });
+    first.join();
+
+    std::thread second(
+        [&]()
+        {
+            cuda::DeviceGuard dg2(Device(kCUDA, 0));
+            if (std::this_thread::get_id() != first_id)
+            {
+                std::cout << "test setup: the new thread didn't get the id of the exited one" << std::endl;
+            }
+            t.ExpectReuseWaits(cudaStreamPerThread, x_ptr, t.n);
+        });
+    second.join();
 }
 
 // Adjacent blocks freed on two different streams are merged (into the block freed first or into the one freed last).

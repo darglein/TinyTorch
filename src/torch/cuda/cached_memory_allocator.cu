@@ -388,6 +388,53 @@ static void* malloc_async(int64_t size, int device_id)
     return ptr;
 }
 
+// Forgets the streams whose (handle, thread) matches: the blocks they freed keep their stamps and events, but a new
+// stream that gets the same identity is not mistaken for them. Call under the lock.
+template <typename Match>
+static void ForgetStreams(Match match)
+{
+    for (int device_id = 0; device_id < MAX_DEVICES; ++device_id)
+    {
+        auto& streams = PreallocDeviceData(device_id).streams;
+        std::vector<uint64_t> ids;
+        for (auto it = streams.begin(); it != streams.end();)
+        {
+            if (match(it->first))
+            {
+                ids.push_back(it->second->id);
+                it = streams.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+        if (ids.empty())
+        {
+            continue;
+        }
+        for (auto& [key, other] : streams)
+        {
+            auto& w = other->waited;
+            w.erase(std::remove_if(w.begin(), w.end(),
+                                   [&](const auto& e) { return std::find(ids.begin(), ids.end(), e.first) != ids.end(); }),
+                    w.end());
+        }
+    }
+}
+
+// A new thread may get the id of a thread that exited, so the per-thread default streams of a thread are forgotten when
+// it exits
+struct ForgetPerThreadStreamsAtThreadExit
+{
+    ~ForgetPerThreadStreamsAtThreadExit()
+    {
+        std::unique_lock l(mu);
+        auto thread = std::this_thread::get_id();
+        ForgetStreams([thread](const auto& key) { return key.second == thread; });
+    }
+};
+
 static bool IsPerThreadStream(cudaStream_t strm)
 {
 #ifdef CUDA_API_PER_THREAD_DEFAULT_STREAM
@@ -401,7 +448,13 @@ static bool IsPerThreadStream(cudaStream_t strm)
 
 static const std::shared_ptr<StreamState>& GetStreamState(int device_id, cudaStream_t strm)
 {
-    std::thread::id thread = IsPerThreadStream(strm) ? std::this_thread::get_id() : std::thread::id();
+    std::thread::id thread;
+    if (IsPerThreadStream(strm))
+    {
+        static thread_local ForgetPerThreadStreamsAtThreadExit forget_at_exit;
+        (void)forget_at_exit;
+        thread = std::this_thread::get_id();
+    }
     auto& ptr              = PreallocDeviceData(device_id).streams[{strm, thread}];
     if (!ptr)
     {
@@ -863,31 +916,7 @@ cudaError_t destroyCUDAStream(cudaStream_t stream)
     std::unique_lock l(mu);
     // a free of this thread after the destruction must not register the dead handle again
     resetCUDAStreamOfThisThread(stream);
-    for (int device_id = 0; device_id < MAX_DEVICES; ++device_id)
-    {
-        // the blocks freed on the stream keep their stamps (and events), only the handle is forgotten
-        auto& streams = PreallocDeviceData(device_id).streams;
-        std::vector<uint64_t> ids;
-        for (auto it = streams.begin(); it != streams.end();)
-        {
-            if (it->first.first == stream)
-            {
-                ids.push_back(it->second->id);
-                it = streams.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
-        for (auto& [key, other] : streams)
-        {
-            auto& w = other->waited;
-            w.erase(std::remove_if(w.begin(), w.end(),
-                                   [&](const auto& e) { return std::find(ids.begin(), ids.end(), e.first) != ids.end(); }),
-                    w.end());
-        }
-    }
+    ForgetStreams([stream](const auto& key) { return key.first == stream; });
     return cudaStreamDestroy(stream);
 }
 
