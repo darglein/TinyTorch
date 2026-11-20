@@ -8,10 +8,15 @@
 
 #ifdef TT_HAS_CUDA
 
+#    include <algorithm>
+#    include <atomic>
+#    include <chrono>
 #    include <cstdlib>
+#    include <cstring>
 #    include <iostream>
 #    include <optional>
 #    include <string>
+#    include <thread>
 
 #    ifdef __linux__
 #        include <sys/prctl.h>
@@ -90,69 +95,450 @@ void AllocateTensorFreedAtExit()
 
 }  // namespace
 
-// The pre-allocate allocator stores an event with every freed block. An allocation of that block on another stream
-// must wait on it, so that it doesn't overwrite memory that is still used by work pending on the freeing stream. The
-// event must stay valid until then, also if the freeing thread uses many other events in between.
+namespace
+{
+// The arena, the allocator mode and the streams of a test of the pre-allocate allocator. The destructor frees them also
+// when an ASSERT ends the test early: a leftover arena would fail every following test of the binary.
+struct PreallocTest
+{
+    Device device{kCUDA, 0};
+    int64_t n             = 64 * 1024;
+    TensorOptions options = TensorOptions(Device(kCUDA, 0)).dtype(kFloat);
+    cudaStream_t original = nullptr;
+    std::optional<cuda::AllocatorAlgorithmGuard> algorithm_guard;
+    bool has_arena = false;
+    std::vector<cudaStream_t> streams;
+    // hold back the work of stalled streams, released by the test in this order
+    std::vector<std::atomic<bool>*> gates;
+    // recorded after the work on freed memory that the gates hold back
+    std::vector<cudaEvent_t> pending;
+
+    // returns false if the arena could not be allocated
+    bool Init()
+    {
+        original = cuda::getCurrentCUDAStream();
+        // load the kernels before stalling a stream: the first launch of a kernel (lazy module loading) synchronizes
+        (void)full({n}, 1.0f, options).min().item<float>();
+        TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+        has_arena = cuda::pre_allocate_vram(64 * 1024 * 1024) >= 64 * 1024 * 1024;
+        algorithm_guard.emplace(cuda::AllocatorAlgorithm::CUDA_PRE_ALLOCATE);
+        // every allocation of the test must come from the arena
+        cuda::prealloc_allow_fallback_cudamalloc(false);
+        return has_arena;
+    }
+
+    ~PreallocTest()
+    {
+        Release();
+        cuda::setCUDAStreamForThisThread(original);
+        (void)cudaDeviceSynchronize();
+        for (auto e : pending)
+        {
+            (void)cudaEventDestroy(e);
+        }
+        for (auto s : streams)
+        {
+            (void)cuda::destroyCUDAStream(s);
+        }
+        cuda::prealloc_allow_fallback_cudamalloc(true);
+        algorithm_guard.reset();
+        if (has_arena)
+        {
+            cuda::free_preallocate_vram();
+        }
+    }
+
+    cudaStream_t NewStream()
+    {
+        cudaStream_t s;
+        TT_CHECK_CUDA_ERROR(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking));
+        streams.push_back(s);
+        return s;
+    }
+
+    void DestroyStream(cudaStream_t s)
+    {
+        streams.erase(std::find(streams.begin(), streams.end(), s));
+        TT_CHECK_CUDA_ERROR(cuda::destroyCUDAStream(s));
+    }
+
+    // Holds back the following work of the stream until Release(). A watchdog releases it after 5 s, so an allocator
+    // that blocks the host on the stalled work fails the test instead of hanging it.
+    void Stall(cudaStream_t stream)
+    {
+        auto gate = tttest::StallStream(stream);
+        tttest::ReleaseLater(gate, 5000);
+        gates.push_back(gate);
+    }
+
+    // Releases the gates in the order they were created, with a pause in between, so that the work behind a later
+    // gate runs well after the work behind an earlier one
+    void Release()
+    {
+        for (size_t i = 0; i < gates.size(); ++i)
+        {
+            if (i > 0)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            *gates[i] = true;
+        }
+        gates.clear();
+    }
+
+    // Writes the tensor behind a stall of its stream. A memset, not a kernel: debug builds synchronize after every
+    // kernel launch, which would wait for the stall.
+    void PendingWrite(cudaStream_t stream, Tensor& x)
+    {
+        TT_CHECK_CUDA_ERROR(cudaMemsetAsync(x.data_ptr(), 1, x.numel() * x.element_size(), stream));
+        cudaEvent_t e;
+        TT_CHECK_CUDA_ERROR(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+        TT_CHECK_CUDA_ERROR(cudaEventRecord(e, stream));
+        pending.push_back(e);
+    }
+
+    // Allocates n floats on the stream, writes them behind a stall of the stream and frees them. Returns the pointer of
+    // the freed tensor.
+    void* FreeWithPendingWrite(cudaStream_t stream)
+    {
+        cuda::setCUDAStreamForThisThread(stream);
+        Stall(stream);
+        auto x    = empty({n}, options);
+        void* ptr = x.data_ptr();
+        PendingWrite(stream, x);
+        return ptr;
+    }
+
+    // Allocates numel floats on the stream (expected at the address of a freed tensor) and sets their bytes to 2. Then
+    // releases the pending writes (bytes 1) to the freed tensor and checks that none of them overwrote y. Memsets, not
+    // kernels: debug builds synchronize after every kernel launch, which would wait for the stalls before the release.
+    void ExpectReuseWaits(cudaStream_t stream, void* freed_ptr, int64_t numel)
+    {
+        for (auto e : pending)
+        {
+            // otherwise the test passes without testing anything
+            ASSERT_EQ(cudaEventQuery(e), cudaErrorNotReady) << "test setup: a watchdog released a stall";
+        }
+        (void)cudaGetLastError();
+
+        cuda::setCUDAStreamForThisThread(stream);
+        auto y = empty({numel}, options);
+        EXPECT_EQ(y.data_ptr(), freed_ptr) << "test setup: y should reuse the freed memory";
+        TT_CHECK_CUDA_ERROR(cudaMemsetAsync(y.data_ptr(), 2, numel * sizeof(float), stream));
+        Release();
+        TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+        EXPECT_EQ(cudaGetLastError(), cudaSuccess) << "the allocator left an error for the application";
+        uint32_t bits = 0x02020202;
+        float expected;
+        std::memcpy(&expected, &bits, sizeof(float));
+        EXPECT_EQ(y.min().item<float>(), expected) << "a pending write to the freed tensor overwrote y";
+        EXPECT_EQ(y.max().item<float>(), expected) << "a pending write to the freed tensor overwrote y";
+    }
+};
+}  // namespace
+
+// An allocation of a block of the pre-allocate allocator on another stream than the one that freed it must wait for the
+// work pending on the freeing stream, so that it doesn't overwrite memory that is still used. This must also hold if
+// the freeing thread uses many other events in between.
 TEST(TinyTorchCudaAllocator, PreallocWaitsForPendingWorkOnFreedMemory)
 {
     if (!tttest::has_cuda())
     {
         GTEST_SKIP() << "no CUDA device available";
     }
-    Device device(kCUDA, 0);
-    cuda::DeviceGuard dg(device);
-    cudaStream_t original = cuda::getCurrentCUDAStream();
+    cuda::DeviceGuard dg(Device(kCUDA, 0));
+    PreallocTest t;
+    ASSERT_TRUE(t.Init());
+    cudaStream_t stream_a = t.NewStream();
+    cudaStream_t stream_b = t.NewStream();
 
-    int64_t n    = 1024 * 1024;
-    auto options = TensorOptions(device).dtype(kFloat);
+    void* x_ptr = t.FreeWithPendingWrite(stream_a);
 
-    // load the kernels before stalling a stream: the first launch of a kernel (lazy module loading) synchronizes
-    empty({n}, options).fill_(1.0);
+    // stream b: unrelated work of this thread that uses events
+    for (int i = 0; i < 1000; ++i)
+    {
+        TT_CHECK_CUDA_ERROR(cudaEventRecord(cuda::getNextEvent(), stream_b));
+    }
+    t.ExpectReuseWaits(stream_b, x_ptr, t.n);
+}
+
+// The reuse on another stream waits for the work of the freeing stream up to the free, not for work queued after it.
+// Here the later work waits for the host, which only continues after the reuse is done.
+TEST(TinyTorchCudaAllocator, PreallocReuseDoesNotWaitForLaterWork)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    cuda::DeviceGuard dg(Device(kCUDA, 0));
+    PreallocTest t;
+    ASSERT_TRUE(t.Init());
+    cudaStream_t stream_a = t.NewStream();
+    cudaStream_t stream_b = t.NewStream();
+
+    void* x_ptr = nullptr;
+    {
+        cuda::setCUDAStreamForThisThread(stream_a);
+        // not the first free of the stream
+        auto w = empty({16}, t.options);
+        w      = {};
+        auto x = empty({t.n}, t.options);
+        x_ptr  = x.data_ptr();
+    }
+    t.Stall(stream_a);
+
+    cuda::setCUDAStreamForThisThread(stream_b);
+    auto y = empty({t.n}, t.options);
+    EXPECT_EQ(y.data_ptr(), x_ptr) << "test setup: y should reuse the freed memory";
+    y.fill_(2.0);
+    auto start = std::chrono::steady_clock::now();
+    TT_CHECK_CUDA_ERROR(cudaStreamSynchronize(stream_b));
+    double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    EXPECT_LT(seconds, 2.0) << "the reuse waited for work queued on the freeing stream after the free";
+}
+
+// Destroying the freeing stream (with destroyCUDAStream) while its work is pending must not drop the wait, also not for
+// a new stream that gets the handle of the destroyed one.
+TEST(TinyTorchCudaAllocator, PreallocWaitsForDestroyedStream)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    cuda::DeviceGuard dg(Device(kCUDA, 0));
+    PreallocTest t;
+    ASSERT_TRUE(t.Init());
+
+    cudaStream_t stream_a = t.NewStream();
+    void* x_ptr           = t.FreeWithPendingWrite(stream_a);
+    t.DestroyStream(stream_a);
+    EXPECT_EQ(cuda::getCurrentCUDAStream(), nullptr) << "the destroyed stream is still the current stream";
+
+    cudaStream_t stream_new = t.NewStream();
+    if (stream_new != stream_a)
+    {
+        std::cout << "test setup: the new stream didn't get the handle of the destroyed one, it is only another stream"
+                  << std::endl;
+    }
+    t.ExpectReuseWaits(stream_new, x_ptr, t.n);
+}
+
+// The handle of the per-thread default stream means another stream in every thread: a block freed on it by one thread
+// and reused on it by another must wait.
+TEST(TinyTorchCudaAllocator, PreallocPerThreadDefaultStreamsDiffer)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    cuda::DeviceGuard dg(Device(kCUDA, 0));
+    PreallocTest t;
+    ASSERT_TRUE(t.Init());
+
+    // The other thread stays alive until the end: its per-thread stream must outlive the pending write
+    void* x_ptr = nullptr;
+    std::atomic<bool> freed{false}, done{false};
+    std::thread other(
+        [&]()
+        {
+            cuda::DeviceGuard dg2(Device(kCUDA, 0));
+            x_ptr = t.FreeWithPendingWrite(cudaStreamPerThread);
+            freed = true;
+            while (!done)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        });
+    struct JoinGuard
+    {
+        std::atomic<bool>& done;
+        std::thread& thread;
+        ~JoinGuard()
+        {
+            done = true;
+            thread.join();
+        }
+    } join_guard{done, other};
+    while (!freed)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    t.ExpectReuseWaits(cudaStreamPerThread, x_ptr, t.n);
+}
+
+// A new thread may get the id of a thread that exited. A block freed on the per-thread default stream of the exited
+// thread (with its work still pending) and reused on the per-thread default stream of the new thread must wait.
+TEST(TinyTorchCudaAllocator, PreallocPerThreadStreamOfExitedThread)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    cuda::DeviceGuard dg(Device(kCUDA, 0));
+    PreallocTest t;
+    ASSERT_TRUE(t.Init());
+
+    void* x_ptr = nullptr;
+    std::thread::id first_id;
+    std::thread first(
+        [&]()
+        {
+            cuda::DeviceGuard dg2(Device(kCUDA, 0));
+            first_id = std::this_thread::get_id();
+            x_ptr    = t.FreeWithPendingWrite(cudaStreamPerThread);
+        });
+    first.join();
+
+    std::thread second(
+        [&]()
+        {
+            cuda::DeviceGuard dg2(Device(kCUDA, 0));
+            if (std::this_thread::get_id() != first_id)
+            {
+                std::cout << "test setup: the new thread didn't get the id of the exited one" << std::endl;
+            }
+            t.ExpectReuseWaits(cudaStreamPerThread, x_ptr, t.n);
+        });
+    second.join();
+}
+
+// Adjacent blocks freed on two different streams are merged (into the block freed first or into the one freed last).
+// An allocation of the merged block on a third stream must wait for the pending work of both.
+TEST(TinyTorchCudaAllocator, PreallocMergedBlockWaitsForAllStreams)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    cuda::DeviceGuard dg(Device(kCUDA, 0));
+    for (bool free_first_block_first : {false, true})
+    {
+        // a lost stamp is only noticed if its work is released last
+        for (bool release_first_block_last : {false, true})
+        {
+            SCOPED_TRACE("free_first_block_first " + std::to_string(free_first_block_first) +
+                         " release_first_block_last " + std::to_string(release_first_block_last));
+            PreallocTest t;
+            ASSERT_TRUE(t.Init());
+            cudaStream_t stream_a = t.NewStream();
+            cudaStream_t stream_b = t.NewStream();
+            cudaStream_t stream_c = t.NewStream();
+
+            t.Stall(release_first_block_last ? stream_b : stream_a);
+            t.Stall(release_first_block_last ? stream_a : stream_b);
+            void* x1_ptr = nullptr;
+            {
+                cuda::setCUDAStreamForThisThread(stream_a);
+                auto x1 = empty({t.n}, t.options);
+                cuda::setCUDAStreamForThisThread(stream_b);
+                auto x2 = empty({t.n}, t.options);
+                ASSERT_EQ((uint8_t*)x2.data_ptr(), (uint8_t*)x1.data_ptr() + t.n * sizeof(float)) << "test setup";
+                x1_ptr = x1.data_ptr();
+                t.PendingWrite(stream_a, x1);
+                t.PendingWrite(stream_b, x2);
+                // x1 is freed on stream a, x2 on stream b
+                if (free_first_block_first)
+                {
+                    cuda::setCUDAStreamForThisThread(stream_a);
+                    x1 = {};
+                    cuda::setCUDAStreamForThisThread(stream_b);
+                }
+                else
+                {
+                    cuda::setCUDAStreamForThisThread(stream_b);
+                    x2 = {};
+                    cuda::setCUDAStreamForThisThread(stream_a);
+                }
+            }
+            t.ExpectReuseWaits(stream_c, x1_ptr, 2 * t.n);
+        }
+    }
+}
+
+// A stream that already waited for an earlier free of another stream must wait again for a later free: the
+// deduplication of waits must not skip it, also after the events of the freeing stream were reused many times.
+TEST(TinyTorchCudaAllocator, PreallocWaitsAgainAfterEarlierWait)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    cuda::DeviceGuard dg(Device(kCUDA, 0));
+    PreallocTest t;
+    ASSERT_TRUE(t.Init());
+    cudaStream_t stream_a = t.NewStream();
+    cudaStream_t stream_b = t.NewStream();
+
+    // stream b waits for a free of stream a. The free is held back, so the wait is not skipped as already done.
+    t.Stall(stream_a);
+    {
+        cuda::setCUDAStreamForThisThread(stream_a);
+        auto x = empty({t.n}, t.options);
+    }
+    {
+        cuda::setCUDAStreamForThisThread(stream_b);
+        auto y = empty({t.n}, t.options);
+    }
+    t.Release();
     TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 
-    ASSERT_GE(cuda::pre_allocate_vram(64 * 1024 * 1024), 64 * 1024 * 1024);
+    // many frees on stream a: the pooled events are recorded again and again
+    cuda::setCUDAStreamForThisThread(stream_a);
+    for (int i = 0; i < 300; ++i)
     {
-        cuda::AllocatorAlgorithmGuard algorithm_guard(cuda::AllocatorAlgorithm::CUDA_PRE_ALLOCATE);
-
-        cudaStream_t stream_a, stream_b;
-        TT_CHECK_CUDA_ERROR(cudaStreamCreate(&stream_a));
-        TT_CHECK_CUDA_ERROR(cudaStreamCreate(&stream_b));
-
-        // stream a: x = 1 is pending (behind the stall) when x is freed
-        cuda::setCUDAStreamForThisThread(stream_a);
-        // released long after the host side of this test is done
-        tttest::ReleaseLater(tttest::StallStream(stream_a), 200);
-        void* x_ptr = nullptr;
-        {
-            auto x = empty({n}, options);
-            x_ptr  = x.data_ptr();
-            x.fill_(1.0);
-        }
-
-        // stream b: unrelated work of this thread that uses events
-        cuda::setCUDAStreamForThisThread(stream_b);
-        for (int i = 0; i < 1000; ++i)
-        {
-            TT_CHECK_CUDA_ERROR(cudaEventRecord(cuda::getNextEvent(), stream_b));
-        }
-
-        // stream b: reuses the memory of x. The allocator must make stream b wait until x = 1 is done.
-        auto y = empty({n}, options);
-        EXPECT_EQ(y.data_ptr(), x_ptr) << "test setup: y should reuse the memory of x";
-        y.fill_(2.0);
-
-        TT_CHECK_CUDA_ERROR(cudaStreamSynchronize(stream_b));
-        TT_CHECK_CUDA_ERROR(cudaStreamSynchronize(stream_a));
-        EXPECT_FLOAT_EQ(y.min().item<float>(), 2.0f) << "the pending x = 1 overwrote y";
-        EXPECT_FLOAT_EQ(y.max().item<float>(), 2.0f) << "the pending x = 1 overwrote y";
-
-        y = {};
-        cuda::setCUDAStreamForThisThread(original);
-        TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-        TT_CHECK_CUDA_ERROR(cudaStreamDestroy(stream_a));
-        TT_CHECK_CUDA_ERROR(cudaStreamDestroy(stream_b));
+        auto x = empty({t.n}, t.options);
     }
-    cuda::free_preallocate_vram();
+
+    void* x_ptr = t.FreeWithPendingWrite(stream_a);
+    t.ExpectReuseWaits(stream_b, x_ptr, t.n);
+}
+
+// Random allocations and frees on several streams: live blocks never overlap, and after freeing everything the arena is
+// one free block again.
+TEST(TinyTorchCudaAllocator, PreallocFreeListStaysConsistent)
+{
+    if (!tttest::has_cuda())
+    {
+        GTEST_SKIP() << "no CUDA device available";
+    }
+    cuda::DeviceGuard dg(Device(kCUDA, 0));
+    PreallocTest t;
+    ASSERT_TRUE(t.Init());
+    int64_t arena                     = cuda::prealloc_free_memory();
+    std::vector<cudaStream_t> streams = {t.NewStream(), t.NewStream(), t.NewStream()};
+    {
+        std::vector<Tensor> live;
+        uint64_t rng = 12345;
+        auto next    = [&]() { return rng = rng * 6364136223846793005ull + 1442695040888963407ull; };
+        for (int i = 0; i < 5000; ++i)
+        {
+            cuda::setCUDAStreamForThisThread(streams[(next() >> 33) % streams.size()]);
+            if (live.size() < 64 && (next() >> 33) % 3 != 0)
+            {
+                int64_t bytes = 1 + (next() >> 33) % (512 * 1024);
+                live.push_back(empty({bytes}, TensorOptions(t.device).dtype(kUInt8)));
+            }
+            else if (!live.empty())
+            {
+                live.erase(live.begin() + (next() >> 33) % live.size());
+            }
+
+            std::vector<std::pair<uint8_t*, uint8_t*>> ranges;
+            for (auto& l : live)
+            {
+                auto p = (uint8_t*)l.data_ptr();
+                ranges.push_back({p, p + l.numel()});
+            }
+            std::sort(ranges.begin(), ranges.end());
+            for (size_t j = 1; j < ranges.size(); ++j)
+            {
+                ASSERT_LE(ranges[j - 1].second, ranges[j].first) << "overlapping blocks at step " << i;
+            }
+        }
+    }
+    EXPECT_EQ(cuda::prealloc_free_memory(), arena);
+    EXPECT_EQ(cuda::prealloc_free_list_size(), 1);
 }
 
 // free_preallocate_vram must wait for the pending work of all streams on the (freed) blocks of the arena before the
@@ -200,7 +586,7 @@ TEST(TinyTorchCudaAllocator, FreePreallocWaitsForPendingWorkOnBlocks)
     EXPECT_EQ(cudaStreamQuery(stream_a), cudaSuccess) << "the arena was freed while work on it was still pending";
 
     TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-    TT_CHECK_CUDA_ERROR(cudaStreamDestroy(stream_a));
+    TT_CHECK_CUDA_ERROR(cuda::destroyCUDAStream(stream_a));
 }
 
 // A failed allocation is not a sticky error: the caller can catch the exception and continue (e.g. with a smaller
@@ -329,8 +715,8 @@ TEST(TinyTorchCudaAllocator, PreallocArenaFromMallocAsyncIsStreamOrdered)
     TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
     cuda::free_preallocate_vram();
     TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-    TT_CHECK_CUDA_ERROR(cudaStreamDestroy(stream_a));
-    TT_CHECK_CUDA_ERROR(cudaStreamDestroy(stream_b));
+    TT_CHECK_CUDA_ERROR(cuda::destroyCUDAStream(stream_a));
+    TT_CHECK_CUDA_ERROR(cuda::destroyCUDAStream(stream_b));
 }
 
 // Memory pool support is queried for the device that is allocated on

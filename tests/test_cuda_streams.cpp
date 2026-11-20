@@ -29,7 +29,7 @@ struct NonBlockingStream
         cuda::DeviceGuard dg(device);
         cudaStreamSynchronize(stream);
         cuda::setCUDAStreamForThisThread(original);
-        cudaStreamDestroy(stream);
+        cuda::destroyCUDAStream(stream);
     }
 
     Device device;
