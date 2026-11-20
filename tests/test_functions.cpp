@@ -202,6 +202,220 @@ TEST_P(TinyTorchCopyOps, Values)
     TT_EXPECT_CLOSE(c, a, 1e-6, 1e-6);
 }
 
+// Values of a view of base (a contiguous float tensor, the view must share its storage), in row-major order of the
+// view, from its sizes, strides and offset. Independent of the copy kernels under test.
+static std::vector<double> ViewValues(const Tensor& base, const Tensor& view)
+{
+    // a contiguous copy to the host, read through the raw pointer
+    Tensor base_cpu        = base.cpu();
+    const float* base_data = base_cpu.data_ptr<float>();
+    int64_t offset         = view.data_ptr<float>() - base.data_ptr<float>();
+    std::vector<double> result;
+    std::vector<int64_t> idx(view.dim(), 0);
+    for (int64_t i = 0; i < view.numel(); ++i)
+    {
+        int64_t o = offset;
+        for (int64_t d = 0; d < view.dim(); ++d)
+        {
+            o += idx[d] * view.stride(d);
+        }
+        result.push_back(base_data[o]);
+        for (int64_t d = view.dim() - 1; d >= 0; --d)
+        {
+            if (++idx[d] < view.size(d)) break;
+            idx[d] = 0;
+        }
+    }
+    return result;
+}
+
+static Tensor TransposedView(const Tensor& t, int64_t d, int64_t e)
+{
+    std::vector<int64_t> p(t.dim());
+    for (int64_t i = 0; i < t.dim(); ++i)
+    {
+        p[i] = i;
+    }
+    std::swap(p[d], p[e]);
+    return t.permute_view(p);
+}
+
+// Copies view (sharing the storage of base) into a contiguous and a strided target, also with a conversion, and
+// checks the values.
+static void CheckViewCopies(const Tensor& base, const Tensor& view, const std::string& what)
+{
+    SCOPED_TRACE(what);
+    std::vector<double> expected = ViewValues(base, view);
+
+    Tensor c = view.contiguous();
+    EXPECT_TRUE(c.is_contiguous());
+    EXPECT_EQ(c.sizes(), view.sizes());
+    EXPECT_EQ(tttest::to_double_vec(c), expected);
+
+    // with conversion
+    Tensor d = tinytorch::empty(view.sizes(), TensorOptions().device(view.device()).dtype(kFloat64));
+    tinytorch::copy(view, d, false);
+    EXPECT_EQ(tttest::to_double_vec(d), expected);
+
+    // into a strided target: the reversed permutation of a contiguous tensor
+    std::vector<int64_t> reversed_sizes(view.sizes().vec().rbegin(), view.sizes().vec().rend());
+    std::vector<int64_t> reverse_dims(view.dim());
+    for (int64_t i = 0; i < view.dim(); ++i)
+    {
+        reverse_dims[i] = view.dim() - 1 - i;
+    }
+    Tensor target_base = tinytorch::zeros(reversed_sizes, TensorOptions().device(view.device()));
+    Tensor target      = target_base.permute_view(reverse_dims);
+    tinytorch::copy(view, target, false);
+    EXPECT_EQ(ViewValues(target_base, target), expected);
+
+    // both
+    Tensor target64 = tinytorch::zeros(reversed_sizes, TensorOptions().device(view.device()).dtype(kFloat64))
+                          .permute_view(reverse_dims);
+    tinytorch::copy(view, target64, false);
+    EXPECT_EQ(tttest::to_double_vec(target64.contiguous()), expected);
+}
+
+// Copies of non-contiguous views (flips, slices with steps, transposes, permutations, size-1 dimensions) into
+// contiguous and strided targets, with and without dtype conversion.
+TEST_P(TinyTorchCopyOps, StridedViews)
+{
+    std::vector<std::vector<int64_t>> shapes = {{7}, {5, 3}, {4, 1, 6}, {3, 5, 2, 4}, {2, 3, 1, 4, 3}};
+    for (const auto& shape : shapes)
+    {
+        int64_t n = 1;
+        for (auto s : shape) n *= s;
+        Tensor base      = tinytorch::range(0, n - 1, 1, TensorOptions().device(device())).reshape(shape);
+        int64_t dim      = base.dim();
+        std::string name = "shape " + std::to_string(dim) + "d ";
+
+        CheckViewCopies(base, base, name + "contiguous");
+        for (int64_t d = 0; d < dim; ++d)
+        {
+            std::string nd  = name + "dim " + std::to_string(d) + " ";
+            Tensor reversed = base.slice_view(d, base.size(d) - 1, -1, -1, false);
+            CheckViewCopies(base, reversed, nd + "reversed view");
+            EXPECT_EQ(tttest::to_double_vec(tinytorch::flip(base, {d})), ViewValues(base, reversed)) << nd;
+            CheckViewCopies(base, base.slice_view(d, 0, base.size(d), 2), nd + "every second");
+            if (base.size(d) > 2) CheckViewCopies(base, base.slice_view(d, 1, base.size(d) - 1), nd + "inner slice");
+            CheckViewCopies(base, base.slice_view(d, 1, 2), nd + "size 1 slice");
+            for (int64_t e = d + 1; e < dim; ++e)
+            {
+                std::string ne = nd + "and " + std::to_string(e) + " ";
+                Tensor tv      = TransposedView(base, d, e);
+                CheckViewCopies(base, tv, ne + "transposed view");
+                CheckViewCopies(base, tv.slice_view(d, tv.size(d) - 1, -1, -1, false), ne + "transposed and reversed");
+                EXPECT_EQ(tttest::to_double_vec(tinytorch::transpose(base, d, e)), ViewValues(base, tv)) << ne;
+            }
+        }
+        if (dim >= 3)
+        {
+            std::vector<int64_t> p(dim);
+            p[0] = dim - 1;
+            for (int64_t i = 1; i < dim; ++i) p[i] = i - 1;
+            Tensor pv = base.permute_view(p);
+            CheckViewCopies(base, pv, name + "cyclic permutation");
+            CheckViewCopies(base, pv.slice_view(1, 0, pv.size(1), 2), name + "cyclic permutation, every second");
+        }
+    }
+
+    // empty view and a single element with only size-1 dimensions
+    {
+        Tensor base = tinytorch::range(0, 5, 1, TensorOptions().device(device())).reshape({2, 3});
+        Tensor e    = base.slice_view(1, 1, 1).permute_view({1, 0});
+        EXPECT_EQ(e.numel(), 0);
+        EXPECT_EQ(e.contiguous().numel(), 0);
+        CheckViewCopies(base, base.slice_view(0, 1, 2).slice_view(1, 2, 3), "single element");
+    }
+
+    // 8 dimensions: reversed, and a permutation that interleaves them
+    {
+        Tensor base = tinytorch::range(0, 575, 1, TensorOptions().device(device())).reshape({2, 3, 2, 2, 3, 2, 2, 2});
+        CheckViewCopies(base, base.permute_view({7, 6, 5, 4, 3, 2, 1, 0}), "8d reversed");
+        CheckViewCopies(base, base.permute_view({0, 2, 4, 6, 1, 3, 5, 7}), "8d interleaved");
+    }
+
+    // a transpose of only full tiles, and a copy of a view onto itself
+    {
+        Tensor base = tinytorch::range(0, 256 * 128 - 1, 1, TensorOptions().device(device())).reshape({256, 128});
+        CheckViewCopies(base, base.permute_view({1, 0}), "full tiles");
+
+        Tensor before = base.clone();
+        Tensor t      = base.permute_view({1, 0});
+        tinytorch::copy(t, t, false);
+        Tensor rows = base.slice_view(1, 0, 100);
+        tinytorch::copy(rows, rows, false);
+        EXPECT_EQ(tttest::to_double_vec(base), tttest::to_double_vec(before));
+    }
+
+    // conversions through a transposed view: float -> uint8 wraps negative values through int, half is exact here
+    {
+        Tensor base = tttest::make_tensor({-3.7f, 2.5f, 300.f, -1.f}, {2, 2}, device());
+        Tensor t    = base.permute_view({1, 0});
+        EXPECT_EQ(tttest::to_double_vec(t.to(tinytorch::kUInt8)), (std::vector<double>{253, 44, 2, 255}));
+        EXPECT_EQ(tttest::to_double_vec(t.to(tinytorch::kFloat16)), (std::vector<double>{-3.69921875, 300, 2.5, -1}));
+        EXPECT_EQ(tttest::to_double_vec(t.to(tinytorch::kFloat16).permute_view({1, 0}).to(tinytorch::kUInt8)),
+                  (std::vector<double>{253, 2, 44, 255}));
+    }
+
+    // large enough for several threads, with rows that do not split evenly between them, and a single row (a
+    // contiguous conversion, a 1D flip) that the threads split
+    for (int threads : {1, 3})
+    {
+        tinytorch::set_num_threads(threads);
+        Tensor base =
+            tinytorch::range(0, 3 * 301 * 257 - 1, 1, TensorOptions().device(device())).reshape({3, 301, 257});
+        std::string name = std::to_string(threads) + " threads ";
+        CheckViewCopies(base, base.permute_view({2, 0, 1}), name + "permutation");
+        Tensor tv = base.permute_view({0, 2, 1});
+        CheckViewCopies(base, tv.slice_view(2, tv.size(2) - 1, -1, -1, false), name + "transposed and reversed");
+        EXPECT_EQ(tttest::to_double_vec(tinytorch::flip(tv, {2})),
+                  ViewValues(base, tv.slice_view(2, tv.size(2) - 1, -1, -1, false)))
+            << name;
+        CheckViewCopies(base, base.slice_view(1, 3, 300, 7), name + "every 7th row");
+
+        Tensor flat     = base.reshape({-1});
+        Tensor reversed = flat.slice_view(0, flat.size(0) - 1, -1, -1, false);
+        CheckViewCopies(flat, reversed, name + "1D reversed");
+        std::vector<double> flat_values = ViewValues(flat, flat);
+        EXPECT_EQ(tttest::to_double_vec(flat.to(kFloat64)), flat_values) << name;
+        tinytorch::set_num_threads(0);
+    }
+}
+
+// Sources with zero strides (a view that repeats elements), as the smallest stride of the tiled copy and as the
+// innermost stride, with one and several threads.
+TEST(TinyTorchCopyOpsCPU, ZeroStrides)
+{
+    std::vector<float> data(1200);
+    for (int i = 0; i < (int)data.size(); ++i)
+    {
+        data[i] = float(i);
+    }
+    Tensor base = tinytorch::from_blob(data.data(), {(int64_t)data.size()});
+    for (int threads : {1, 3})
+    {
+        tinytorch::set_num_threads(threads);
+        std::string name = std::to_string(threads) + " threads ";
+        CheckViewCopies(base, tinytorch::from_blob(data.data(), {64, 40, 30}, {0, 1, 40}), name + "repeated planes");
+        CheckViewCopies(base, tinytorch::from_blob(data.data(), {5, 3}, {1, 0}), name + "repeated columns");
+        CheckViewCopies(base, tinytorch::from_blob(data.data(), {300, 257}, {1, 0}), name + "repeated columns, large");
+        CheckViewCopies(base, tinytorch::from_blob(data.data(), {257, 300}, {0, 1}), name + "repeated rows, large");
+        tinytorch::set_num_threads(0);
+    }
+}
+
+// A copy between tensors of the same number of elements but different shapes goes element by element in row-major
+// order.
+TEST_P(TinyTorchCopyOps, DifferentShapes)
+{
+    Tensor a = tttest::make_tensor({1, 2, 3, 4, 5, 6}, {2, 3}, device());
+    Tensor t = a.permute_view({1, 0});
+    Tensor b = tinytorch::empty({6}, TensorOptions().device(device()));
+    tinytorch::copy(t, b, false);
+    EXPECT_EQ(tttest::to_double_vec(b), (std::vector<double>{1, 4, 2, 5, 3, 6}));
+}
+
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchFillOps);
 TEST_P(TinyTorchFillOps, Values)
 {
