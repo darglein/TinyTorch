@@ -57,10 +57,10 @@ TINYTORCH_API cudaStream_t getCUDAStream(Device device);
 TINYTORCH_API void setCUDAStreamForThisThread(cudaStream_t stream);
 
 // Destroys a stream on which tensors may have been allocated or freed. Use it instead of cudaStreamDestroy: the
-// pre-allocating allocator records events on the streams that freed its blocks (only while they exist) and must not
-// confuse a new stream that gets the same handle with this one. If the stream is the current stream of the calling
-// thread, the thread falls back to the default stream. Other threads must not have it as their current stream any
-// more. Does not throw.
+// pre-allocating allocator tells streams apart by their handle, and a new stream that gets the same handle must not be
+// mistaken for this one (it would skip waiting for the work of this stream on freed blocks). If the stream is the
+// current stream of the calling thread, the thread falls back to the default stream. Other threads must not have it
+// as their current stream any more. Does not throw.
 TINYTORCH_API cudaError_t destroyCUDAStream(cudaStream_t stream);
 
 TINYTORCH_API int getDevice();
