@@ -42,6 +42,17 @@ void setCUDAStreamForThisThread(cudaStream_t stream)
     thread_local_stream(getDevice()) = stream;
 }
 
+void resetCUDAStreamOfThisThread(cudaStream_t stream)
+{
+    for (int d = 0; d < MAX_DEVICES; ++d)
+    {
+        if (thread_local_stream(d) == stream)
+        {
+            thread_local_stream(d) = nullptr;
+        }
+    }
+}
+
 int getDevice()
 {
     int device_index;

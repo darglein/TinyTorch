@@ -4,9 +4,13 @@
  * See LICENSE file for more information.
  */
 
+#include <algorithm>
+#include <array>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <unordered_map>
+#include <vector>
 
 #include "cached_memory_allocator.h"
 #include "torch/cuda/ops_impl_cuda_helper.h"
@@ -54,19 +58,6 @@ static PerDeviceMemoryData& PinnedMemoryData()
     return *data;
 }
 
-// The free events of a block are waited on by later allocations, possibly much later. They are owned by the block
-// (not taken from getNextEvent(), whose ring buffer re-records every event after a few more calls of the same thread).
-using OwnedEvent = std::shared_ptr<CUevent_st>;
-
-static OwnedEvent RecordOwnedEvent(cudaStream_t strm)
-{
-    cudaEvent_t e;
-    TT_CHECK_CUDA_ERROR(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
-    OwnedEvent result(e, [](cudaEvent_t e) { cudaEventDestroy(e); });
-    TT_CHECK_CUDA_ERROR(cudaEventRecord(e, strm));
-    return result;
-}
-
 // Frees run in destructors (also after a CUDA error, e.g. a crashed kernel), so they must not throw
 static void LogFreeError(cudaError_t error, const char* function)
 {
@@ -77,20 +68,185 @@ static void LogFreeError(cudaError_t error, const char* function)
 }
 #define TT_LOG_FREE_ERROR(cudaFunction) LogFreeError(cudaFunction, #cudaFunction)
 
-struct PreallocBlock
-{
-    uint8_t* ptr;
-    int64_t size;
+// Stream ordering of the pre-allocated arena.
+//
+// A block freed on stream A may only be reused on stream B after A's work up to the free is done. Almost every block is
+// reused on the stream that freed it, which needs nothing. So a free records no event: it only stamps the block with
+// the number of frees of its stream so far (free_seq). An event recorded on A at any point after the free covers it, so
+// the events of a stream ("marks") are recorded lazily, when another stream takes a block. A lazy mark makes the other
+// stream wait for all work queued so far, not only up to the free, so a mark is also recorded every kFreesPerMark
+// frees, and at the free of a block of at least kEagerMarkBytes (large blocks, e.g. staging buffers, are the ones that
+// other streams take, and one event record is cheap next to their use). A mark covers every free with a stamp <= its
+// seq. Re-recording a mark only moves it later on the same stream, so a stream gets a few reused events.
+//
+// Recording a mark needs the stream: destroy streams that allocated or freed with destroyCUDAStream(), which records a
+// final mark and removes the stream, so a new stream that gets the same handle is not mistaken for it.
+// implemented in tt_cuda.cu: every device for which the stream is the current stream of this thread gets the default
+// stream
+void resetCUDAStreamOfThisThread(cudaStream_t stream);
 
-    // recorded at the moment of free()
-    // -> next usage should wait on this event
-    std::vector<std::pair<OwnedEvent, cudaStream_t>> free_events;
+static constexpr int kMarksPerStream     = 8;
+static constexpr uint64_t kFreesPerMark  = 16;
+static constexpr int64_t kEagerMarkBytes = 1024 * 1024;
+static uint64_t next_stream_state_id    = 0;
+
+struct StreamState
+{
+    struct Mark
+    {
+        cudaEvent_t event = nullptr;
+        uint64_t seq      = 0;
+    };
+
+    uint64_t id         = 0;
+    int device          = 0;
+    cudaStream_t stream = nullptr;
+    bool destroyed      = false;
+
+    uint64_t free_seq      = 0;
+    uint64_t last_mark_seq = 0;
+    bool has_mark          = false;
+    std::array<Mark, kMarksPerStream> marks;
+    int next_mark = 0;
+
+    // (id of another stream, seq of its mark this stream waited on): a later wait for an older mark is redundant
+    std::vector<std::pair<uint64_t, uint64_t>> waited;
+
+    StreamState() = default;
+    StreamState(const StreamState&) = delete;
+    StreamState& operator=(const StreamState&) = delete;
+    ~StreamState()
+    {
+        // runs when the last block stamped by a destroyed stream is taken, possibly with another device current
+        try
+        {
+            DeviceGuard dg(Device(kCUDA, device));
+            for (auto& m : marks)
+            {
+                if (m.event)
+                {
+                    TT_LOG_FREE_ERROR(cudaEventDestroy(m.event));
+                }
+            }
+        }
+        catch (const std::exception& e)
+        {
+            std::cout << "[TinyTorch] ~StreamState: " << e.what() << std::endl;
+        }
+    }
+
+    const Mark& RecordMark()
+    {
+        CHECK(!destroyed);
+        DeviceGuard dg(Device(kCUDA, device));
+        auto& m = marks[next_mark];
+        if (!m.event)
+        {
+            TT_CHECK_CUDA_ERROR(cudaEventCreateWithFlags(&m.event, cudaEventDisableTiming));
+        }
+        TT_CHECK_CUDA_ERROR(cudaEventRecord(m.event, stream));
+        m.seq         = free_seq;
+        last_mark_seq = free_seq;
+        has_mark      = true;
+        int recorded  = next_mark;
+        next_mark     = (next_mark + 1) % kMarksPerStream;
+        return marks[recorded];
+    }
+
+    // The earliest mark that covers the free with this stamp, nullptr if there is none
+    const Mark* FindMarkCovering(uint64_t stamp) const
+    {
+        const Mark* best = nullptr;
+        for (auto& m : marks)
+        {
+            if (m.event && m.seq >= stamp && (!best || m.seq < best->seq))
+            {
+                best = &m;
+            }
+        }
+        return best;
+    }
+
+    // Makes this stream wait until the free with this stamp on the other stream is done. Returns false if the stamp is
+    // no longer needed by anyone: its stream was destroyed and its work is done. Without that, a block that many
+    // short-lived streams freed next to (e.g. the tail of the arena) would collect stamps for the whole run.
+    bool WaitFor(StreamState& other, uint64_t stamp)
+    {
+        const Mark* m = other.FindMarkCovering(stamp);
+        if (other.destroyed)
+        {
+            if (!m)
+            {
+                // the final mark failed after a CUDA error; this throws that error, or the work of the stream is done
+                TT_CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+                return false;
+            }
+            cudaError_t query = cudaEventQuery(m->event);
+            if (query == cudaSuccess)
+            {
+                return false;
+            }
+            if (query == cudaErrorNotReady && cudaPeekAtLastError() == cudaErrorNotReady)
+            {
+                // not an error, the application must not see it in a later cudaGetLastError()
+                (void)cudaGetLastError();
+            }
+            // No entry in waited: no stream can free under this id any more, the entry would only grow the list
+            TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(stream, m->event));
+            return true;
+        }
+        if (!m)
+        {
+            m = &other.RecordMark();
+        }
+        for (auto& w : waited)
+        {
+            if (w.first == other.id)
+            {
+                if (w.second < m->seq)
+                {
+                    TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(stream, m->event));
+                    w.second = m->seq;
+                }
+                return true;
+            }
+        }
+        TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(stream, m->event));
+        waited.push_back({other.id, m->seq});
+        return true;
+    }
 };
 
-bool operator<(const PreallocBlock& lhs, const PreallocBlock& rhs)
+// The newest free stamp of every stream that freed (a part of) the block. Stream order makes older stamps of the same
+// stream redundant, so this holds at most one entry per stream.
+using Stamps = std::vector<std::pair<std::shared_ptr<StreamState>, uint64_t>>;
+
+static void MergeStamps(Stamps& dst, const Stamps& src)
 {
-    return std::make_pair(lhs.ptr, lhs.size) < std::make_pair(rhs.ptr, rhs.size);
+    for (auto& s : src)
+    {
+        bool found = false;
+        for (auto& d : dst)
+        {
+            if (d.first == s.first)
+            {
+                d.second = std::max(d.second, s.second);
+                found    = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            dst.push_back(s);
+        }
+    }
 }
+
+struct PreallocFreeBlock
+{
+    int64_t size;
+    Stamps stamps;
+};
 
 struct PreallocPerDeviceMemoryData
 {
@@ -98,8 +254,11 @@ struct PreallocPerDeviceMemoryData
     int64_t full_size       = 0;
     int64_t full_alloc_info = 0;
     int64_t reserved_bytes  = 0;
-    std::vector<PreallocBlock> free_blocks;
-    std::vector<PreallocBlock> alloc_blocks;
+    // ordered by address: first fit, and merging with the neighbors on free
+    std::map<uint8_t*, PreallocFreeBlock> free_blocks;
+    int64_t free_bytes = 0;
+    std::unordered_map<void*, int64_t> alloc_blocks;
+    std::unordered_map<cudaStream_t, std::shared_ptr<StreamState>> streams;
 };
 
 static PreallocPerDeviceMemoryData& PreallocDeviceData(int device_id)
@@ -256,49 +415,17 @@ static void* malloc_async(int64_t size, int device_id)
     return ptr;
 }
 
-static void CleanFreeList(int device_id)
+static const std::shared_ptr<StreamState>& GetStreamState(int device_id, cudaStream_t strm)
 {
-    auto& data = PreallocDeviceData(device_id);
-
-    std::sort(data.free_blocks.begin(), data.free_blocks.end());
-
-
-    for (int i = 1; i < data.free_blocks.size(); i++)
+    auto& ptr = PreallocDeviceData(device_id).streams[strm];
+    if (!ptr)
     {
-        auto& b0 = data.free_blocks[i - 1];
-        auto& b1 = data.free_blocks[i];
-
-        // merge b0 into b1 ( b0 will be empty)
-        if (b0.size > 0 && b0.ptr + b0.size == b1.ptr)
-        {
-            // std::cout << "merge " << (void*)data.free_blocks[i - 1].first << " + " <<
-            // (void*)data.free_blocks[i].first
-            //     << std::endl;
-            // merge from (i-1) -> i
-            b1.ptr = b0.ptr;
-            b1.size += b0.size;
-            b0.size = 0;
-
-            b1.free_events.insert(b1.free_events.end(), b0.free_events.begin(), b0.free_events.end());
-            b0.free_events.clear();
-
-            // if (b0.last_stream != b1.last_stream)
-            {
-                // auto finished_event = getNextEvent();
-                // cudaEventRecord(finished_event, b0.last_stream);
-                // cudaStreamWaitEvent(b1.last_stream, finished_event);
-            }
-        }
+        ptr         = std::make_shared<StreamState>();
+        ptr->id     = next_stream_state_id++;
+        ptr->device = device_id;
+        ptr->stream = strm;
     }
-
-    // remove empty free blocks
-    data.free_blocks.erase(
-        std::remove_if(data.free_blocks.begin(), data.free_blocks.end(), [](auto pair) { return pair.size == 0; }),
-        data.free_blocks.end());
-
-    // std::cout << "prefree " << ptr
-    // << " free size: "
-    // << data.free_blocks.size() << std::endl;
+    return ptr;
 }
 
 static void* premalloc(int64_t initial_size, int device_id)
@@ -306,121 +433,101 @@ static void* premalloc(int64_t initial_size, int device_id)
     int64_t size = iAlignUp(initial_size, prealloc_alignment);
     auto& data   = PreallocDeviceData(device_id);
 
-
-
+    if (data.free_bytes - size < data.reserved_bytes)
     {
-        int64_t free_size = 0;
-        for (auto& b : data.free_blocks)
-        {
-            free_size += b.size;
-        }
-
-        if (free_size - size < data.reserved_bytes)
-        {
-            return nullptr;
-        }
-    }
-    auto strm        = getCurrentCUDAStream();
-    void* result_ptr = nullptr;
-
-    // std::cout << "premalloc " << initial_size << " free " <<  prealloc_free_memory()  << std::endl;
-    for (auto& f : data.free_blocks)
-    {
-        // std::cout << "free " << f.size << std::endl;
-        if (f.size >= size)
-        {
-            auto remaining = f.size - size;
-            if (remaining < 1024 * 8 && remaining > 0)
-            {
-                // std::cout << "free block small " << remaining << std::endl;
-                // use complete block if the free block would be too small to avoid fragmentation
-                size = f.size;
-            }
-
-            for (auto& e : f.free_events)
-            {
-                if (e.second != strm)
-                {
-                    // only wait if stream different
-                    TT_CHECK_CUDA_ERROR(cudaStreamWaitEvent(strm, e.first.get()));
-                }
-            }
-
-            if (f.free_events.size() > 1)
-            {
-                // replace the large event list of the free block by just one event on the current stream,
-                // beecause we have just waited on all events
-                f.free_events.clear();
-                f.free_events.push_back({RecordOwnedEvent(strm), strm});
-            }
-
-
-            auto return_ptr = f.ptr;
-
-            PreallocBlock out_block;
-            out_block.ptr  = return_ptr;
-            out_block.size = size;
-            out_block.free_events.clear();
-
-            data.alloc_blocks.emplace_back(out_block);
-            f.ptr += size;
-            f.size -= size;
-
-            // make sure the pointer is really aligned
-            CHECK_EQ(((uintptr_t)return_ptr) % prealloc_alignment, 0);
-
-            // make sure remaining size is also aligned
-            CHECK_EQ(f.size % prealloc_alignment, 0);
-
-
-
-            // std::cout << "premalloc " << (void*)return_ptr << " " << (size / (1024.0 * 1024)) << "MiB" << " free
-            // size: "
-            // << data.free_blocks.size() << std::endl;
-            result_ptr = return_ptr;
-            break;
-        }
+        return nullptr;
     }
 
-    CleanFreeList(device_id);
-    return result_ptr;
+    for (auto it = data.free_blocks.begin(); it != data.free_blocks.end(); ++it)
+    {
+        auto& f = it->second;
+        if (f.size < size)
+        {
+            continue;
+        }
+        auto remaining = f.size - size;
+        if (remaining < 1024 * 8 && remaining > 0)
+        {
+            // use complete block if the free block would be too small to avoid fragmentation
+            size      = f.size;
+            remaining = 0;
+        }
+
+        auto& state = *GetStreamState(device_id, getCUDAStream(Device(kCUDA, device_id)));
+        Stamps kept;
+        for (auto& [other, stamp] : f.stamps)
+        {
+            if (other.get() == &state || state.WaitFor(*other, stamp))
+            {
+                kept.push_back({other, stamp});
+            }
+        }
+
+        uint8_t* return_ptr = it->first;
+        if (remaining > 0)
+        {
+            // the remainder keeps its stamps: they are still valid for any later user
+            data.free_blocks.emplace_hint(std::next(it), return_ptr + size,
+                                          PreallocFreeBlock{remaining, std::move(kept)});
+        }
+        data.free_blocks.erase(it);
+        data.free_bytes -= size;
+        data.alloc_blocks.emplace(return_ptr, size);
+
+        // make sure the pointer is really aligned
+        CHECK_EQ(((uintptr_t)return_ptr) % prealloc_alignment, 0);
+        // make sure remaining size is also aligned
+        CHECK_EQ(remaining % prealloc_alignment, 0);
+        return return_ptr;
+    }
+    return nullptr;
 }
 
 static void prefree(void* ptr, int device_id)
 {
-    auto& data         = PreallocDeviceData(device_id);
-    int alloc_block_id = -1;
-    for (int i = 0; i < data.alloc_blocks.size(); i++)
+    auto& data = PreallocDeviceData(device_id);
+    auto a     = data.alloc_blocks.find(ptr);
+    CHECK(a != data.alloc_blocks.end());
+    int64_t size = a->second;
+    data.alloc_blocks.erase(a);
+
+    PreallocFreeBlock block{size, {}};
+    try
     {
-        if (data.alloc_blocks[i].ptr == ptr)
+        auto state = GetStreamState(device_id, getCUDAStream(Device(kCUDA, device_id)));
+        state->free_seq++;
+        block.stamps.push_back({state, state->free_seq});
+        if (!state->has_mark || size >= kEagerMarkBytes || state->free_seq - state->last_mark_seq >= kFreesPerMark)
         {
-            alloc_block_id = i;
-            break;
+            state->RecordMark();
         }
     }
-
-
-    // std::cout << "prefree " << data.alloc_blocks[alloc_block_id].size << " free " <<  prealloc_free_memory()  <<
-    // std::endl;
-
-    CHECK_GE(alloc_block_id, 0);
-
+    catch (const std::exception& e)
     {
-        DeviceGuard dg(Device(kCUDA, device_id));
-        auto strm = getCurrentCUDAStream();
-        try
+        // only fails after a CUDA error, then the device can't be used anyway
+        std::cout << "[TinyTorch] free: " << e.what() << std::endl;
+    }
+
+    auto it = data.free_blocks.emplace((uint8_t*)ptr, std::move(block)).first;
+    data.free_bytes += size;
+
+    auto next = std::next(it);
+    if (next != data.free_blocks.end() && it->first + it->second.size == next->first)
+    {
+        it->second.size += next->second.size;
+        MergeStamps(it->second.stamps, next->second.stamps);
+        data.free_blocks.erase(next);
+    }
+    if (it != data.free_blocks.begin())
+    {
+        auto prev = std::prev(it);
+        if (prev->first + prev->second.size == it->first)
         {
-            data.alloc_blocks[alloc_block_id].free_events.push_back({RecordOwnedEvent(strm), strm});
-        }
-        catch (const std::exception& e)
-        {
-            // only fails after a CUDA error, then the device can't be used anyway
-            std::cout << "[TinyTorch] free: " << e.what() << std::endl;
+            prev->second.size += it->second.size;
+            MergeStamps(prev->second.stamps, it->second.stamps);
+            data.free_blocks.erase(it);
         }
     }
-    data.free_blocks.emplace_back(data.alloc_blocks[alloc_block_id]);
-    data.alloc_blocks.erase(data.alloc_blocks.begin() + alloc_block_id);
-    CleanFreeList(device_id);
 }
 
 static void free_async(void* ptr)
@@ -558,10 +665,11 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
         auto& d = DeviceData(device_id);
         CHECK(d.allocated_blocks.find(ptr) != d.allocated_blocks.end());
         size = d.allocated_blocks.find(ptr)->second;
-
-
-        d.current_allocated_bytes -= size;
         d.allocated_blocks.erase(ptr);
+        if (algo != AllocatorAlgorithm::CUDA_MALLOC)
+        {
+            d.current_allocated_bytes -= size;
+        }
     }
 
 
@@ -570,19 +678,14 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
     {
         free_async(ptr);
     }
-    else if (algo == AllocatorAlgorithm::CUDA_MALLOC)
-    {
-        free_blocking(ptr);
-    }
     else if (algo == AllocatorAlgorithm::CUDA_PRE_ALLOCATE)
     {
         prefree(ptr, device_id);
     }
     else
     {
-        CHECK(false);
+        CHECK(algo == AllocatorAlgorithm::CUDA_MALLOC);
     }
-
 
     if (log_level >= 3 || (log_level >= 2 && size >= log_level_size_th))
     {
@@ -597,6 +700,17 @@ void cuda_cached_free(void* ptr, uint64_t alloc_info, int device_id)
             std::cout << " #free: " << PreallocDeviceData(device_id).free_blocks.size();
         }
         std::cout << std::endl;
+    }
+
+    if (algo == AllocatorAlgorithm::CUDA_MALLOC)
+    {
+        // The synchronization waits for all work of the device, other threads must not wait for it on the lock (unless
+        // the caller holds it too, the mutex is recursive). The memory can't be handed out again before cudaFree, so
+        // the block is already forgotten; it still counts as allocated until it is freed.
+        l.unlock();
+        free_blocking(ptr);
+        l.lock();
+        DeviceData(device_id).current_allocated_bytes -= size;
     }
 }
 
@@ -715,9 +829,11 @@ int64_t pre_allocate_vram(int64_t requested)
 
 
     // an arena from cudaMallocAsync is stream ordered: it may reuse memory that pending work on the current stream
-    // still uses, so allocations of its blocks on other streams wait for this event
-    auto strm = getCurrentCUDAStream();
-    data.free_blocks.push_back({data.full_ptr, data.full_size, {{RecordOwnedEvent(strm), strm}}});
+    // still uses, so the arena is stamped like a block freed on the current stream
+    auto state = GetStreamState(device_id, getCUDAStream(Device(kCUDA, device_id)));
+    state->free_seq++;
+    data.free_blocks.emplace(data.full_ptr, PreallocFreeBlock{data.full_size, {{state, state->free_seq}}});
+    data.free_bytes = data.full_size;
 
     if (log_level > 3)
     {
@@ -742,18 +858,54 @@ void free_preallocate_vram()
             std::cout << "free_preallocate_vram\n";
         }
         // work on any stream may still use (already freed) blocks of the arena
-        for (auto& block : data.free_blocks)
-        {
-            for (auto& e : block.free_events)
-            {
-                TT_LOG_FREE_ERROR(cudaEventSynchronize(e.first.get()));
-            }
-        }
+        TT_LOG_FREE_ERROR(cudaDeviceSynchronize());
         cuda_cached_free(data.full_ptr, data.full_alloc_info, device_id);
-        data.full_ptr  = nullptr;
-        data.full_size = 0;
+        data.full_ptr   = nullptr;
+        data.full_size  = 0;
+        data.free_bytes = 0;
         data.free_blocks.clear();
     }
+}
+
+cudaError_t destroyCUDAStream(cudaStream_t stream)
+{
+    // Under the lock: an allocation of another thread must not register the handle again between the final mark and
+    // the destruction.
+    std::unique_lock l(mu);
+    // a free of this thread after the destruction must not register the dead handle again
+    resetCUDAStreamOfThisThread(stream);
+    for (int device_id = 0; device_id < MAX_DEVICES; ++device_id)
+    {
+        auto& streams = PreallocDeviceData(device_id).streams;
+        auto it       = streams.find(stream);
+        if (it == streams.end())
+        {
+            continue;
+        }
+        auto& state = *it->second;
+        try
+        {
+            // blocks freed on this stream are still stamped with it: a final mark covers all its frees
+            if (!state.has_mark || state.last_mark_seq < state.free_seq)
+            {
+                state.RecordMark();
+            }
+        }
+        catch (const std::exception& e)
+        {
+            // only fails after a CUDA error, then the device can't be used anyway
+            std::cout << "[TinyTorch] destroyCUDAStream: " << e.what() << std::endl;
+        }
+        state.destroyed = true;
+        uint64_t id     = state.id;
+        streams.erase(it);
+        for (auto& [handle, other] : streams)
+        {
+            auto& w = other->waited;
+            w.erase(std::remove_if(w.begin(), w.end(), [id](const auto& e) { return e.first == id; }), w.end());
+        }
+    }
+    return cudaStreamDestroy(stream);
 }
 
 int64_t prealloc_free_list_size()
@@ -768,13 +920,7 @@ int64_t prealloc_free_memory()
 {
     std::unique_lock l(mu);
     auto device_id = getDevice();
-    auto& data     = PreallocDeviceData(device_id);
-    int64_t sum    = 0;
-    for (auto& b : data.free_blocks)
-    {
-        sum += b.size;
-    }
-    return sum;
+    return PreallocDeviceData(device_id).free_bytes;
 }
 void prealloc_print_debug_line()
 {
