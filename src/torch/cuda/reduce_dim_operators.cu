@@ -44,6 +44,13 @@ constexpr int64_t REDUCE_MAX_SPLITS       = 1024;
 constexpr int64_t REDUCE_TARGET_BLOCKS  = 1024;
 constexpr int64_t REDUCE_TARGET_THREADS = 256 * 1024;
 
+// ceil(a / b) in 64 bit: iDivUp returns uint32_t, which truncates the split length of huge views and the grid size
+// that the launcher checks
+TT_HD constexpr int64_t reduce_div_up(int64_t a, int64_t b)
+{
+    return (a + b - 1) / b;
+}
+
 // Writes the reduced value of one (output, split) pair: the result if the reduction is not split, else its partial.
 template <typename InputType, typename AccType, int MAX_DIMS>
 __device__ inline void dimensional_reduce_store(TensorInfoCuda<InputType, MAX_DIMS>& result, AccType* partials,
@@ -72,7 +79,7 @@ static __global__ void dimensional_reduce_thread(TensorInfoCuda<InputType, MAX_D
     using IndexType          = typename TensorInfoCuda<InputType, MAX_DIMS>::IndexType;
     IndexType size_to_reduce = a.size(dim);
     IndexType num_outputs    = a.numel() / size_to_reduce;
-    IndexType split_length   = iDivUp(size_to_reduce, (IndexType)num_splits);
+    IndexType split_length   = reduce_div_up(size_to_reduce, num_splits);
 
     IndexType output = (IndexType)threadIdx.x + (IndexType)blockIdx.x * (IndexType)blockDim.x;
     IndexType split  = blockIdx.y;
@@ -106,7 +113,7 @@ static __global__ void dimensional_reduce(TensorInfoCuda<InputType, MAX_DIMS> a,
     using IndexType          = typename TensorInfoCuda<InputType, MAX_DIMS>::IndexType;
     IndexType size_to_reduce = a.size(dim);
     IndexType num_outputs    = a.numel() / size_to_reduce;
-    IndexType split_length   = iDivUp(size_to_reduce, (IndexType)num_splits);
+    IndexType split_length   = reduce_div_up(size_to_reduce, num_splits);
     IndexType num_work       = num_outputs * (IndexType)num_splits;
     IndexType stride         = a.strides[dim];
 
@@ -163,7 +170,7 @@ static __global__ void dimensional_reduce_partials(const AccType* partials, int6
 static int64_t reduce_num_splits(int64_t num_outputs, int64_t size_to_reduce, int64_t target_work,
                                  int64_t min_split_length)
 {
-    int64_t wanted        = iDivUp(target_work, num_outputs);
+    int64_t wanted        = reduce_div_up(target_work, num_outputs);
     int64_t max_by_length = std::max<int64_t>(size_to_reduce / min_split_length, 1);
     return std::clamp<int64_t>(std::min(wanted, max_by_length), 1, REDUCE_MAX_SPLITS);
 }
@@ -206,8 +213,9 @@ void dimensional_reduce_launcher_size_dim(TensorInfoCuda<InputType, MAX_DIMS> a,
     {
         // few outputs (e.g. 3 columns summed over a million rows) would leave most threads of a full block idle
         int64_t block_size = std::min<int64_t>(REDUCE_BLOCK_SIZE, iAlignUp(num_outputs, int64_t(32)));
-        CHECK_LE(iDivUp(num_outputs, block_size), int64_t(std::numeric_limits<int32_t>::max()));
-        dim3 grid(iDivUp(num_outputs, block_size), num_splits);
+        int64_t num_blocks = reduce_div_up(num_outputs, block_size);
+        CHECK_LE(num_blocks, int64_t(std::numeric_limits<int32_t>::max()));
+        dim3 grid(num_blocks, num_splits);
         dimensional_reduce_thread<InputType, AccType, Op, MAX_DIMS, REDUCE_DIM><<<grid, block_size, 0, stream>>>(
             a, dim, result, partials_ptr, num_splits, Op(), Op::template default_value<AccType>());
     }
