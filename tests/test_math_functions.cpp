@@ -70,6 +70,96 @@ TEST_P(TinyTorchSumDim, WithAndWithoutKeepDim)
     TT_EXPECT_CLOSE(s12, tttest::make_tensor({21}, {1, 1}, device()), 1e-5, 1e-6);
 }
 
+// Long and short reductions, along the innermost and outer dimensions, of contiguous and transposed tensors. The
+// values are multiples of 0.25 whose sums stay exact in float, so every summation order gives the same result.
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchSumDimShapes);
+TEST_P(TinyTorchSumDimShapes, MatchesReference)
+{
+    struct Case
+    {
+        SizeType sizes;
+        int64_t dim;
+        bool transpose_01;
+    };
+    std::vector<Case> cases = {
+        {{1, 1000000}, 1, false}, {{3, 700001}, 1, false},    {{700001, 3}, 0, false}, {{2000, 1000}, 0, false},
+        {{2000, 1000}, 1, false}, {{4, 100000, 5}, 1, false}, {{100000, 7}, 1, false}, {{1000, 3000}, 0, true},
+        {{1000, 3000}, 1, true},  {{1, 33}, 1, false},        {{5, 1}, 1, false},
+        // more (output, split) pairs than blocks: the grid-stride loop of the block-wide reduction
+        {{5000, 1000}, 1, false},
+        // a long reduction over a dimension without its own kernel instantiation
+        {{2, 3, 200000}, 2, false}, {{2, 3, 4, 50000}, 2, false},
+    };
+    for (const auto& c : cases)
+    {
+        int64_t n = 1;
+        for (int64_t i = 0; i < c.sizes.size(); ++i) n *= c.sizes[i];
+        std::vector<float> data(n);
+        for (int64_t i = 0; i < n; ++i) data[i] = float((i * 7919) % 8) * 0.25f;
+
+        Tensor a_cpu = tttest::make_tensor(data, c.sizes, kCPU);
+        Tensor a     = tttest::make_tensor(data, c.sizes, device());
+        if (c.transpose_01)
+        {
+            a_cpu = a_cpu.transpose(0, 1);
+            a     = a.transpose(0, 1);
+        }
+
+        // reference: accumulate in double over the logical indices of the (possibly transposed) cpu tensor
+        Tensor a_ref   = a_cpu.contiguous();
+        auto ref_sizes = a_ref.sizes();
+        int64_t inner  = 1;
+        for (int64_t i = c.dim + 1; i < a_ref.dim(); ++i) inner *= ref_sizes[i];
+        int64_t len      = ref_sizes[c.dim];
+        int64_t outer    = a_ref.numel() / (inner * len);
+        const float* ptr = a_ref.data_ptr<float>();
+        std::vector<float> expected(outer * inner);
+        for (int64_t o = 0; o < outer; ++o)
+        {
+            for (int64_t i = 0; i < inner; ++i)
+            {
+                double sum = 0;
+                for (int64_t k = 0; k < len; ++k) sum += ptr[(o * len + k) * inner + i];
+                expected[o * inner + i] = float(sum);
+            }
+        }
+        auto out_sizes   = a_ref.sizes();
+        out_sizes[c.dim] = 1;
+
+        Tensor s = tinytorch::sum(a, c.dim, true);
+        TT_EXPECT_CLOSE(s, tttest::make_tensor(expected, out_sizes, device()), 0, 0)
+            << "sizes " << c.sizes << " dim " << c.dim << " transposed " << c.transpose_01;
+    }
+}
+
+// Split reductions of the other value types and ops: half accumulates in float, integers in int64.
+TT_INSTANTIATE_DEVICE_TESTS(TinyTorchReduceDimTypes);
+TEST_P(TinyTorchReduceDimTypes, HalfIntAndProd)
+{
+    const int64_t n = 20000;
+    std::vector<float> data(n), signs(n);
+    double half_sum      = 0;
+    int64_t num_negative = 0;
+    for (int64_t i = 0; i < n; ++i)
+    {
+        data[i]  = float((i * 7919) % 4) * 0.5f;
+        signs[i] = (i * 31) % 7 == 0 ? -1.f : 1.f;
+        half_sum += data[i];
+        num_negative += signs[i] < 0;
+    }
+
+    Tensor h  = tttest::make_tensor(data, {1, n}, device(), tinytorch::kHalf);
+    Tensor sh = tinytorch::sum(h, 1, true).to(kFloat);
+    TT_EXPECT_CLOSE(sh, tttest::make_tensor({half_sum}, {1, 1}, device()), 1e-3, 0);
+
+    Tensor i32 = (tttest::make_tensor(data, {1, n}, device()) * 4).to(tinytorch::kInt32);
+    Tensor si  = tinytorch::sum(i32, 1, true).to(kFloat);
+    TT_EXPECT_CLOSE(si, tttest::make_tensor({4 * half_sum}, {1, 1}, device()), 0, 0);
+
+    Tensor p = tinytorch::prod(tttest::make_tensor(signs, {n, 1}, device()), 0, true);
+    TT_EXPECT_CLOSE(p, tttest::make_tensor({num_negative % 2 ? -1.0 : 1.0}, {1, 1}, device()), 0, 0);
+}
+
 TT_INSTANTIATE_DEVICE_TESTS(TinyTorchSumGradient);
 TEST_P(TinyTorchSumGradient, GlobalAndDim)
 {
