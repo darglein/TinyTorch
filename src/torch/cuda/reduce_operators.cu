@@ -71,8 +71,8 @@ void global_reduce_launcher(TensorInfoCuda<InputType> a, Tensor result, Op op, T
     }
     auto stream         = cuda::getCurrentCUDAStream();
     OutputType* partial_ptr = partial.data_ptr<OutputType>();
-    global_reduce<InputType, OutputType, Op>
-        <<<n_blocks, REDUCE_BLOCK_SIZE, 0, stream>>>(a, op, Op::template default_value<OutputType>(), partial_ptr);
+    global_reduce<InputType, OutputType, Op><<<(unsigned int)n_blocks, REDUCE_BLOCK_SIZE, 0, stream>>>(
+        a, op, Op::template default_value<OutputType>(), partial_ptr);
     reduce_partial<OutputType, Op>
         <<<1, REDUCE_BLOCK_SIZE, 0, stream>>>(partial_ptr, n_blocks, TensorInfoCuda<OutputType>(result), op,
                                                Op::template default_value<OutputType>());

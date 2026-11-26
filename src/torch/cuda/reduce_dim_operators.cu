@@ -206,8 +206,8 @@ void dimensional_reduce_launcher_size_dim(TensorInfoCuda<InputType, MAX_DIMS> a,
     {
         int64_t num_blocks = std::min(num_outputs * num_splits, int64_t(1024) * 1024 / REDUCE_BLOCK_SIZE);
         dimensional_reduce<InputType, AccType, Op, REDUCE_BLOCK_SIZE, MAX_DIMS, REDUCE_DIM>
-            <<<num_blocks, REDUCE_BLOCK_SIZE, 0, stream>>>(a, dim, result, partials_ptr, num_splits, Op(),
-                                                           Op::template default_value<AccType>());
+            <<<(unsigned int)num_blocks, REDUCE_BLOCK_SIZE, 0, stream>>>(a, dim, result, partials_ptr, num_splits, Op(),
+                                                                         Op::template default_value<AccType>());
     }
     else
     {
@@ -215,9 +215,10 @@ void dimensional_reduce_launcher_size_dim(TensorInfoCuda<InputType, MAX_DIMS> a,
         int64_t block_size = std::min<int64_t>(REDUCE_BLOCK_SIZE, iAlignUp(num_outputs, int64_t(32)));
         int64_t num_blocks = reduce_div_up(num_outputs, block_size);
         CHECK_LE(num_blocks, int64_t(std::numeric_limits<int32_t>::max()));
-        dim3 grid(num_blocks, num_splits);
-        dimensional_reduce_thread<InputType, AccType, Op, MAX_DIMS, REDUCE_DIM><<<grid, block_size, 0, stream>>>(
-            a, dim, result, partials_ptr, num_splits, Op(), Op::template default_value<AccType>());
+        dim3 grid((unsigned int)num_blocks, (unsigned int)num_splits);
+        dimensional_reduce_thread<InputType, AccType, Op, MAX_DIMS, REDUCE_DIM>
+            <<<grid, (unsigned int)block_size, 0, stream>>>(a, dim, result, partials_ptr, num_splits, Op(),
+                                                            Op::template default_value<AccType>());
     }
     CUDA_SYNC_CHECK_ERROR();
 
@@ -225,8 +226,8 @@ void dimensional_reduce_launcher_size_dim(TensorInfoCuda<InputType, MAX_DIMS> a,
     {
         int64_t num_blocks = std::min(num_outputs, int64_t(1024) * 1024 / REDUCE_BLOCK_SIZE);
         dimensional_reduce_partials<InputType, AccType, Op, REDUCE_BLOCK_SIZE, MAX_DIMS>
-            <<<num_blocks, REDUCE_BLOCK_SIZE, 0, stream>>>(partials_ptr, num_outputs, num_splits, result, Op(),
-                                                           Op::template default_value<AccType>());
+            <<<(unsigned int)num_blocks, REDUCE_BLOCK_SIZE, 0, stream>>>(partials_ptr, num_outputs, num_splits, result,
+                                                                         Op(), Op::template default_value<AccType>());
         CUDA_SYNC_CHECK_ERROR();
     }
 }
@@ -436,8 +437,9 @@ void dimensional_scan_launcher(TensorInfoCuda<InputType> a, int64_t dim, TensorI
     int64_t num_blocks_to_reduce = a.numel() / size_to_reduce;
     int64_t num_blocks           = std::min(num_blocks_to_reduce, int64_t(1024) * 1024 / REDUCE_BLOCK_SIZE);
 
-    dimensional_scan<InputType, AccType, Op><<<num_blocks, REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
-        a, dim, result, Op(), Op::template default_value<AccType>());
+    dimensional_scan<InputType, AccType, Op>
+        <<<(unsigned int)num_blocks, REDUCE_BLOCK_SIZE, 0, cuda::getCurrentCUDAStream()>>>(
+            a, dim, result, Op(), Op::template default_value<AccType>());
     CUDA_SYNC_CHECK_ERROR();
 }
 

@@ -127,7 +127,7 @@ template <typename T, typename ComputeType>
 static void ReduceToDevice0Launcher(std::vector<Tensor> grads)
 {
     CheckUVATensors(grads);
-    int num_gpus  = grads.size();
+    int num_gpus  = (int)grads.size();
     int64_t numel = grads[0].numel();
     if (numel == 0)
     {
